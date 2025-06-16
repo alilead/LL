@@ -1,0 +1,117 @@
+from datetime import datetime, timedelta
+from typing import Any, Union, Optional
+from jose import jwt
+from passlib.context import CryptContext
+from app.core.config import settings
+from fastapi import HTTPException
+from app import models
+from cryptography.fernet import Fernet
+import base64
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    try:
+        logger.debug(f"Password verification starting (hash length: {len(hashed_password)})")
+        result = pwd_context.verify(plain_password, hashed_password)
+        logger.debug(f"Password verification completed: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"Password verification error: {str(e)}")
+        # Hata durumunda False döndürerek authentication'ın güvenli bir şekilde başarısız olmasını sağla
+        return False
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+# JWT token functions
+def create_access_token(
+    subject: Union[str, Any],
+    expires_delta: Optional[timedelta] = None,
+    organization_id: Optional[int] = None
+) -> str:
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(
+            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        )
+    
+    to_encode = {
+        "exp": expire,
+        "sub": str(subject),
+        "organization_id": organization_id
+    }
+    
+    try:
+        encoded_jwt = jwt.encode(
+            to_encode,
+            settings.SECRET_KEY,
+            algorithm=settings.ALGORITHM
+        )
+        return encoded_jwt
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error creating access token: {str(e)}"
+        )
+
+def check_permission(user: models.User, entity_type: str, entity_id: int, db_obj: Any = None) -> bool:
+    """
+    Check if user has permission to access an entity.
+    """
+    # Superuser has all permissions
+    if user.is_superuser:
+        return True
+    
+    # Check organization match
+    if hasattr(db_obj, 'organization_id'):
+        if db_obj.organization_id != user.organization_id:
+            raise HTTPException(
+                status_code=403,
+                detail="You don't have permission to access this resource"
+            )
+    
+    # Check ownership
+    if hasattr(db_obj, 'user_id'):
+        if db_obj.user_id != user.id and not user.is_superuser:
+            raise HTTPException(
+                status_code=403,
+                detail="You don't have permission to access this resource"
+            )
+    
+    return True
+
+class TokenEncryption:
+    def __init__(self):
+        try:
+            # Generate or load encryption key
+            key = settings.TOKEN_ENCRYPTION_KEY.encode()
+            # Ensure the key is properly padded for Fernet
+            key_base64 = base64.b64encode(key.ljust(32)[:32])
+            self.cipher = Fernet(key_base64)
+        except Exception as e:
+            logger.error(f"Failed to initialize token encryption: {str(e)}")
+            raise
+
+    def encrypt_token(self, token: str) -> str:
+        """Encrypt a token using Fernet symmetric encryption"""
+        try:
+            return self.cipher.encrypt(token.encode()).decode()
+        except Exception as e:
+            logger.error(f"Token encryption failed: {str(e)}")
+            raise
+
+    def decrypt_token(self, encrypted_token: str) -> str:
+        """Decrypt an encrypted token"""
+        try:
+            return self.cipher.decrypt(encrypted_token.encode()).decode()
+        except Exception as e:
+            logger.error(f"Token decryption failed: {str(e)}")
+            raise
+
+token_encryption = TokenEncryption()
