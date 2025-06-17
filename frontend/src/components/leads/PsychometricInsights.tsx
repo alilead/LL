@@ -70,19 +70,19 @@ interface PsychometricData {
     closing_technique: string;
     objection_handling: string;
     follow_up_style: string;
-    meeting_recommendations: {
+    meeting_recommendations?: {
       optimal_duration: string;
       best_time: string;
       preparation_tips: string[];
       agenda_style: string;
     };
-    email_guidelines: {
+    email_guidelines?: {
       subject_line_style: string;
       message_length: string;
       tone: string;
       call_to_action: string;
     };
-    negotiation_strategy: {
+    negotiation_strategy?: {
       approach: string;
       concession_strategy: string;
       decision_timeline: string;
@@ -366,6 +366,19 @@ const PsychometricInsights: React.FC<PsychometricInsightsProps> = ({ leadId, lea
     );
   };
 
+  // SafeGuards: psychometricData ve sales_intelligence kontrolü
+  const sales_intelligence = psychometricData?.sales_intelligence || {};
+  const meeting_recommendations = (sales_intelligence as any).meeting_recommendations || {};
+  const email_guidelines = (sales_intelligence as any).email_guidelines || {};
+  const negotiation_strategy = (sales_intelligence as any).negotiation_strategy || {};
+  const combined_insights = psychometricData?.combined_insights || {};
+
+  useEffect(() => {
+    if (leadId && !hasAnalyzed) {
+      loadPsychometricData();
+    }
+  }, [leadId]);
+
   if (loading) {
     return (
       <Card>
@@ -450,7 +463,7 @@ const PsychometricInsights: React.FC<PsychometricInsightsProps> = ({ leadId, lea
     );
   }
 
-  const { combined_insights, sales_intelligence, confidence_score } = psychometricData;
+  const { confidence_score } = psychometricData;
   const confidenceLevel = getConfidenceLevel(confidence_score);
 
   return (
@@ -598,15 +611,15 @@ const PsychometricInsights: React.FC<PsychometricInsightsProps> = ({ leadId, lea
                   <div className="space-y-3">
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="text-sm font-medium mb-1">Subject Line:</div>
-                      <div className="text-sm text-gray-700">{sales_intelligence.email_guidelines.subject_line_style}</div>
+                      <div className="text-sm text-gray-700">{email_guidelines?.subject_line_style || 'Not available'}</div>
                     </div>
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="text-sm font-medium mb-1">Message Length:</div>
-                      <div className="text-sm text-gray-700">{sales_intelligence.email_guidelines.message_length}</div>
+                      <div className="text-sm text-gray-700">{email_guidelines?.message_length || 'Not available'}</div>
                     </div>
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="text-sm font-medium mb-1">Tone:</div>
-                      <div className="text-sm text-gray-700">{sales_intelligence.email_guidelines.tone}</div>
+                      <div className="text-sm text-gray-700">{email_guidelines?.tone || 'Not available'}</div>
                     </div>
                   </div>
                 </div>
@@ -621,27 +634,27 @@ const PsychometricInsights: React.FC<PsychometricInsightsProps> = ({ leadId, lea
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="p-4 bg-green-50 rounded-lg">
                     <div className="font-medium text-green-800 mb-2">Optimal Duration</div>
-                    <div className="text-sm text-green-700">{sales_intelligence.meeting_recommendations.optimal_duration}</div>
+                    <div className="text-sm text-green-700">{meeting_recommendations?.optimal_duration || 'Not available'}</div>
                   </div>
                   <div className="p-4 bg-purple-50 rounded-lg">
                     <div className="font-medium text-purple-800 mb-2">Best Time</div>
-                    <div className="text-sm text-purple-700">{sales_intelligence.meeting_recommendations.best_time}</div>
+                    <div className="text-sm text-purple-700">{meeting_recommendations?.best_time || 'Not available'}</div>
                   </div>
                   <div className="p-4 bg-orange-50 rounded-lg">
                     <div className="font-medium text-orange-800 mb-2">Agenda Style</div>
-                    <div className="text-sm text-orange-700">{sales_intelligence.meeting_recommendations.agenda_style}</div>
+                    <div className="text-sm text-orange-700">{meeting_recommendations?.agenda_style || 'Not available'}</div>
                   </div>
                 </div>
                 
                 <div className="mt-4">
                   <div className="font-medium mb-2">Preparation Tips:</div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {sales_intelligence.meeting_recommendations.preparation_tips.map((tip, index) => (
+                    {meeting_recommendations?.preparation_tips?.map((tip, index) => (
                       <div key={index} className="flex items-start gap-2">
                         <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
                         <span className="text-sm">{tip}</span>
                       </div>
-                    ))}
+                    )) || <div className="text-sm text-gray-500">No preparation tips available</div>}
                   </div>
                 </div>
               </div>
@@ -693,15 +706,15 @@ const PsychometricInsights: React.FC<PsychometricInsightsProps> = ({ leadId, lea
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="p-4 bg-gray-50 rounded-lg">
                     <div className="font-medium mb-2">Approach</div>
-                    <div className="text-sm text-gray-700">{sales_intelligence.negotiation_strategy.approach}</div>
+                    <div className="text-sm text-gray-700">{negotiation_strategy?.approach || 'Not available'}</div>
                   </div>
                   <div className="p-4 bg-gray-50 rounded-lg">
                     <div className="font-medium mb-2">Concession Strategy</div>
-                    <div className="text-sm text-gray-700">{sales_intelligence.negotiation_strategy.concession_strategy}</div>
+                    <div className="text-sm text-gray-700">{negotiation_strategy?.concession_strategy || 'Not available'}</div>
                   </div>
                   <div className="p-4 bg-gray-50 rounded-lg">
                     <div className="font-medium mb-2">Decision Timeline</div>
-                    <div className="text-sm text-gray-700">{sales_intelligence.negotiation_strategy.decision_timeline}</div>
+                    <div className="text-sm text-gray-700">{negotiation_strategy?.decision_timeline || 'Not available'}</div>
                   </div>
                 </div>
               </div>
@@ -790,7 +803,7 @@ const PsychometricInsights: React.FC<PsychometricInsightsProps> = ({ leadId, lea
                   Decision Making Style
                 </h4>
                 <div className="p-4 bg-gray-50 rounded-lg">
-                  <div className="text-sm text-gray-700">{sales_intelligence.decision_making_style}</div>
+                  <div className="text-sm text-gray-700">{sales_intelligence.decision_making_style || 'Not available'}</div>
                 </div>
               </div>
             </TabsContent>

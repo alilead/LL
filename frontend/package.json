@@ -116,6 +116,7 @@
     "jsdom": "^22.1.0",
     "postcss": "^8.4.31",
     "tailwindcss": "^3.3.5",
+    "terser": "^5.43.0",
     "typescript": "^5.2.2",
     "vite": "^6.2.4",
     "vitest": "^3.1.1"

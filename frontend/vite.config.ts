@@ -23,6 +23,10 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.MODE': JSON.stringify(mode),
       'process.env': {},
       global: 'globalThis',
+      // LinkedIn OAuth Environment Variables
+      'import.meta.env.VITE_LINKEDIN_CLIENT_ID': JSON.stringify(env.VITE_LINKEDIN_CLIENT_ID || '77ndp90oa63xyn'),
+      'import.meta.env.VITE_LINKEDIN_REDIRECT_URI': JSON.stringify(env.VITE_LINKEDIN_REDIRECT_URI || 'https://the-leadlab.com/linkedin/callback'),
+      'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'https://api.the-leadlab.com'),
     },
     server: {
       port: 3000,
@@ -38,9 +42,15 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       sourcemap: mode === 'development',
-      minify: mode === 'production',
+      minify: mode === 'production' ? 'terser' : false,
       outDir: 'dist',
       assetsDir: 'assets',
+      terserOptions: mode === 'production' ? {
+        compress: {
+          drop_console: true,
+          drop_debugger: true,
+        },
+      } : undefined,
       rollupOptions: {
         output: {
           manualChunks: {

@@ -29,6 +29,7 @@ interface InfoFieldProps {
   type?: 'text' | 'link' | 'multiline' | 'json';
   leadId: number;
   fieldName: string;
+  email_guidelines?: string | null;
 }
 
 // Add URL shortener helper function
@@ -57,7 +58,7 @@ const shortenLinkedInUrl = (url: string | null | undefined): { displayUrl: strin
   }
 };
 
-const InfoField = ({ label, value, icon, type = 'text', leadId, fieldName }: InfoFieldProps) => {
+const InfoField = ({ label, value, icon, type = 'text', leadId, fieldName, email_guidelines }: InfoFieldProps) => {
   const queryClient = useQueryClient();
   const queryKey = ['information-requests', leadId, fieldName];
 
@@ -558,7 +559,7 @@ export function LeadDetail() {
   const personalInfo = [
     { label: 'First Name', value: lead.first_name, icon: <User size={16} />, fieldName: 'first_name', type: 'text' as const },
     { label: 'Last Name', value: lead.last_name, icon: <User size={16} />, fieldName: 'last_name', type: 'text' as const },
-    { label: 'Email', value: lead.email, icon: <Mail size={16} />, fieldName: 'email', type: 'text' as const },
+    { label: 'Email', value: lead.email, icon: <Mail size={16} />, fieldName: 'email', type: 'text' as const, email_guidelines: lead.email_guidelines || null },
     { label: 'Telephone', value: lead.telephone, icon: <Phone size={16} />, fieldName: 'telephone', type: 'text' as const },
     { label: 'Mobile', value: lead.mobile, icon: <Phone size={16} />, fieldName: 'mobile', type: 'text' as const }
   ];
@@ -733,6 +734,7 @@ export function LeadDetail() {
                   type={info.type || 'text'}
                   leadId={leadId}
                   fieldName={info.fieldName}
+                  email_guidelines={info.email_guidelines}
                 />
               ))}
             </CardContent>

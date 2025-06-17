@@ -82,15 +82,35 @@ async def api_status():
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        # Development
         "http://localhost:3000", 
         "http://127.0.0.1:3000",
         "http://localhost:3001",
         "http://localhost:3002", 
-        "http://localhost:3003"
+        "http://localhost:3003",
+        # Production
+        "https://the-leadlab.com",
+        "https://www.the-leadlab.com",
+        "https://api.the-leadlab.com"
     ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
+    allow_headers=[
+        "Accept",
+        "Accept-Language",
+        "Content-Language",
+        "Content-Type",
+        "Authorization",
+        "Origin",
+        "X-Requested-With",
+        "DNT",
+        "User-Agent",
+        "If-Modified-Since",
+        "Cache-Control",
+        "Range",
+        "Access-Control-Request-Method",
+        "Access-Control-Request-Headers"
+    ],
 )
 
 # Request logging middleware

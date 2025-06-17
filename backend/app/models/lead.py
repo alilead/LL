@@ -37,6 +37,8 @@ class Lead(Base):
     is_deleted = Column(Boolean, nullable=False, default=False)
     visible = Column(Boolean, nullable=False, default=True)
     source = Column(String(100), nullable=True)
+    email_guidelines = Column(Text, nullable=True)  # Email ile ilgili yönergeler
+    sales_intelligence = Column(JSON, nullable=True)  # AI sales intelligence verisi
 
     # Hybrid property for psychometrics
     @hybrid_property
@@ -146,7 +148,9 @@ class Lead(Base):
                         "name": tag.name,
                         "organization_id": tag.organization_id
                     } for tag in self.tags
-                ] if self.tags else []
+                ] if self.tags else [],
+                "email_guidelines": self.email_guidelines or "",
+                "sales_intelligence": self.sales_intelligence or {}
             }
         except Exception as e:
             print(f"Error in to_dict: {str(e)}")

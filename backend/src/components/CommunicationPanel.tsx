@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'react-hot-toast';
 import api from '@/services/axios';
+import { VITE_LINKEDIN_CLIENT_ID, VITE_LINKEDIN_REDIRECT_URI } from '@/config/env';
 
 interface CommunicationPanelProps {
   leadId: number;
@@ -19,9 +20,9 @@ export const CommunicationPanel: React.FC<CommunicationPanelProps> = ({
 
   const handleLinkedInAuth = async () => {
     // Redirect to LinkedIn OAuth page
-    const clientId = process.env.REACT_APP_LINKEDIN_CLIENT_ID;
-    const redirectUri = encodeURIComponent(process.env.REACT_APP_LINKEDIN_REDIRECT_URI || '');
-    const scope = encodeURIComponent('r_liteprofile w_member_social');
+    const clientId = VITE_LINKEDIN_CLIENT_ID;
+    const redirectUri = encodeURIComponent(VITE_LINKEDIN_REDIRECT_URI);
+    const scope = encodeURIComponent('openid profile email w_member_social');
     
     window.location.href = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}`;
   };
@@ -40,7 +41,7 @@ export const CommunicationPanel: React.FC<CommunicationPanelProps> = ({
 
       toast.success('LinkedIn message sent successfully');
       setLinkedInMessage('');
-      queryClient.invalidateQueries(['communications', leadId]);
+      queryClient.invalidateQueries({ queryKey: ['communications', leadId] });
     } catch (error: any) {
       if (error.response?.status === 401) {
         // Need to authenticate with LinkedIn

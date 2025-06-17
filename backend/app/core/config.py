@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     # LinkedIn Configuration
     LINKEDIN_CLIENT_ID: str = Field(default="77ndp90oa63xyn", description="LinkedIn client ID")
     LINKEDIN_CLIENT_SECRET: str = Field(default="WPL_AP1.kNDMX6fD1YaEA4oo.qGm/LQ==", description="LinkedIn client secret")
-    LINKEDIN_REDIRECT_URI: str = Field(default="http://localhost:3000/linkedin/callback", description="LinkedIn redirect URI")
+    LINKEDIN_REDIRECT_URI: str = Field(default="https://the-leadlab.com/linkedin/callback", description="LinkedIn redirect URI")
     LINKEDIN_SCOPE: str = Field(default="openid profile email w_member_social", description="LinkedIn OAuth scope")
     
     @field_validator("LINKEDIN_CLIENT_SECRET", mode="before")
