@@ -53,6 +53,12 @@ prometheus-client>=0.17.1
 httpx>=0.24.1
 psutil>=5.9.5
 
+# Timezone işlemleri (EKSIK PAKET)
+pytz==2025.2
+
+# Date utilities
+python-dateutil==2.9.0
+
 # Geliştirme Araçları
 pytest==7.4.3
 pytest-asyncio==0.21.1
