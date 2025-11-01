@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
 import { Search } from 'lucide-react';
 import { format } from 'date-fns';
-import { tasksAPI, TaskPriority, TaskStatus, Task } from '@/services/tasks';
+import tasksAPI, { TaskPriority, TaskStatus } from '@/services/tasks';
+import type { Task } from '@/services/tasks';
 import { toast } from 'react-hot-toast';
 import usersAPI, { User } from '@/services/api/users';
 

@@ -1,86 +1,94 @@
-import api from './axios';
+import api from '@/lib/axios';
 
 export interface User {
-  id: number;
+  id: string;
   email: string;
   first_name: string;
   last_name: string;
+  role: string;
+  organization_id: string;
   is_active: boolean;
-  is_superuser: boolean;
-  token_balance: number;
+  last_login?: string;
+  created_at: string;
+  updated_at: string;
+  preferences?: Record<string, any>;
+}
+
+export interface UserUpdateInput {
+  first_name?: string;
+  last_name?: string;
+  preferences?: Record<string, any>;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  organization: {
+    id: string;
+    name: string;
+  };
+  preferences?: Record<string, any>;
   created_at: string;
   updated_at: string;
 }
 
-export interface UserCreate {
-  email: string;
-  password: string;
-  first_name: string;
-  last_name: string;
-  is_active?: boolean;
-  is_superuser?: boolean;
+export interface ChangePasswordInput {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
 }
 
-export interface UserUpdate extends Partial<Omit<UserCreate, 'password'>> {}
-
-export interface UsersParams {
-  search?: string;
-  is_active?: boolean;
-  is_superuser?: boolean;
-  page?: number;
-  per_page?: number;
-}
-
-export const getUsers = async (params: UsersParams = {}) => {
-  const response = await api.get('/users', { params });
+// User API endpoints
+export const getCurrentUser = async (): Promise<UserProfile> => {
+  const response = await api.get('/users/me');
   return response.data;
 };
 
-export const getUser = async (id: number) => {
+export const updateProfile = async (data: UserUpdateInput): Promise<UserProfile> => {
+  const response = await api.put('/users/me', data);
+  return response.data;
+};
+
+export const changePassword = async (data: ChangePasswordInput): Promise<{ message: string }> => {
+  const response = await api.post('/users/me/change-password', data);
+  return response.data;
+};
+
+export const getUsers = async (): Promise<User[]> => {
+  const response = await api.get('/users');
+  return response.data;
+};
+
+export const getUser = async (id: string): Promise<User> => {
   const response = await api.get(`/users/${id}`);
   return response.data;
 };
 
-export const createUser = async (data: UserCreate) => {
-  const response = await api.post('/users', data);
-  return response.data;
-};
-
-export const updateUser = async (id: number, data: UserUpdate) => {
+export const updateUser = async (id: string, data: UserUpdateInput): Promise<User> => {
   const response = await api.put(`/users/${id}`, data);
   return response.data;
 };
 
-export const deleteUser = async (id: number) => {
-  await api.delete(`/users/${id}`);
-};
-
-// Profile endpoints
-export const getProfile = async () => {
-  const response = await api.get('/auth/me');
+export const deactivateUser = async (id: string): Promise<{ message: string }> => {
+  const response = await api.patch(`/api/v1/users/${id}/deactivate`);
   return response.data;
 };
 
-export const updateProfile = async (data: UserUpdate) => {
-  const response = await api.patch('/auth/me', data);
-  return response.data;
-};
-
-export const changePassword = async (currentPassword: string, newPassword: string) => {
-  const response = await api.post('/auth/change-password', {
-    current_password: currentPassword,
-    new_password: newPassword,
-  });
+export const activateUser = async (id: string): Promise<{ message: string }> => {
+  const response = await api.patch(`/api/v1/users/${id}/activate`);
   return response.data;
 };
 
 export default {
-  getUsers,
-  getUser,
-  createUser,
-  updateUser,
-  deleteUser,
-  getProfile,
+  getCurrentUser,
   updateProfile,
   changePassword,
+  getUsers,
+  getUser,
+  updateUser,
+  deactivateUser,
+  activateUser,
 };

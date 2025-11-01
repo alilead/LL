@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = Field(default="https://the-leadlab.com", description="Frontend application URL")
     
     # Database
-    DATABASE_URL: str = Field(default="mysql+pymysql://httpdvic1_admin:JVI~dEtn6#gs@localhost/leadlab?charset=utf8mb4", description="Database connection URL")
+    DATABASE_URL: str = Field(default="mysql+pymysql://leadlab_admin:Oh5#Jy5#Ak3!Nw7#@localhost/leadlab_admin?charset=utf8mb4", description="Database connection URL")
     MYSQL_POOL_SIZE: int = Field(default=5, description="MySQL connection pool size")
     MYSQL_MAX_OVERFLOW: int = Field(default=2, description="MySQL connection pool max overflow")
     MYSQL_POOL_TIMEOUT: int = Field(default=30, description="MySQL connection pool timeout")

@@ -27,11 +27,15 @@ import {
   Grid3X3,
   List,
   Eye,
-  X
+  X,
+  Mail,
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import eventsAPI, { Event, EventCreateInput } from '@/services/api/events';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import emailAPI from '../../services/emailAPI';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { useAuthStore } from '@/store/auth';
 import EventDetailModal from './EventDetailModal';
@@ -206,6 +210,32 @@ export const CalendarPage = () => {
       }));
     },
     enabled: !!user
+  });
+
+  const { data: emailAccounts = [], refetch: refetchEmailAccounts } = useQuery({
+    queryKey: ['email-accounts'],
+    queryFn: emailAPI.getAccounts,
+  });
+
+  const emailCalendarAccounts = emailAccounts.filter(account => account.calendar_sync_enabled);
+
+  const syncCalendarMutation = useMutation({
+    mutationFn: ({ accountId }: { accountId: number }) => 
+      emailAPI.syncCalendar(accountId),
+    onSuccess: () => {
+      refetchEmailAccounts();
+      toast({
+        title: "Calendar sync completed",
+        description: "Email calendar events have been updated.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Calendar sync failed",
+        description: "Failed to sync email calendar events.",
+        variant: "destructive",
+      });
+    },
   });
 
   // Generate calendar days for month view
@@ -462,6 +492,82 @@ export const CalendarPage = () => {
             <span>New Event</span>
           </Button>
         </div>
+      </div>
+      
+      {/* Email Calendar Sync Section */}
+      <div className="mt-4 pt-4 border-t border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Mail className="h-4 w-4 text-gray-500" />
+            <span className="text-sm font-medium">Email Calendar Sync</span>
+            {emailCalendarAccounts.length > 0 && (
+              <span className="text-xs text-gray-500">
+                ({emailCalendarAccounts.length} account{emailCalendarAccounts.length !== 1 ? 's' : ''} connected)
+              </span>
+            )}
+          </div>
+          <div className="flex items-center space-x-2">
+              {emailCalendarAccounts.length > 0 && (
+                <Button
+                  onClick={() => {
+                    emailCalendarAccounts.forEach(account => {
+                      syncCalendarMutation.mutate({ accountId: account.id });
+                    });
+                  }}
+                  variant="outline"
+                  size="sm"
+                  disabled={syncCalendarMutation.isPending}
+                >
+                  {syncCalendarMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                      Sync All
+                    </>
+                  )}
+                </Button>
+              )}
+              <Button
+                onClick={() => window.location.href = '/settings'}
+                variant="outline"
+                size="sm"
+              >
+                Manage Email Accounts
+              </Button>
+            </div>
+        </div>
+        
+        {emailCalendarAccounts.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {emailCalendarAccounts.map((account) => (
+              <div
+                key={account.id}
+                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+              >
+                {account.provider} - {account.email}
+                {account.last_calendar_sync && (
+                  <span className="ml-1 text-blue-600">
+                    (synced {new Date(account.last_calendar_sync).toLocaleDateString()})
+                  </span>
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    syncCalendarMutation.mutate({ accountId: account.id });
+                  }}
+                  className="ml-1 text-blue-600 hover:text-blue-800 transition-colors"
+                  title="Sync this account"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

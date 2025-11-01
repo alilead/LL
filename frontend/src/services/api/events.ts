@@ -1,5 +1,6 @@
 import { AxiosInstance } from 'axios';
 import api from '../axios';
+import toast from 'react-hot-toast';
 
 export interface Event {
   id: number;
@@ -75,7 +76,7 @@ export interface EventListResponse {
 
 const eventsAPI = {
   // Create a new event
-  create: async (eventData: EventCreateInput) => {
+  create: async (eventData: EventCreateInput): Promise<Event> => {
     try {
       // Create a clean data model that aligns with the backend expectations
       const cleanData: Record<string, any> = {
@@ -97,57 +98,27 @@ const eventsAPI = {
       } else if (eventData.user_id) {
         cleanData.created_by = eventData.user_id;
       } else {
-        // Try to get from user store and localStorage
+        // Get user ID from auth store
         try {
-          // Try from localStorage auth info
-          const token = localStorage.getItem('token');
-          const authData = localStorage.getItem('auth');
-          const authStore = localStorage.getItem('authStore');
+          const authStore = JSON.parse(localStorage.getItem('auth-storage') || '{}');
+          const user = authStore?.state?.user;
           
-          // Log available local storage data for debugging
-          console.log('Auth sources available:', {
-            token: !!token,
-            authData: !!authData,
-            authStore: !!authStore
-          });
-          
-          let userId;
-          
-          // Try parsing from auth data
-          if (authData) {
-            try {
-              const parsed = JSON.parse(authData);
-              if (parsed && parsed.user && parsed.user.id) {
-                userId = parsed.user.id;
-              }
-            } catch (e) {
-              console.error('Error parsing auth data:', e);
-            }
-          }
-          
-          // Try parsing from auth store if user ID not found yet
-          if (!userId && authStore) {
-            try {
-              const parsed = JSON.parse(authStore);
-              if (parsed && parsed.state && parsed.state.user && parsed.state.user.id) {
-                userId = parsed.state.user.id;
-              }
-            } catch (e) {
-              console.error('Error parsing auth store:', e);
-            }
-          }
-          
-          // If ID found from any source, use it
-          if (userId) {
-            cleanData.created_by = userId;
-            console.log('Using user ID from storage:', userId);
+          if (user && user.id) {
+            cleanData.created_by = user.id;
+            console.log('Using user ID from auth store:', user.id);
           } else {
-            console.error('Could not find user ID in any storage');
-            throw new Error('User ID is required to create an event');
+            // Fallback to direct localStorage check
+            const token = localStorage.getItem('token');
+            if (!token) {
+              throw new Error('User ID is required to create an event. Please log in.');
+            }
+            
+            // Try to fetch user info from token
+            throw new Error('User ID is required to create an event. Please log in again.');
           }
         } catch (e) {
           console.error('Error extracting user info:', e);
-          throw new Error('User ID is required to create an event');
+          throw new Error('User ID is required to create an event. Please log in again.');
         }
       }
       
@@ -221,7 +192,7 @@ const eventsAPI = {
     try {
       console.log('Fetching events with params:', params);
       const response = await api.get('/events', { params });
-      return response.data;
+      return response.data.items; // Extract the items array from EventListResponse
     } catch (error) {
       console.error('Error fetching events:', error);
       throw error;

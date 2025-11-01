@@ -77,6 +77,7 @@ class Lead(Base):
     information_requests = relationship("InformationRequest", back_populates="lead", cascade="all, delete-orphan")
     tags = relationship("Tag", secondary=lead_tags, back_populates="leads")
     ai_insights = relationship("AIInsight", back_populates="lead", cascade="all, delete-orphan")
+    emails = relationship("Email", back_populates="lead", cascade="all, delete-orphan")
 
     def __init__(self, **kwargs):
         # Ensure tags is always initialized as an empty list

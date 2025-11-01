@@ -47,9 +47,10 @@ def predict_lead(
         # Tahmin yap
         prediction = predictor.predict(lead_data)
         
-        # Lead'i güncelle
-        lead.note = f"{lead.note}\n\nML Prediction: {prediction}" if lead.note else f"ML Prediction: {prediction}"
-        db.commit()
+        # Lead'i güncelle (notes field varsa)
+        if hasattr(lead, 'notes'):
+            lead.notes = f"{lead.notes}\n\nML Prediction: {prediction}" if lead.notes else f"ML Prediction: {prediction}"
+            db.commit()
         
         return prediction
         
@@ -88,8 +89,9 @@ def batch_predict(
                 
                 try:
                     prediction = predictor.predict(lead_data)
-                    lead.note = f"{lead.note}\n\nML Prediction: {prediction}" if lead.note else f"ML Prediction: {prediction}"
-                    db.commit()
+                    if hasattr(lead, 'notes'):
+                        lead.notes = f"{lead.notes}\n\nML Prediction: {prediction}" if lead.notes else f"ML Prediction: {prediction}"
+                        db.commit()
                 except Exception as e:
                     logger.error(f"Error predicting lead {lead.id}: {str(e)}")
                     continue

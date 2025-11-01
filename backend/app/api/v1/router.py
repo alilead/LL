@@ -3,7 +3,7 @@ from app.api.v1.endpoints import (
     auth, leads, admin, deals, activities, notes, users, 
     leads_import, dashboard, tasks, events, reports, advanced_reports,
     information_requests, organizations, tags, linkedin, 
-    tokens, notifications, contact, lead_stages, health, settings, psychometrics, files, ai_insights, messages, credits, invoices, team_invitations
+    tokens, notifications, contact, lead_stages, health, settings, psychometrics, files, ai_insights, messages, credits, invoices, team_invitations, email, ml
 )
 import logging
 
@@ -108,4 +108,8 @@ api_router.include_router(invoices.router, prefix="/invoices", tags=["invoices"]
 # Team Invitations routes (NEW - Team member invitation system)
 api_router.include_router(team_invitations.router, prefix="/team-invitations", tags=["team-invitations"])
 
-# REMOVED: ml (not used by frontend)
+# Email routes (Email account management and calendar sync)
+api_router.include_router(email.router, prefix="/email", tags=["email"])
+
+# ML routes (Machine Learning predictions and model management)
+api_router.include_router(ml.router, prefix="/ml", tags=["ml"])

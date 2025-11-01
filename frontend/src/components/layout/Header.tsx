@@ -13,7 +13,8 @@ import {
   Settings,
   LogOut,
   Shield,
-  Menu
+  Menu,
+  Mail
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -46,13 +47,26 @@ export function Header() {
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div className="w-full px-6">
         <div className="flex h-20 items-center justify-between">
-          {/* Logo */}
-          <Link 
-            to="/dashboard" 
-            className="flex-shrink-0 flex items-center hover:opacity-80 transition-opacity"
-          >
-            <img className="h-12 w-auto" src={logo} alt="Logo" />
-          </Link>
+          {/* Logo and Emails Button */}
+          <div className="flex items-center space-x-4">
+            <Link 
+              to="/dashboard" 
+              className="flex-shrink-0 flex items-center hover:opacity-80 transition-opacity"
+            >
+              <img className="h-12 w-auto" src={logo} alt="Logo" />
+            </Link>
+            
+            {/* Emails Button - Disabled */}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled
+              className="flex items-center text-gray-400 border-gray-200 cursor-not-allowed opacity-50"
+            >
+              <Mail className="h-4 w-4 mr-2" />
+              Emails
+            </Button>
+          </div>
 
           {/* Navigation */}
           <nav className="hidden lg:flex items-center space-x-1">

@@ -36,6 +36,24 @@ from .information_request import (
     InformationRequestInDB,
     InformationRequestResponse
 )
+from .email import (
+    EmailTemplateCreate,
+    EmailTemplateUpdate,
+    EmailTemplateResponse,
+    EmailTemplateListResponse,
+    EmailLogResponse,
+    EmailLogListResponse,
+    SendEmailResponse,
+    EmailStatus as EmailStatusSchema
+)
+from .email_integration import (
+    EmailAccountCreate, 
+    EmailAccountUpdate, 
+    EmailAccountOut,
+    EmailOut, 
+    EmailSend, 
+    EmailSuggestion
+)
 
 __all__ = [
     "Token",
@@ -97,5 +115,19 @@ __all__ = [
     "InformationRequestCreate",
     "InformationRequestUpdate",
     "InformationRequestInDB",
-    "InformationRequestResponse"
+    "InformationRequestResponse",
+    "EmailTemplateCreate",
+    "EmailTemplateUpdate",
+    "EmailTemplateResponse",
+    "EmailTemplateListResponse",
+    "EmailLogResponse",
+    "EmailLogListResponse",
+    "SendEmailResponse",
+    "EmailStatusSchema",
+    "EmailAccountCreate", 
+    "EmailAccountUpdate", 
+    "EmailAccountOut",
+    "EmailOut", 
+    "EmailSend", 
+    "EmailSuggestion"
 ]

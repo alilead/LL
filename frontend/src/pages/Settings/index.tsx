@@ -9,6 +9,7 @@ import { useAuthStore } from '../../store/auth';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { EmailIntegration } from '../../components/email/EmailIntegration';
 
 // Simplified user settings schema
 const userSettingsSchema = z.object({
@@ -169,6 +170,9 @@ export function SettingsPage() {
             </Form>
           </CardContent>
         </Card>
+
+        {/* Email Integration Settings */}
+        <EmailIntegration />
       </div>
     </div>
   );

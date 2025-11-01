@@ -61,6 +61,7 @@ class Deal(Base, TimestampMixin):
     activities = relationship("Activity", back_populates="deal")
     opportunities = relationship("Opportunity", back_populates="deal")
     events = relationship("Event", back_populates="deal", cascade="all, delete-orphan")
+    emails = relationship("Email", back_populates="deal", foreign_keys="Email.deal_id")
 
     def __repr__(self):
         return f"<Deal {self.name}>"

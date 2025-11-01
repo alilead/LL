@@ -18,7 +18,7 @@ import { PageContainer } from '@/components/ui/PageContainer';
 import { useAuthStore } from '@/store/auth';
 
 // API imports
-import { tasksAPI, TaskPriority, TaskStatus, TaskCreate } from '@/services/tasks';
+import tasksAPI, { TaskPriority } from '@/services/tasks';
 import leadsAPI, { Lead } from '@/services/api/leads';
 import usersAPI, { User } from '@/services/api/users';
 import api from '@/services/axios';
@@ -28,9 +28,9 @@ interface NewTaskForm {
   description: string;
   due_date: string;
   priority: TaskPriority;
-  status: TaskStatus;
-  lead_id: number;
-  assigned_to_id: number;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  lead_id?: string;
+  assigned_to_id?: string;
 }
 
 const TASK_PRIORITIES = [
@@ -41,10 +41,10 @@ const TASK_PRIORITIES = [
 ];
 
 const TASK_STATUSES = [
-  { value: TaskStatus.PENDING, label: 'Pending' },
-  { value: TaskStatus.IN_PROGRESS, label: 'In Progress' },
-  { value: TaskStatus.COMPLETED, label: 'Completed' },
-  { value: TaskStatus.CANCELLED, label: 'Cancelled' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
 ];
 
 export const NewTaskPage = () => {
@@ -313,7 +313,7 @@ export const NewTaskPage = () => {
     queryKey: ['current-user-profile'],
     queryFn: async () => {
       try {
-        const response = await api.get('/api/v1/auth/me');
+        const response = await api.get('/auth/me');
         return response.data;
       } catch (error) {
         console.error('Error fetching current user profile:', error);
@@ -330,19 +330,15 @@ export const NewTaskPage = () => {
         throw new Error('Organization ID is required');
       }
       
-      if (!selectedLead?.id || !selectedUser?.id) {
-        throw new Error('Please select both a lead and an assigned user');
-      }
-      
-      await tasksAPI.createTask({
+      const taskData = {
         ...data,
-        lead_id: selectedLead.id,
-        assigned_to_id: selectedUser.id,
         organization_id: currentUser.organization_id
-      });
+      };
+      
+      const task = await tasksAPI.createTask(taskData);
       
       toast.success("Task created successfully");
-      navigate('/tasks');
+      navigate(`/tasks/${task.id}`);
     } catch (error) {
       console.error('Error creating task:', error);
       toast.error(error instanceof Error ? error.message : "Failed to create task");
@@ -426,7 +422,7 @@ export const NewTaskPage = () => {
           <div className="space-y-2">
             <label htmlFor="status" className="text-sm font-medium">Status</label>
             <Select
-              onValueChange={(value) => setValue('status', value as TaskStatus)}
+              onValueChange={(value) => setValue('status', value as 'pending' | 'in_progress' | 'completed' | 'cancelled')}
               defaultValue=""
             >
               <SelectTrigger>
@@ -546,29 +542,49 @@ export const NewTaskPage = () => {
                     </div>
                   </div>
                 ) : (
-                  filteredLeads?.map((lead) => (
+                  <>
                     <div
-                      key={lead.id}
-                      className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-gray-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                      className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-gray-100 border-b"
                       onClick={() => {
-                        setSelectedLead(lead);
-                        setValue('lead_id', lead.id);
+                        setSelectedLead(null);
+                        setValue('lead_id', undefined);
                         setLeadPopoverOpen(false);
                       }}
                     >
                       <div className="flex items-center w-full">
-                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary mr-2">
-                          {(lead.first_name?.[0] || '?')}{(lead.last_name?.[0] || '?')}
+                        <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 mr-2">
+                          <span className="text-xs">∅</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="font-medium">{lead.first_name || 'Anonim'} {lead.last_name || ''}</span>
-                          {lead.company && (
-                            <span className="text-xs text-gray-500">{lead.company}</span>
-                          )}
+                          <span className="font-medium">No lead</span>
+                          <span className="text-xs text-gray-500">Task without associated client</span>
                         </div>
                       </div>
                     </div>
-                  ))
+                    {filteredLeads?.map((lead) => (
+                      <div
+                        key={lead.id}
+                        className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-gray-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                        onClick={() => {
+                          setSelectedLead(lead);
+                          setValue('lead_id', lead.id);
+                          setLeadPopoverOpen(false);
+                        }}
+                      >
+                        <div className="flex items-center w-full">
+                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary mr-2">
+                            {(lead.first_name?.[0] || '?')}{(lead.last_name?.[0] || '?')}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{lead.first_name || 'Anonim'} {lead.last_name || ''}</span>
+                            {lead.company && (
+                              <span className="text-xs text-gray-500">{lead.company}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </>
                 )}
               </div>
             </PopoverContent>

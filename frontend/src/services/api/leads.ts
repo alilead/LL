@@ -97,6 +97,16 @@ export interface LeadWithStats extends Lead {
   };
 }
 
+export interface LeadStats {
+  total: number;
+  new: number;
+  qualified: number;
+  contacted: number;
+  converted: number;
+  hot_prospects?: number;
+  qualification_rate?: number;
+}
+
 interface LeadsParams {
   search?: string;
   sort_by?: string;
@@ -225,14 +235,89 @@ const updateTags = async (id: number, data: { tags: number[] }) => {
   }
 };
 
-const leadsAPI = {
-  getLeads,
-  getById,
-  create,
-  update,
-  remove,
-  updateTags,
-  getAll: getLeads
+// leadsAPI export'u ekleniyor
+export const leadsAPI = {
+  getAll: async (params?: { 
+    search?: string;
+    sort_by?: string;
+    sort_desc?: boolean;
+    stage_id?: number;
+    assigned_to_id?: number;
+  }): Promise<any> => {
+    return api.get('/leads/', { params });
+  },
+
+  getLeads: async (params?: { 
+    search?: string;
+    sort_by?: string;
+    sort_desc?: boolean;
+    stage_id?: number;
+    assigned_to_id?: number;
+    skip?: number;
+    limit?: number;
+  }): Promise<any> => {
+    const response = await api.get('/leads/', { params });
+    const data = response.data;
+    // Backend returns array, wrap it in expected format
+    return {
+      results: Array.isArray(data) ? data : data.results || [],
+      total: Array.isArray(data) ? data.length : data.total || 0,
+      page: params?.skip ? Math.floor(params.skip / (params.limit || 20)) : 0,
+      limit: params?.limit || 20
+    };
+  },
+
+  getById: async (id: number): Promise<any> => {
+    return api.get(`/leads/${id}`);
+  },
+
+  create: async (data: Partial<Lead>): Promise<any> => {
+    return api.post('/leads/', data);
+  },
+
+  update: async (id: number, data: Partial<Lead>): Promise<any> => {
+    return api.put(`/leads/${id}`, data);
+  },
+
+  delete: async (id: number): Promise<any> => {
+    return api.delete(`/leads/${id}`);
+  },
+
+  uploadCSV: async (formData: FormData): Promise<any> => {
+    return api.post('/leads/import/csv', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+
+  exportCSV: async (params?: {
+    search?: string;
+    tag?: string;
+    filters?: any;
+  }): Promise<Blob> => {
+    const response = await api.get('/leads/export/csv', {
+      params,
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  downloadTemplate: async (): Promise<Blob> => {
+    const response = await api.get('/leads/template', {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  requestInfo: async (data: { lead_id: number; field_name: string; notes?: string }): Promise<any> => {
+    return await api.post('/requests/info-request', data);
+  },
+
+  getLeadStats: async (): Promise<LeadStats> => {
+    const response = await api.get('/leads/stats');
+    return response.data;
+  }
 };
 
 export default leadsAPI;

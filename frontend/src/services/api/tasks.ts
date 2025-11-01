@@ -1,5 +1,8 @@
 import api from '../../lib/axios';
 
+export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+
 export interface User {
   id: number;
   first_name: string;

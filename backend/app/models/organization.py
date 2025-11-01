@@ -31,6 +31,8 @@ class Organization(Base, TimestampMixin):
     settings = relationship("OrganizationSettings", back_populates="organization", uselist=False)
     email_templates = relationship("EmailTemplate", back_populates="organization", cascade="all, delete-orphan")
     email_logs = relationship("EmailLog", back_populates="organization", cascade="all, delete-orphan")
+    email_accounts = relationship("EmailAccount", back_populates="organization", cascade="all, delete-orphan")
+    emails = relationship("Email", back_populates="organization", cascade="all, delete-orphan")
     lead_stages = relationship("LeadStage", back_populates="organization", cascade="all, delete-orphan")
     api_tokens = relationship("APIToken", back_populates="organization", cascade="all, delete-orphan")  
     custom_fields = relationship("CustomFieldDefinition", back_populates="organization", cascade="all, delete-orphan")

@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 
 // Services
-import { leadsAPI } from '@/services/leads';
+import { leadsAPI } from '@/services/api/leads';
 import { getTags } from '@/services/tags';
 
 // Components
@@ -533,4 +533,4 @@ export function ModernLeadList() {
       </Dialog>
     </div>
   );
-} 
+}

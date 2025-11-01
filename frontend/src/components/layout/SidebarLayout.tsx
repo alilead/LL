@@ -15,18 +15,26 @@ import {
   User,
   LogOut,
   Menu,
-  X,
   Zap,
   Target,
-  PieChart,
   CreditCard,
-  UserPlus
+  UserPlus,
+  Mail
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
 
 interface SidebarLayoutProps {
   children: ReactNode
+}
+
+interface NavigationItem {
+  name: string
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  description: string
+  badge?: string
+  disabled?: boolean
 }
 
 export function SidebarLayout({ children }: SidebarLayoutProps) {
@@ -43,7 +51,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
     navigate('/')
   }
 
-  const navigationItems = [
+  const navigationItems: NavigationItem[] = [
     { 
       name: 'Dashboard', 
       href: '/dashboard', 
@@ -79,6 +87,13 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
       href: '/messages', 
       icon: MessageSquare,
       description: 'Communications'
+    },
+    { 
+      name: 'Emails', 
+      href: '/emails', 
+      icon: Mail,
+      description: 'Email Management',
+      disabled: true
     },
     { 
       name: 'Reports', 
@@ -161,6 +176,31 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
           {navigationItems.map((item) => {
             const Icon = item.icon
             const isActive = location.pathname === item.href
+            const isDisabled = item.disabled
+            
+            if (isDisabled) {
+              return (
+                <button
+                  key={item.name}
+                  disabled
+                  className="group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 relative w-full text-left opacity-50 cursor-not-allowed text-gray-400 dark:text-gray-600"
+                >
+                  <Icon className="flex-shrink-0 w-5 h-5 text-gray-300 dark:text-gray-700" />
+                  
+                  {!isCollapsed && (
+                    <>
+                      <span className="ml-3 flex-1">{item.name}</span>
+                      <span className="ml-auto text-xs text-gray-400 dark:text-gray-600">Soon</span>
+                      {item.badge && (
+                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-600">
+                          {item.badge}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </button>
+              )
+            }
             
             return (
               <Link

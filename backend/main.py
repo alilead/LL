@@ -36,9 +36,9 @@ async def health_check():
         # Veritabanı bağlantı testi
         conn = pymysql.connect(
             host='localhost',
-            user='httpdvic1_admin',
-            password='JVI~dEtn6#gs',
-            database='leadlab'
+            user='leadlab_admin',
+            password='Oh5#Jy5#Ak3!Nw7#',
+            database='leadlab_admin'
         )
         
         # Tablo sayısını al

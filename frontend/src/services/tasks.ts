@@ -1,112 +1,163 @@
-import api from './axios';
-import { User } from './api/users';
+import api from '@/lib/axios';
 
-export enum TaskPriority {
-  LOW = 'LOW',
-  MEDIUM = 'MEDIUM',
-  HIGH = 'HIGH',
-  URGENT = 'URGENT'
-}
+export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 
-export enum TaskStatus {
-  PENDING = 'PENDING',
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED'
-}
+// Enum-like constants for easier usage
+export const TaskStatus = {
+  PENDING: 'pending' as TaskStatus,
+  IN_PROGRESS: 'in_progress' as TaskStatus,
+  COMPLETED: 'completed' as TaskStatus,
+  CANCELLED: 'cancelled' as TaskStatus,
+};
+
+export const TaskPriority = {
+  LOW: 'low' as TaskPriority,
+  MEDIUM: 'medium' as TaskPriority,
+  HIGH: 'high' as TaskPriority,
+  URGENT: 'urgent' as TaskPriority,
+};
 
 export interface Task {
-  id: number;
+  id: string;
   title: string;
-  description: string;
-  due_date: string;
-  priority: TaskPriority;
+  description?: string;
   status: TaskStatus;
-  completed_at: string | null;
-  assigned_to_id: number;
-  assigned_to?: User;
-  organization_id: number;
-  lead_id: number;
-  lead?: {
-    id: number;
-    first_name: string;
-    last_name: string;
-    company?: string;
-  };
+  priority: TaskPriority;
+  due_date?: string;
+  assigned_to?: string;
+  created_by: string;
+  lead_id?: string;
+  deal_id?: string;
   created_at: string;
   updated_at: string;
+  completed_at?: string;
+  assignee?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+  creator?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
 }
 
-export interface TaskCreate {
+export interface TaskCreateInput {
   title: string;
-  description: string;
-  due_date: string;
+  description?: string;
   priority: TaskPriority;
-  status: TaskStatus;
-  assigned_to_id: number;
-  organization_id: number;
-  lead_id: number;
+  due_date?: string;
+  assigned_to?: string;
+  lead_id?: string;
+  deal_id?: string;
 }
 
-export interface TaskUpdate {
+export interface TaskUpdateInput {
   title?: string;
   description?: string;
-  due_date?: string;
-  priority?: TaskPriority;
   status?: TaskStatus;
-  assigned_to_id?: number;
-  lead_id?: number;
+  priority?: TaskPriority;
+  due_date?: string;
+  assigned_to?: string;
 }
 
-export interface TasksParams {
-  lead_id?: number;
-  status?: TaskStatus;
-  skip?: number;
+export interface TaskFilters {
+  status?: string;
+  priority?: string;
+  assigned_to?: string;
+  created_by?: string;
+  lead_id?: string;
+  deal_id?: string;
+  due_date_from?: string;
+  due_date_to?: string;
+  search?: string;
+  page?: number;
   limit?: number;
-  sort_by?: string;
-  sort_desc?: boolean;
 }
 
 export interface TaskListResponse {
-  items: Task[];
+  tasks: Task[];
   total: number;
+  page: number;
+  limit: number;
+  has_more: boolean;
 }
 
-async function getTasks(params: TasksParams = {}): Promise<TaskListResponse> {
-  const response = await api.get('/tasks/', { params });
+export interface TaskStats {
+  total: number;
+  pending: number;
+  in_progress: number;
+  completed: number;
+  overdue: number;
+}
+
+export const getTasks = async (filters?: TaskFilters): Promise<TaskListResponse> => {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        params.append(key, value.toString());
+      }
+    });
+  }
+  const response = await api.get(`/tasks?${params.toString()}`);
   return response.data;
-}
+};
 
-async function getTask(id: number): Promise<Task> {
+export const getTask = async (id: string): Promise<Task> => {
   const response = await api.get(`/tasks/${id}`);
   return response.data;
-}
+};
 
-async function createTask(data: TaskCreate): Promise<Task> {
+export const createTask = async (data: TaskCreateInput): Promise<Task> => {
   const response = await api.post('/tasks', data);
   return response.data;
-}
+};
 
-async function updateTask(id: number, data: TaskUpdate): Promise<Task> {
+export const updateTask = async (id: string, data: TaskUpdateInput): Promise<Task> => {
   const response = await api.put(`/tasks/${id}`, data);
   return response.data;
-}
+};
 
-async function deleteTask(id: number): Promise<void> {
-  await api.delete(`/tasks/${id}`);
-}
-
-async function getOverdueTasks(): Promise<TaskListResponse> {
-  const response = await api.get('/tasks/overdue');
+export const deleteTask = async (id: string): Promise<{ message: string }> => {
+  const response = await api.delete(`/tasks/${id}`);
   return response.data;
-}
+};
 
-async function getUpcomingTasks(days: number = 7): Promise<TaskListResponse> {
-  const response = await api.get('/tasks/upcoming', {
-    params: { days }
+export const completeTask = async (id: string): Promise<Task> => {
+  const response = await api.patch(`/tasks/${id}/complete`);
+  return response.data;
+};
+
+export const getTaskStats = async (): Promise<TaskStats> => {
+  const response = await api.get('/tasks/stats');
+  return response.data;
+};
+
+export const getMyTasks = async (filters?: Omit<TaskFilters, 'assigned_to'>): Promise<TaskListResponse> => {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        params.append(key, value.toString());
+      }
+    });
+  }
+  const response = await api.get(`/tasks/my?${params.toString()}`);
+  return response.data;
+};
+
+export const bulkUpdateTasks = async (taskIds: string[], updates: TaskUpdateInput): Promise<{ message: string; updated_count: number }> => {
+  const response = await api.patch('/tasks/bulk', {
+    task_ids: taskIds,
+    updates
   });
   return response.data;
-}
+};
 
 export const tasksAPI = {
   getTasks,
@@ -114,6 +165,10 @@ export const tasksAPI = {
   createTask,
   updateTask,
   deleteTask,
-  getOverdueTasks,
-  getUpcomingTasks,
+  completeTask,
+  getTaskStats,
+  getMyTasks,
+  bulkUpdateTasks,
 };
+
+export default tasksAPI;

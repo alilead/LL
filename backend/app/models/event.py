@@ -28,15 +28,18 @@ class Event(Base):
     created_at: Mapped[datetime] = Column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = Column(DateTime(timezone=True), nullable=False)
     is_all_day: Mapped[bool] = Column(Boolean, default=False, nullable=False)
+    timezone: Mapped[str] = Column(String(50), nullable=False, default='UTC')
     lead_id: Mapped[Optional[int]] = Column(Integer, ForeignKey("leads.id"), nullable=True)
     deal_id: Mapped[Optional[int]] = Column(Integer, ForeignKey("deals.id"), nullable=True)
-    timezone: Mapped[str] = Column(String(50), nullable=False)
+    source_email_id: Mapped[Optional[int]] = Column(Integer, nullable=True)
+    email_account_id: Mapped[Optional[int]] = Column(Integer, ForeignKey("email_accounts.id"), nullable=True)
     
     # Relationships
     organization = relationship("Organization", back_populates="events")
     creator = relationship("User", foreign_keys=[created_by], back_populates="created_events")
     lead = relationship("Lead", back_populates="events")
     deal = relationship("Deal", back_populates="events")
+    # email_account = relationship("EmailAccount", back_populates="synced_events")
     attendees = relationship(
         "User",
         secondary="event_attendees",
@@ -71,6 +74,7 @@ class Event(Base):
             "is_all_day": self.is_all_day,
             "lead_id": self.lead_id,
             "deal_id": self.deal_id,
+            "email_account_id": self.email_account_id,
             "timezone": self.timezone
         }
 

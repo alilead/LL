@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { toast } from 'react-hot-toast'
+import authService from '../services/auth'
 
 export function ResetPassword() {
   const navigate = useNavigate()
@@ -33,14 +35,20 @@ export function ResetPassword() {
     }
 
     try {
-      // TODO: Implement password reset
-      await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate API call
+      await authService.resetPassword({
+        token,
+        password: formData.password,
+        password_confirmation: formData.confirmPassword
+      })
       setSuccess(true)
+      toast.success('Password reset successfully!')
       setTimeout(() => {
         navigate('/signin')
       }, 3000)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reset password')
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || err.response?.data?.detail || err.message || 'Failed to reset password'
+      setError(errorMessage)
+      toast.error(errorMessage)
     } finally {
       setIsLoading(false)
     }

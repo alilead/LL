@@ -35,11 +35,14 @@ export function SignIn() {
     setIsLoading(true)
 
     try {
-      await login(formData.email, formData.password)
+      await login({
+        email: formData.email,
+        password: formData.password
+      })
       toast.success('Login successful!')
     } catch (err: any) {
       console.error('Login error:', err)
-      toast.error(err.response?.data?.detail || 'Failed to sign in')
+      toast.error(err.response?.data?.message || err.response?.data?.detail || 'Failed to sign in')
     } finally {
       setIsLoading(false)
     }

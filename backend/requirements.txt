@@ -1,23 +1,22 @@
-# Python 3.13+ gereklidir
+# Python 3.7+ compatible versions
 # FastAPI ve ilgili paketler
-fastapi==0.109.2
-uvicorn==0.24.0
-python-multipart==0.0.6
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-pydantic==2.5.1
-pydantic-settings==2.1.0
-email-validator==2.1.0.post1
-aiosmtplib==3.0.1  # Async SMTP client
+fastapi>=0.68.0,<0.84.0
+uvicorn>=0.15.0,<0.24.0
+python-multipart>=0.0.5
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+pydantic>=1.10.0,<2.0.0
+email-validator>=1.1.0
+aiosmtplib>=2.0.0
 
 # Payment Processing
 stripe==8.4.0  # Payment processing
 
 # Veritabanı
-sqlalchemy==2.0.23
-alembic==1.12.1
-psycopg2-binary==2.9.9
-pymysql==1.1.0
+sqlalchemy>=1.4.0,<2.0.0
+alembic>=1.7.0
+psycopg2-binary>=2.9.0
+pymysql>=1.0.0
 
 # ML ve Veri Analizi
 scikit-learn>=1.4.0

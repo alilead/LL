@@ -67,6 +67,7 @@ class User(Base):
     created_events: Mapped[List["Event"]] = relationship("Event", back_populates="creator", foreign_keys="[Event.created_by]")
     deals: Mapped[List["Deal"]] = relationship("Deal", back_populates="assigned_to")
     email_logs: Mapped[List["EmailLog"]] = relationship("EmailLog", back_populates="user")
+    email_accounts: Mapped[List["EmailAccount"]] = relationship("EmailAccount", back_populates="user")
     files: Mapped[List["File"]] = relationship("File", back_populates="user")
     communications: Mapped[List["Communication"]] = relationship("Communication", back_populates="user")
     opportunities: Mapped[List["Opportunity"]] = relationship("Opportunity", back_populates="user")

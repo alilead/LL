@@ -33,38 +33,38 @@ export interface PsychometricsParams {
 }
 
 export const getPsychometrics = async (params: PsychometricsParams = {}) => {
-  const response = await api.get('/api/v1/psychometrics', { params });
+  const response = await api.get('/psychometrics', { params });
   return response.data;
 };
 
 export const getPsychometric = async (id: number) => {
-  const response = await api.get(`/api/v1/psychometrics/${id}`);
+  const response = await api.get(`/psychometrics/${id}`);
   return response.data;
 };
 
 export const createPsychometric = async (data: PsychometricCreate) => {
-  const response = await api.post('/api/v1/psychometrics', data);
+  const response = await api.post('/psychometrics', data);
   return response.data;
 };
 
 export const updatePsychometric = async (id: number, data: PsychometricUpdate) => {
-  const response = await api.put(`/api/v1/psychometrics/${id}`, data);
+  const response = await api.put(`/psychometrics/${id}`, data);
   return response.data;
 };
 
 export const deletePsychometric = async (id: number) => {
-  await api.delete(`/api/v1/psychometrics/${id}`);
+  await api.delete(`/psychometrics/${id}`);
 };
 
 // Get psychometric test types
 export const getPsychometricTypes = async () => {
-  const response = await api.get('/api/v1/psychometrics/types');
+  const response = await api.get('/psychometrics/types');
   return response.data;
 };
 
 // Get psychometric statistics for a lead
 export const getLeadPsychometricStats = async (leadId: number) => {
-  const response = await api.get(`/api/v1/psychometrics/stats/${leadId}`);
+  const response = await api.get(`/psychometrics/stats/${leadId}`);
   return response.data;
 };
 

@@ -1,8 +1,9 @@
 # app/schemas/email_integration.py
 import re
+import json
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, EmailStr, validator, root_validator
 from app.models.email_account import EmailProviderType, EmailSyncStatus
 from app.models.email_message import EmailDirection, EmailStatus
 
@@ -29,9 +30,31 @@ class EmailAccountCreate(EmailAccountBase):
 
 class EmailAccountUpdate(BaseModel):
     display_name: Optional[str] = None
+    password: Optional[str] = None
+    provider_type: Optional[str] = None
+    custom_settings: Optional[Dict[str, Any]] = None
     sync_enabled: Optional[bool] = None
     sync_frequency_minutes: Optional[int] = None
+    sync_sent_items: Optional[bool] = None
+    sync_inbox: Optional[bool] = None
+    days_to_sync: Optional[int] = None
+    auto_create_contacts: Optional[bool] = None
+    auto_create_tasks: Optional[bool] = None
+    calendar_sync_enabled: Optional[bool] = None
     signature: Optional[str] = None
+
+    @validator('provider_type')
+    def validate_provider_type(cls, v):
+        if v is None:
+            return v
+        try:
+            # Convert to lowercase for validation
+            v = v.lower()
+            if v not in ['gmail', 'outlook', 'yahoo', 'custom']:
+                raise ValueError("Invalid provider type")
+            return v
+        except AttributeError:
+            raise ValueError("Provider type must be a string")
 
 class EmailAccountOut(EmailAccountBase):
     id: int
@@ -81,7 +104,7 @@ class EmailCreate(EmailBase):
     body_text: Optional[str] = None
     body_html: Optional[str] = None
     direction: EmailDirection
-    status: EmailStatus = EmailStatus.UNREAD
+    status: EmailStatus = EmailStatus.unread
     priority: str = "normal"
     sent_date: datetime
     received_date: Optional[datetime] = None
@@ -133,6 +156,33 @@ class EmailOut(EmailBase):
     
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+    @validator('to_emails', 'cc_emails', 'bcc_emails', pre=True)
+    def parse_email_lists(cls, v):
+        """Parse JSON strings to lists for email fields"""
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, ValueError):
+                return []
+        elif isinstance(v, list):
+            return v
+        else:
+            return []
+
+    @validator('extracted_dates', 'action_items', pre=True)
+    def parse_list_fields(cls, v):
+        """Parse JSON strings to lists for analysis fields"""
+        if isinstance(v, str):
+            try:
+                parsed = json.loads(v)
+                return parsed if isinstance(parsed, list) else []
+            except (json.JSONDecodeError, ValueError):
+                return []
+        elif isinstance(v, list):
+            return v
+        else:
+            return []
 
     class Config:
         from_attributes = True

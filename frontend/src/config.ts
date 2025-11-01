@@ -2,6 +2,7 @@ import axios from 'axios';
 
 // Export the API URL directly without modifying it
 export const API_URL = import.meta.env.VITE_API_URL || 'https://api.the-leadlab.com';
+export const API_BASE_URL = API_URL; // Alias for compatibility
 
 export const APP_CONFIG = {
   apiBaseUrl: API_URL,

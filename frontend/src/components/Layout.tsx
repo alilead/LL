@@ -3,6 +3,7 @@ import { MainLayout } from './layout/MainLayout';
 import { Outlet } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth';
 import { Navigate } from 'react-router-dom';
+import ScrollManager from './ScrollManager';
 
 interface LayoutProps {
   children?: ReactNode;
@@ -17,8 +18,11 @@ export function Layout({ children, className }: LayoutProps) {
   }
 
   return (
-    <MainLayout>
-      {children || <Outlet />}
-    </MainLayout>
+    <>
+      <ScrollManager />
+      <MainLayout>
+        {children || <Outlet />}
+      </MainLayout>
+    </>
   );
 }

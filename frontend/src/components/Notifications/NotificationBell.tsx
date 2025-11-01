@@ -45,8 +45,9 @@ export function NotificationBell({ isCollapsed = false }: NotificationBellProps)
       markAsReadMutation.mutate(notification.id)
     }
     
-    if (notification.action_url) {
-      window.location.href = notification.action_url
+    const url = notification.action_url || notification.link
+    if (url) {
+      window.location.href = url
     }
     
     setIsOpen(false)

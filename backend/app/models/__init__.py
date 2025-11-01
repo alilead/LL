@@ -11,6 +11,9 @@ from .permission import Permission
 from .user import User
 from .email import EmailTemplate
 from .email_log import EmailLog
+from .email_message import Email, EmailDirection, EmailStatus
+from .email_attachment import EmailAttachment
+from .email_account import EmailAccount
 from .activity import Activity
 from .lead_stage import LeadStage
 from .currency import Currency
@@ -63,6 +66,11 @@ __all__ = [
     "APITokenUsage",
     "EmailTemplate",
     "EmailLog",
+    "Email",
+    "EmailDirection",
+    "EmailStatus",
+    "EmailAttachment",
+    "EmailAccount",
     "File",
     "CustomFieldDefinition",
     "CustomFieldValue",

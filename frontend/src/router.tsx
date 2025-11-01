@@ -11,7 +11,7 @@ import PrivateRoute from './components/PrivateRoute'
 import { AdminRoute } from './components/AdminRoute'
 import { LeadsPage } from './pages/Leads'
 import { LeadDetail } from './pages/Leads/LeadDetail'
-import { DashboardPage } from './pages/Dashboard'
+import { DashboardPage } from './pages/Dashboard/index'
 import { NotFound } from './pages/NotFound'
 import { ProfilePage } from './pages/ProfilePage'
 import { TasksPage } from './pages/Tasks'
@@ -27,6 +27,10 @@ import { ReportsPage } from './pages/Reports'
 import { CalendarPage } from './pages/Calendar'
 import { AIInsightsPage } from './pages/AIInsights'
 import { CreditsPage } from './pages/Credits'
+import { SettingsPage } from './pages/Settings'
+import { EmailsPage } from './pages/Emails'
+import CustomizationPage from './pages/Customization'
+import { OrganizationPage } from './pages/OrganizationPage'
 
 export const router = createBrowserRouter([
   {
@@ -73,12 +77,19 @@ export const router = createBrowserRouter([
           },
           {
             path: '/leads',
-            children: [
-              { index: true, element: <LeadsPage /> },
-              { path: 'form', element: <LeadForm /> },
-              { path: 'new', element: <Navigate to="/leads/form" replace /> },
-              { path: ':id', element: <LeadDetail /> },
-            ],
+            element: <LeadsPage />
+          },
+          {
+            path: '/leads/form',
+            element: <LeadForm />
+          },
+          {
+            path: '/leads/new',
+            element: <Navigate to="/leads/form" replace />
+          },
+          {
+            path: '/leads/:id',
+            element: <LeadDetail />
           },
           {
             path: '/tasks',
@@ -118,6 +129,22 @@ export const router = createBrowserRouter([
           {
             path: '/credits',
             element: <CreditsPage />
+          },
+          {
+            path: '/settings',
+            element: <SettingsPage />
+          },
+          {
+            path: '/emails',
+            element: <EmailsPage />
+          },
+          {
+            path: '/customization',
+            element: <CustomizationPage />
+          },
+          {
+            path: '/organization',
+            element: <OrganizationPage />
           }
         ]
       }

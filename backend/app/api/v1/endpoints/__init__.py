@@ -29,6 +29,7 @@ from . import (
     ai_insights,
     messages,
     invoices,
+    email,
 )
 
 __all__ = [
@@ -62,4 +63,5 @@ __all__ = [
     "ai_insights",
     "messages",
     "invoices",
+    "email",
 ]

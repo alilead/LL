@@ -4,6 +4,7 @@ import smtplib
 import email
 import re
 import socket
+import json
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -42,6 +43,17 @@ class EmailService:
         """Add a new email account with auto-detection of settings"""
         
         try:
+            # Validate provider_type
+            if isinstance(provider_type, str):
+                provider_value = provider_type.lower()
+            else:
+                provider_value = provider_type.value.lower()
+                
+            # Check if provider_type is valid
+            valid_providers = [e.value for e in EmailProviderType]
+            if provider_value not in valid_providers:
+                raise ValueError(f"Invalid provider type: {provider_value}. Must be one of: {valid_providers}")
+            
             # Check if account already exists
             existing_account = self.db.query(EmailAccount).filter(
                 and_(
@@ -56,7 +68,7 @@ class EmailService:
             # Auto-detect IMAP/SMTP settings based on provider
             imap_settings, smtp_settings = self._get_provider_settings(
                 email=email,
-                provider_type=provider_type if isinstance(provider_type, str) else provider_type.value,
+                provider_type=provider_value,
                 custom_settings=custom_settings
             )
             
@@ -71,7 +83,7 @@ class EmailService:
             email_account = EmailAccount(
                 email=email,
                 display_name=display_name or email,
-                provider_type=provider_type,
+                provider_type=provider_value,
                 password_encrypted=password_encrypted,
                 organization_id=organization_id,
                 user_id=user_id,
@@ -89,16 +101,137 @@ class EmailService:
             )
             
             # Save to database
-            db = next(get_db())
-            db.add(email_account)
-            db.commit()
-            db.refresh(email_account)
+            self.db.add(email_account)
+            self.db.commit()
+            self.db.refresh(email_account)
             
             return email_account
             
         except Exception as e:
             logger.error(f"Error creating email account: {str(e)}")
             raise ValueError(f"Failed to save email account: {str(e)}")
+    
+    def get_email_accounts(self, organization_id: int, user_id: Optional[int] = None) -> List[EmailAccount]:
+        """Get email accounts for an organization, optionally filtered by user"""
+        
+        query = self.db.query(EmailAccount).filter(EmailAccount.organization_id == organization_id)
+        
+        if user_id:
+            query = query.filter(EmailAccount.user_id == user_id)
+        
+        return query.all()
+    
+    def get_email_account_by_id(self, account_id: int, organization_id: int) -> Optional[EmailAccount]:
+        """Get a specific email account by ID"""
+        
+        return self.db.query(EmailAccount).filter(
+            and_(
+                EmailAccount.id == account_id,
+                EmailAccount.organization_id == organization_id
+            )
+        ).first()
+    
+    def update_email_account(
+        self,
+        account_id: int,
+        organization_id: int,
+        email: Optional[str] = None,
+        password: Optional[str] = None,
+        display_name: Optional[str] = None,
+        provider_type: Optional[str] = None,
+        custom_settings: Optional[Dict] = None,
+        sync_settings: Optional[Dict] = None
+    ) -> Optional[EmailAccount]:
+        """Update an existing email account"""
+        
+        try:
+            # Get existing account
+            account = self.get_email_account_by_id(account_id, organization_id)
+            if not account:
+                raise ValueError("Email account not found")
+            
+            # Update basic info
+            if email:
+                account.email = email
+            if display_name:
+                account.display_name = display_name
+            if provider_type:
+                # Validate provider_type
+                if isinstance(provider_type, str):
+                    provider_value = provider_type.lower()
+                else:
+                    provider_value = provider_type.value.lower()
+                    
+                valid_providers = [e.value for e in EmailProviderType]
+                if provider_value not in valid_providers:
+                    raise ValueError(f"Invalid provider type: {provider_value}")
+                account.provider_type = provider_value
+            
+            # Update password if provided
+            if password:
+                account.password_encrypted = encrypt_password(password)
+            
+            # Update connection settings if provided
+            if custom_settings:
+                current_email = email or account.email
+                current_provider = provider_type or account.provider_type
+                
+                imap_settings, smtp_settings = self._get_provider_settings(
+                    email=current_email,
+                    provider_type=current_provider,
+                    custom_settings=custom_settings
+                )
+                
+                # Test connection with new settings
+                test_password = password or decrypt_password(account.password_encrypted)
+                if not self._test_connection(current_email, test_password, imap_settings, smtp_settings):
+                    raise ValueError("Failed to connect to email server with new settings")
+                
+                # Update IMAP settings
+                for key, value in imap_settings.items():
+                    setattr(account, key, value)
+                
+                # Update SMTP settings
+                for key, value in smtp_settings.items():
+                    setattr(account, key, value)
+            
+            # Update sync settings if provided
+            if sync_settings:
+                for key, value in sync_settings.items():
+                    if hasattr(account, key):
+                        setattr(account, key, value)
+            
+            # Update modified timestamp
+            account.updated_at = datetime.utcnow()
+            
+            # Save changes
+            self.db.commit()
+            self.db.refresh(account)
+            
+            return account
+            
+        except Exception as e:
+            logger.error(f"Error updating email account: {str(e)}")
+            self.db.rollback()
+            raise ValueError(f"Failed to update email account: {str(e)}")
+    
+    def delete_email_account(self, account_id: int, organization_id: int) -> bool:
+        """Delete an email account"""
+        
+        try:
+            account = self.get_email_account_by_id(account_id, organization_id)
+            if not account:
+                raise ValueError("Email account not found")
+            
+            self.db.delete(account)
+            self.db.commit()
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error deleting email account: {str(e)}")
+            self.db.rollback()
+            raise ValueError(f"Failed to delete email account: {str(e)}")
     
     def _get_provider_settings(self, email: str, provider_type: str, custom_settings: Optional[Dict] = None) -> Tuple[Dict, Dict]:
         """Auto-detect IMAP/SMTP settings based on email provider"""
@@ -217,10 +350,18 @@ class EmailService:
             if not account:
                 raise ValueError("Email account not found")
             
+            # Refresh to get current values
+            self.db.refresh(account)
+            
             # Update sync status
-            account.sync_status = EmailSyncStatus.SYNCING
-            account.last_sync_at = datetime.utcnow()
+            self.db.query(EmailAccount).filter(EmailAccount.id == account_id).update({
+                "sync_status": "syncing",
+                "last_sync_at": datetime.utcnow()
+            })
             self.db.commit()
+            
+            # Refresh again to get updated values
+            self.db.refresh(account)
             
             # Connect to IMAP
             password = decrypt_password(account.password_encrypted)
@@ -236,16 +377,23 @@ class EmailService:
                 total_synced += inbox_synced
                 total_errors += inbox_errors
             
-            # Sync Sent Items
-            if account.sync_sent_items:
-                sent_folder = "Sent" if account.provider_type == EmailProviderType.GMAIL else "[Gmail]/Sent Mail"
+            # Sync Sent Items - custom mail için sadece "Sent" klasörü kullan
+            # Gmail değil custom provider olduğu için standard "Sent" klasörünü kullan
+            try:
+                sent_folder = "Sent"  # Custom provider için standard folder
                 sent_synced, sent_errors = self._sync_folder(imap, account, sent_folder, days_back)
                 total_synced += sent_synced
                 total_errors += sent_errors
+            except Exception as sent_error:
+                logger.error(f"Error syncing Sent folder: {sent_error}")
+                total_errors += 1
             
-            # Update sync status
-            account.sync_status = EmailSyncStatus.ACTIVE
-            account.sync_error_message = None if total_errors == 0 else f"Failed to sync {total_errors} emails"
+            # Update sync status in database using raw query  
+            self.db.query(EmailAccount).filter(EmailAccount.id == account_id).update({
+                "sync_status": "active",
+                "sync_error_message": None if total_errors == 0 else f"Failed to sync {total_errors} emails",
+                "last_sync_at": datetime.utcnow()
+            })
             self.db.commit()
 
             imap.logout()
@@ -259,11 +407,13 @@ class EmailService:
         except Exception as e:
             logger.error(f"Error syncing emails: {str(e)}")
             
-            # Update sync status to error
-            if account:
-                account.sync_status = EmailSyncStatus.ERROR
-                account.sync_error_message = str(e)
-                self.db.commit()
+            # Update sync status to error using raw query
+            self.db.query(EmailAccount).filter(EmailAccount.id == account_id).update({
+                "sync_status": "error",
+                "sync_error_message": str(e),
+                "last_sync_at": datetime.utcnow()
+            })
+            self.db.commit()
             
             return {
                 "success": False,
@@ -360,15 +510,15 @@ class EmailService:
                 subject=parsed_data['subject'],
                 from_email=parsed_data['from_email'],
                 from_name=parsed_data['from_name'],
-                to_emails=parsed_data['to_emails'],
-                cc_emails=parsed_data.get('cc_emails', []),
-                bcc_emails=parsed_data.get('bcc_emails', []),
+                to_emails=json.dumps(parsed_data['to_emails']) if parsed_data['to_emails'] else json.dumps([]),
+                cc_emails=json.dumps(parsed_data.get('cc_emails', [])),
+                bcc_emails=json.dumps(parsed_data.get('bcc_emails', [])),
                 reply_to=parsed_data.get('reply_to'),
                 body_text=parsed_data.get('body_text'),
                 body_html=parsed_data.get('body_html'),
                 sent_date=parsed_data['sent_date'],
-                direction=EmailDirection.INCOMING if folder.upper() == 'INBOX' else EmailDirection.OUTGOING,
-                status=EmailStatus.UNREAD if folder.upper() == 'INBOX' else EmailStatus.READ
+                direction=EmailDirection.incoming if folder.upper() == 'INBOX' else EmailDirection.outgoing,
+                status=EmailStatus.unread if folder.upper() == 'INBOX' else EmailStatus.read
             )
             
             self.db.add(db_email)
@@ -597,12 +747,15 @@ class EmailService:
         """Analyze email content for meetings, tasks, etc."""
         content = (db_email.body_text or '') + ' ' + (db_email.body_html or '')
         
+        # Prepare update data
+        update_data = {}
+        
         # Check for meeting-related keywords
         meeting_keywords = ['meeting', 'call', 'appointment', 'schedule', 'toplantı', 'randevu', 'görüşme']
         contains_meeting = any(keyword in content.lower() for keyword in meeting_keywords)
         
         if contains_meeting:
-            db_email.contains_meeting_info = True
+            update_data['contains_meeting_info'] = True
             
             # Extract dates (basic regex patterns)
             date_patterns = [
@@ -617,7 +770,7 @@ class EmailService:
                 extracted_dates.extend(matches)
             
             if extracted_dates:
-                db_email.extracted_dates = extracted_dates
+                update_data['extracted_dates'] = json.dumps(extracted_dates)
         
         # Extract action items (basic implementation)
         action_keywords = ['todo', 'action', 'follow up', 'call', 'email', 'send', 'review']
@@ -629,9 +782,12 @@ class EmailService:
                 action_items.append(sentence.strip())
         
         if action_items:
-            db_email.action_items = action_items[:5]  # Limit to 5 action items
+            update_data['action_items'] = json.dumps(action_items[:5])  # Limit to 5 action items
         
-        self.db.commit()
+        # Update using raw query if there's data to update
+        if update_data:
+            self.db.query(Email).filter(Email.id == db_email.id).update(update_data)
+            self.db.commit()
     
     def send_email(
         self,
@@ -713,13 +869,13 @@ class EmailService:
                 subject=subject,
                 from_email=account.email,
                 from_name=account.display_name,
-                to_emails=to_emails,
-                cc_emails=cc_emails,
-                bcc_emails=bcc_emails,
+                to_emails=json.dumps(to_emails) if to_emails else json.dumps([]),
+                cc_emails=json.dumps(cc_emails) if cc_emails else json.dumps([]),
+                bcc_emails=json.dumps(bcc_emails) if bcc_emails else json.dumps([]),
                 body_text=body_text,
                 body_html=body_html,
-                direction=EmailDirection.OUTGOING,
-                status=EmailStatus.READ,
+                direction=EmailDirection.outgoing,
+                status=EmailStatus.read,
                 sent_date=datetime.utcnow(),
                 received_date=datetime.utcnow(),
                 folder_name='SENT',

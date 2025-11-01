@@ -55,7 +55,7 @@ import { PageContainer } from '@/components/ui/PageContainer';
 import { cn } from '@/lib/utils';
 import { LucideIcon } from 'lucide-react';
 import { UserProfile } from '@/types/user';
-import { leadsAPI, type LeadStats } from '@/services/leads';
+import { leadsAPI, type LeadStats } from '@/services/api/leads';
 
 type DateRange = '7d' | '30d' | '90d' | 'next30d' | 'next90d' | 'next180d';
 
@@ -691,18 +691,7 @@ export function DashboardPage() {
           </div>
           
           <div className="flex gap-3">
-            <Button size="sm" variant="outline" onClick={() => navigate('/leads')} className="flex items-center gap-2 bg-white border border-gray-200">
-              <UserPlus className="w-4 h-4" />
-              New Lead
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => navigate('/deals')} className="flex items-center gap-2 bg-white border border-gray-200">
-              <DollarSign className="w-4 h-4" />
-              New Deal
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => navigate('/tasks')} className="flex items-center gap-2 bg-white border border-gray-200">
-              <ClipboardList className="w-4 h-4" />
-              New Task
-            </Button>
+            {/* Action buttons removed as requested */}
           </div>
         </div>
       </div>

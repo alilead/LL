@@ -389,11 +389,44 @@ def create_email_account(
     email_service = EmailService(db)
     
     try:
-        # Convert string provider_type to enum
-        if isinstance(account_in.provider_type, str):
-            provider_type = EmailProviderType(account_in.provider_type.lower())
-        else:
-            provider_type = account_in.provider_type
+        # Convert string provider_type to enum - handle case insensitive
+        provider_type_str = account_in.provider_type.lower()
+        
+        # Map the provider type correctly
+        provider_mapping = {
+            'gmail': EmailProviderType.GMAIL,
+            'outlook': EmailProviderType.OUTLOOK,
+            'yahoo': EmailProviderType.YAHOO,
+            'custom': EmailProviderType.CUSTOM
+        }
+        
+        if provider_type_str not in provider_mapping:
+            raise ValueError(f"Invalid provider type: {account_in.provider_type}. Valid options are: gmail, outlook, yahoo, custom")
+            
+        provider_type = provider_mapping[provider_type_str]
+        
+        # Check if account already exists
+        existing_account = db.query(EmailAccount).filter(
+            EmailAccount.email == account_in.email,
+            EmailAccount.organization_id == current_user.organization_id
+        ).first()
+        
+        if existing_account:
+            raise HTTPException(
+                status_code=409,  # Conflict
+                detail={
+                    "error": "Email account already exists",
+                    "account_id": existing_account.id,
+                    "message": "An email account with this address already exists for your organization. Use the update endpoint to modify the existing account.",
+                    "existing_account": {
+                        "id": existing_account.id,
+                        "email": existing_account.email,
+                        "provider": existing_account.provider_type,
+                        "display_name": existing_account.display_name,
+                        "created_at": existing_account.created_at.isoformat() if existing_account.created_at else None
+                    }
+                }
+            )
             
         account = email_service.add_email_account(
             email=account_in.email,
@@ -416,7 +449,107 @@ def create_email_account(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.error(f"Error creating email account: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to create email account")
+
+
+@router.put("/accounts/{account_id}", response_model=EmailAccountOut)
+def update_email_account(
+    account_id: int,
+    account_in: EmailAccountUpdate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user)
+):
+    """Update an existing email account"""
+    
+    try:
+        # Get existing account
+        existing_account = db.query(EmailAccount).filter(
+            EmailAccount.id == account_id,
+            EmailAccount.organization_id == current_user.organization_id
+        ).first()
+        
+        if not existing_account:
+            raise HTTPException(status_code=404, detail="Email account not found")
+        
+        # Create update data
+        update_data = {}
+        
+        # Update basic fields if provided
+        if account_in.display_name is not None:
+            update_data['display_name'] = account_in.display_name
+            
+        if account_in.password is not None:
+            from app.core.security import encrypt_password
+            update_data['password_encrypted'] = encrypt_password(account_in.password)
+            
+        if account_in.provider_type is not None:
+            provider_type_str = account_in.provider_type.lower()
+            provider_mapping = {
+                'gmail': EmailProviderType.GMAIL.value,
+                'outlook': EmailProviderType.OUTLOOK.value,
+                'yahoo': EmailProviderType.YAHOO.value,
+                'custom': EmailProviderType.CUSTOM.value
+            }
+            
+            if provider_type_str not in provider_mapping:
+                raise ValueError(f"Invalid provider type: {account_in.provider_type}")
+                
+            update_data['provider_type'] = provider_mapping[provider_type_str]
+        
+        # Update custom settings if provided
+        if account_in.custom_settings:
+            email_service = EmailService(db)
+            current_email = existing_account.email
+            current_provider = account_in.provider_type or existing_account.provider_type
+            
+            imap_settings, smtp_settings = email_service._get_provider_settings(
+                email=current_email,
+                provider_type=current_provider,
+                custom_settings=account_in.custom_settings
+            )
+            
+            update_data.update(imap_settings)
+            update_data.update(smtp_settings)
+        
+        # Update sync settings if provided  
+        sync_fields = [
+            'sync_enabled', 'sync_frequency_minutes', 'sync_sent_items', 
+            'sync_inbox', 'days_to_sync', 'auto_create_contacts', 
+            'auto_create_tasks', 'calendar_sync_enabled'
+        ]
+        
+        for field in sync_fields:
+            value = getattr(account_in, field, None)
+            if value is not None:
+                update_data[field] = value
+        
+        # Apply updates
+        for key, value in update_data.items():
+            setattr(existing_account, key, value)
+        
+        # Update timestamp
+        existing_account.updated_at = datetime.utcnow()
+        
+        # Save changes
+        db.commit()
+        db.refresh(existing_account)
+        
+        # Start background sync if connection settings changed
+        if any(key in update_data for key in ['password_encrypted', 'imap_host', 'smtp_host']):
+            background_tasks.add_task(
+                EmailService(db).sync_account_emails,
+                existing_account.id
+            )
+        
+        return existing_account
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error updating email account: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update email account")
 
 
 @router.delete("/accounts/{account_id}")
@@ -570,11 +703,11 @@ def get_emails(
     # since sent emails are not typically marked as unread
     if direction:
         if direction.lower() == "incoming":
-            query = query.filter(Email.direction == EmailDirection.INCOMING)
+            query = query.filter(Email.direction == EmailDirection.incoming)
             if unread_only:
-                query = query.filter(Email.status == EmailStatus.UNREAD)
+                query = query.filter(Email.status == EmailStatus.unread)
         elif direction.lower() == "outgoing":
-            query = query.filter(Email.direction == EmailDirection.OUTGOING)
+            query = query.filter(Email.direction == EmailDirection.outgoing)
             # Don't apply unread filter for outgoing emails
         else:
             # Invalid direction parameter
@@ -582,7 +715,7 @@ def get_emails(
     else:
         # No direction specified, apply unread filter if requested
         if unread_only:
-            query = query.filter(Email.status == EmailStatus.UNREAD)
+            query = query.filter(Email.status == EmailStatus.unread)
     
     emails = query.order_by(Email.sent_date.desc()).offset(skip).limit(limit).all()
     return emails
@@ -621,7 +754,7 @@ def mark_email_read(
     if not email:
         raise HTTPException(status_code=404, detail="Email not found")
     
-    email.status = EmailStatus.READ
+    email.status = EmailStatus.read
     db.commit()
     
     return {"message": "Email marked as read"}

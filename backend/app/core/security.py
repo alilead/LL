@@ -86,6 +86,24 @@ def check_permission(user: models.User, entity_type: str, entity_id: int, db_obj
     
     return True
 
+def encrypt_password(password: str) -> str:
+    """Encrypt a password using Fernet symmetric encryption"""
+    try:
+        encryption = TokenEncryption()
+        return encryption.encrypt_token(password)
+    except Exception as e:
+        logger.error(f"Password encryption failed: {str(e)}")
+        raise
+
+def decrypt_password(encrypted_password: str) -> str:
+    """Decrypt an encrypted password"""
+    try:
+        encryption = TokenEncryption()
+        return encryption.decrypt_token(encrypted_password)
+    except Exception as e:
+        logger.error(f"Password decryption failed: {str(e)}")
+        raise
+
 class TokenEncryption:
     def __init__(self):
         try:

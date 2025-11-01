@@ -47,6 +47,43 @@ instance.interceptors.response.use(
 );
 
 export { instance as api, informationRequestsAPI, leadsAPI };
+export { default as backendGoAPI } from './backend-go';
+export { default as usersAPI } from './users';
+export { default as dealsAPI } from './deals';
+export { notificationsAPI } from './notifications';
+export { default as tagsAPI } from '../tags';
+export { default as organizationsAPI } from './backend-go';
+export { default as settingsAPI } from './backend-go';
+
+// Re-export types
+export type { Lead, LeadStats, User, Tag } from './leads';
+export type { Tag as TagType } from '../tags';
+export type { User as UserType } from './users';
+
+// Placeholder types for missing APIs
+export interface OrganizationSettings {
+  id: number;
+  name: string;
+  domain?: string;
+  settings?: Record<string, any>;
+}
+
+export interface EmailSettings {
+  id: number;
+  smtp_host?: string;
+  smtp_port?: number;
+  smtp_user?: string;
+  from_email?: string;
+  from_name?: string;
+}
+
+export interface EmailTemplate {
+  id: number;
+  name: string;
+  subject: string;
+  body: string;
+  type: string;
+}
 
 import axiosApiInstance from '../axios';
 

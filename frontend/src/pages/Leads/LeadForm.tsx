@@ -276,9 +276,9 @@ const sectors = [
 const formSchema = z.object({
   first_name: z.string().min(1, 'First name is required'),
   last_name: z.string().min(1, 'Last name is required'),
-  company: z.string().min(1, 'Company name is required'),
-  job_title: z.string().min(1, 'Job title is required'),
-  email: z.string().email('Invalid email address').min(1, 'Email is required'),
+  company: z.string().optional(),
+  job_title: z.string().optional(),
+  email: z.string().email('Invalid email address').optional().or(z.literal('')),
   telephone: z.string().optional(),
   mobile: z.string().optional(),
   location: z.string().optional(),
@@ -372,11 +372,12 @@ export function LeadForm() {
         organization_id: Number(user.organization_id),
         user_id: Number(user.id),
         created_by: Number(user.id),
-        stage_id: null,
+        // Don't include stage_id if it's null - let backend handle default
         // Add default values for required database fields
         is_deleted: false,
         visible: true,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        tags: [] // Add empty tags array to prevent type mismatch
       };
 
       // Log the complete data being sent
@@ -487,13 +488,12 @@ export function LeadForm() {
                       <FormItem>
                         <FormLabel className="flex items-center gap-1">
                           Company
-                          <span className="text-red-500">*</span>
                         </FormLabel>
                         <FormControl>
                           <Input placeholder="Acme Inc." {...field} />
                         </FormControl>
                         <FormDescription className="text-xs text-gray-500">
-                          Required field
+                          Optional - Company name
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -506,13 +506,12 @@ export function LeadForm() {
                       <FormItem>
                         <FormLabel className="flex items-center gap-1">
                           Job Title
-                          <span className="text-red-500">*</span>
                         </FormLabel>
                         <FormControl>
                           <Input placeholder="Sales Manager" {...field} />
                         </FormControl>
                         <FormDescription className="text-xs text-gray-500">
-                          Required field
+                          Optional - Job title or position
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -527,13 +526,12 @@ export function LeadForm() {
                     <FormItem>
                       <FormLabel className="flex items-center gap-1">
                         Email
-                        <span className="text-red-500">*</span>
                       </FormLabel>
                       <FormControl>
                         <Input type="email" placeholder="john.doe@example.com" {...field} />
                       </FormControl>
                       <FormDescription className="text-xs text-gray-500">
-                        Required field - Please enter a valid email address
+                        Optional - Valid email address
                       </FormDescription>
                       <FormMessage />
                     </FormItem>

@@ -2,22 +2,22 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import { PublicHeader } from '../components/layout/PublicHeader'
-import { useAuthStore } from '../store/auth'
+import authService from '../services/auth'
 
 export function ForgotPassword() {
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const resetPassword = useAuthStore(state => state.resetPassword)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
     try {
-      await resetPassword(email)
+      await authService.forgotPassword({ email })
       toast.success('Password reset instructions sent to your email')
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to send reset instructions')
+      const errorMessage = err.response?.data?.message || err.response?.data?.detail || err.message || 'Failed to send reset instructions'
+      toast.error(errorMessage)
     } finally {
       setIsLoading(false)
     }

@@ -17,9 +17,12 @@ import {
   Menu,
   Zap,
   Target,
+  FileText,
   Building,
   Building2,
-  Shield
+  Shield,
+  Mail,
+  Palette
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
@@ -72,6 +75,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       icon: Target,
       description: 'Sales pipeline'
     },
+
     { 
       name: 'Calendar', 
       href: '/calendar', 
@@ -89,6 +93,12 @@ export function MainLayout({ children }: MainLayoutProps) {
       href: '/messages', 
       icon: MessageSquare,
       description: 'Communications'
+    },
+    { 
+      name: 'Emails', 
+      href: '/emails', 
+      icon: Mail,
+      description: 'Email Management'
     },
     { 
       name: 'Reports', 

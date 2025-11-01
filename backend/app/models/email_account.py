@@ -9,16 +9,6 @@ class EmailProviderType(str, enum.Enum):
     YAHOO = "yahoo"
     CUSTOM = "custom"
 
-    @classmethod
-    def _missing_(cls, value):
-        # Handle case-insensitive lookup
-        if isinstance(value, str):
-            value = value.lower()
-            for member in cls:
-                if member.value == value:
-                    return member
-        return None
-
 class EmailSyncStatus(str, enum.Enum):
     ACTIVE = "active"
     ERROR = "error"
@@ -31,7 +21,7 @@ class EmailAccount(Base, TimestampMixin):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), nullable=False, index=True)
     display_name = Column(String(255), nullable=True)
-    provider_type = Column(Enum(EmailProviderType), nullable=False)
+    provider_type = Column(String(50), nullable=False)
     
     # IMAP Settings
     imap_host = Column(String(255), nullable=False)
@@ -47,7 +37,7 @@ class EmailAccount(Base, TimestampMixin):
     password_encrypted = Column(Text, nullable=False)  # Will encrypt this
     
     # Sync Settings
-    sync_status = Column(Enum(EmailSyncStatus), default=EmailSyncStatus.ACTIVE)
+    sync_status = Column(String(50), default=EmailSyncStatus.ACTIVE.value)
     last_sync_at = Column(DateTime, nullable=True)
     sync_error_message = Column(Text, nullable=True)
     sync_enabled = Column(Boolean, default=True)
@@ -79,7 +69,6 @@ class EmailAccount(Base, TimestampMixin):
     organization = relationship("Organization", back_populates="email_accounts")
     user = relationship("User", back_populates="email_accounts")
     emails = relationship("Email", back_populates="email_account", cascade="all, delete-orphan")
-    synced_events = relationship("Event", back_populates="email_account")
     
     def __repr__(self):
         return f"<EmailAccount {self.email}>" 

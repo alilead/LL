@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { register, RegisterData } from '../services/auth';
+import { useAuthStore } from '../store/auth';
 import { motion } from 'framer-motion';
 import { Mail, User, Lock } from 'lucide-react';
 import { PublicHeader } from '../components/layout/PublicHeader';
+import { toast } from 'react-hot-toast';
+import type { RegisterData } from '../services/auth';
 
 export default function Register() {
   const navigate = useNavigate();
+  const { register } = useAuthStore();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -26,9 +29,12 @@ export default function Register() {
 
     try {
       await register(userData);
+      toast.success('Account created successfully! Please check your email to verify your account.');
       navigate('/signin', { state: { message: 'Account created successfully. Please sign in.' } });
     } catch (err: any) {
-      setError(err.message || 'Registration failed');
+      const errorMessage = err.response?.data?.message || err.response?.data?.detail || err.message || 'Registration failed';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
