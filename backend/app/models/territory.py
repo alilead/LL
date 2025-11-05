@@ -60,7 +60,7 @@ class Territory(Base):
     is_active = Column(Boolean, default=True)
 
     # Metadata
-    metadata = Column(JSON, nullable=True)  # Store custom attributes
+    custom_metadata = Column(JSON, nullable=True)  # Store custom attributes
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
