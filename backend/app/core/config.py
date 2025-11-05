@@ -13,11 +13,11 @@ class Settings(BaseSettings):
     VERSION: str = Field(default="1.0.0", description="API version")
     API_V1_STR: str = Field(default="/api/v1", description="API version prefix")
     DEBUG: bool = Field(default=False, description="Debug mode")
-    SECRET_KEY: str = Field(default="leadlab-secret-key-2024", description="Secret key for JWT encoding")
+    SECRET_KEY: str = Field(..., description="Secret key for JWT encoding - MUST be set via environment variable")
     FRONTEND_URL: str = Field(default="https://the-leadlab.com", description="Frontend application URL")
-    
+
     # Database
-    DATABASE_URL: str = Field(default="mysql+pymysql://leadlab_admin:Oh5#Jy5#Ak3!Nw7#@localhost/leadlab_admin?charset=utf8mb4", description="Database connection URL")
+    DATABASE_URL: str = Field(..., description="Database connection URL - MUST be set via environment variable")
     MYSQL_POOL_SIZE: int = Field(default=5, description="MySQL connection pool size")
     MYSQL_MAX_OVERFLOW: int = Field(default=2, description="MySQL connection pool max overflow")
     MYSQL_POOL_TIMEOUT: int = Field(default=30, description="MySQL connection pool timeout")
@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = Field(default="HS256", description="JWT algorithm")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=60 * 24, description="Access token expiry in minutes")
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7, description="Refresh token expiry in days")
-    TOKEN_ENCRYPTION_KEY: str = Field(default="d-bObG__j-IynTqhD-eatflCbGnbb3Kqzi8xmb_2HQ8=", description="Key used for encrypting tokens")
+    TOKEN_ENCRYPTION_KEY: str = Field(..., description="Key used for encrypting tokens - MUST be set via environment variable")
     
     # CORS
     CORS_ORIGINS: List[str] = Field(
@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     )
     
     # API Keys
-    API_SECRET_KEY: str = Field(default="leadlab-api-secret-2024", description="API secret key")
+    API_SECRET_KEY: str = Field(..., description="API secret key - MUST be set via environment variable")
     CRYSTAL_KNOWS_API_KEY: Optional[str] = Field(default=None, description="Crystal Knows API key")
     CRYSTAL_KNOWS_BASE_URL: Optional[str] = Field(
         default="https://api.crystalknows.com/v1",
@@ -69,8 +69,8 @@ class Settings(BaseSettings):
     )
 
     # LinkedIn Configuration
-    LINKEDIN_CLIENT_ID: str = Field(default="77ndp90oa63xyn", description="LinkedIn client ID")
-    LINKEDIN_CLIENT_SECRET: str = Field(default="WPL_AP1.kNDMX6fD1YaEA4oo.qGm/LQ==", description="LinkedIn client secret")
+    LINKEDIN_CLIENT_ID: str = Field(..., description="LinkedIn client ID - MUST be set via environment variable")
+    LINKEDIN_CLIENT_SECRET: str = Field(..., description="LinkedIn client secret - MUST be set via environment variable")
     LINKEDIN_REDIRECT_URI: str = Field(default="https://the-leadlab.com/linkedin/callback", description="LinkedIn redirect URI")
     LINKEDIN_SCOPE: str = Field(default="openid profile email w_member_social", description="LinkedIn OAuth scope")
     
@@ -84,23 +84,23 @@ class Settings(BaseSettings):
         return v
 
     # Stripe Configuration
-    STRIPE_PUBLISHABLE_KEY: str = Field(default="pk_test_51Po9pFGAwS5JrvA5DqSMFXh2iccm5zAOQ6oWGXet6aycxKUxiQPQIpmCj32H2STSGVNLvbf04FtiQXy9r8XL0Edz00I3YVnmnH", description="Stripe publishable key")
-    STRIPE_SECRET_KEY: str = Field(default="sk_test_51Po9pFGAwS5JrvA5Qa3ihQXCKRn305tCrusJJHqXExghCpYlkyzhCmOpH1CVLCIt9rCHgCYSG7BVtXd2puzRHavq00exEeNX4l", description="Stripe secret key")
-    STRIPE_WEBHOOK_SECRET: str = Field(default="whsec_51PoaqzHhYzNfGDxGwzO1ujGbN8HMbYY", description="Stripe webhook secret")
+    STRIPE_PUBLISHABLE_KEY: str = Field(..., description="Stripe publishable key - MUST be set via environment variable")
+    STRIPE_SECRET_KEY: str = Field(..., description="Stripe secret key - MUST be set via environment variable")
+    STRIPE_WEBHOOK_SECRET: str = Field(..., description="Stripe webhook secret - MUST be set via environment variable")
     STRIPE_CURRENCY: str = Field(default="usd", description="Default currency for Stripe payments")
     
     # Email/SMTP Configuration
     SMTP_HOST: str = Field(default="the-leadlab.com", description="SMTP server host")
     SMTP_PORT: int = Field(default=465, description="SMTP server port")
     SMTP_USER: Optional[str] = Field(default="no-reply@the-leadlab.com", description="SMTP username")
-    SMTP_PASSWORD: Optional[str] = Field(default="^O3f35rm2", description="SMTP password")
+    SMTP_PASSWORD: Optional[str] = Field(default=None, description="SMTP password - MUST be set via environment variable")
     SMTP_TLS: bool = Field(default=True, description="Use TLS for SMTP")
     EMAILS_FROM_EMAIL: str = Field(default="no-reply@the-leadlab.com", description="Default from email")
     SMTP_FROM_NAME: str = Field(default="LeadLab", description="Default from name")
-    
+
     # Invoice Email Configuration (separate from auth emails)
     INVOICE_EMAIL: str = Field(default="invoice@the-leadlab.com", description="Invoice-specific email")
-    INVOICE_EMAIL_PASSWORD: str = Field(default="oq96tJ2~7", description="Invoice email password")
+    INVOICE_EMAIL_PASSWORD: Optional[str] = Field(default=None, description="Invoice email password - MUST be set via environment variable")
     
     # Email Token Configuration
     EMAIL_RESET_TOKEN_EXPIRE_HOURS: int = Field(default=1, description="Password reset token expiry in hours")
