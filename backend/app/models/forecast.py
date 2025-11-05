@@ -134,7 +134,7 @@ class Forecast(Base):
     currency = Column(String(3), default="USD")
 
     # Metadata
-    metadata = Column(JSON, nullable=True)  # Additional forecast data
+    custom_metadata = Column(JSON, nullable=True)  # Additional forecast data
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)

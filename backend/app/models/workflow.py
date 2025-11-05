@@ -96,7 +96,7 @@ class Workflow(Base):
 
     # Metadata
     version = Column(Integer, default=1)
-    metadata = Column(JSON, nullable=True)
+    custom_metadata = Column(JSON, nullable=True)
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
