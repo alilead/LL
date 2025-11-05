@@ -197,3 +197,9 @@ class UnsubscribeRequest(BaseModel):
     """Unsubscribe from sequence"""
     enrollment_id: int
     reason: Optional[str] = None
+
+
+# CRITICAL: Rebuild models to resolve forward references in Pydantic v2
+# This is required because SequenceEnrollmentDetail uses SequenceStepResponse
+# Without this, FastAPI will fail to load the module at startup
+SequenceEnrollmentDetail.model_rebuild()
