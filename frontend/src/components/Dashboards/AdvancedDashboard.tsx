@@ -40,6 +40,8 @@ import {
   Area,
   AreaChart,
 } from 'recharts';
+import { advancedReportsApi } from '@/api/advancedReports';
+import { useQuery } from '@tanstack/react-query';
 
 // Widget types
 export type WidgetType =
@@ -384,9 +386,74 @@ export function FunnelWidget({ title, stages }: FunnelWidgetProps) {
 // Complete Dashboard Example
 export function AdvancedDashboard() {
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Mock data
+  // Calculate date range based on selection
+  const dateRange = useMemo(() => {
+    const endDate = new Date();
+    const startDate = new Date();
+    switch (timeRange) {
+      case '7d':
+        startDate.setDate(endDate.getDate() - 7);
+        break;
+      case '30d':
+        startDate.setDate(endDate.getDate() - 30);
+        break;
+      case '90d':
+        startDate.setDate(endDate.getDate() - 90);
+        break;
+      case '1y':
+        startDate.setFullYear(endDate.getFullYear() - 1);
+        break;
+    }
+    return {
+      start_date: startDate.toISOString().split('T')[0],
+      end_date: endDate.toISOString().split('T')[0],
+    };
+  }, [timeRange]);
+
+  // Fetch KPI metrics
+  const { data: kpiData, isLoading: isLoadingKPI, refetch: refetchKPI } = useQuery({
+    queryKey: ['kpiDashboard', dateRange],
+    queryFn: () => advancedReportsApi.getKPIDashboard(dateRange),
+  });
+
+  // Fetch lead sources
+  const { data: leadSources, isLoading: isLoadingLeadSources, refetch: refetchLeadSources } = useQuery({
+    queryKey: ['leadSources', dateRange],
+    queryFn: () => advancedReportsApi.getLeadSourceAnalysis(dateRange),
+  });
+
+  // Fetch pipeline health
+  const { data: pipelineHealth, isLoading: isLoadingPipeline, refetch: refetchPipeline } = useQuery({
+    queryKey: ['pipelineHealth'],
+    queryFn: () => advancedReportsApi.getPipelineHealth(),
+  });
+
+  // Fetch conversion funnel
+  const { data: conversionFunnel, isLoading: isLoadingFunnel, refetch: refetchFunnel } = useQuery({
+    queryKey: ['conversionFunnel', dateRange],
+    queryFn: () => advancedReportsApi.getConversionFunnel(dateRange),
+  });
+
+  const isRefreshing = isLoadingKPI || isLoadingLeadSources || isLoadingPipeline || isLoadingFunnel;
+
+  // Transform API data to chart format
+  const leadSourceData = useMemo(() => {
+    return (leadSources || []).map(source => ({
+      name: source.source,
+      value: source.total_leads,
+    }));
+  }, [leadSources]);
+
+  const pipelineData = useMemo(() => {
+    return (pipelineHealth || []).map(stage => ({
+      name: stage.stage_name,
+      count: stage.lead_count,
+      value: stage.total_value,
+    }));
+  }, [pipelineHealth]);
+
+  // Mock revenue data (would need time-series endpoint from backend)
   const revenueData = [
     { name: 'Jan', revenue: 45000, target: 50000 },
     { name: 'Feb', revenue: 52000, target: 50000 },
@@ -396,28 +463,19 @@ export function AdvancedDashboard() {
     { name: 'Jun', revenue: 67000, target: 60000 },
   ];
 
-  const leadSourceData = [
-    { name: 'Website', value: 400 },
-    { name: 'Referral', value: 300 },
-    { name: 'Social Media', value: 200 },
-    { name: 'Email Campaign', value: 150 },
-    { name: 'Other', value: 100 },
-  ];
-
-  const pipelineData = [
-    { name: 'New', count: 45, value: 125000 },
-    { name: 'Qualified', count: 32, value: 98000 },
-    { name: 'Proposal', count: 18, value: 67000 },
-    { name: 'Negotiation', count: 12, value: 45000 },
-    { name: 'Won', count: 8, value: 32000 },
-  ];
-
   const handleRefresh = async () => {
-    setIsRefreshing(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsRefreshing(false);
+    await Promise.all([refetchKPI(), refetchLeadSources(), refetchPipeline(), refetchFunnel()]);
   };
+
+  // Extract KPI metrics
+  const totalRevenue = kpiData?.kpi_metrics.find(m => m.name.includes('Revenue'))?.current_value || 0;
+  const revenueChange = kpiData?.kpi_metrics.find(m => m.name.includes('Revenue'))?.change_percentage || 0;
+  const newLeads = kpiData?.kpi_metrics.find(m => m.name.includes('Lead'))?.current_value || 0;
+  const leadsChange = kpiData?.kpi_metrics.find(m => m.name.includes('Lead'))?.change_percentage || 0;
+  const conversionRate = kpiData?.kpi_metrics.find(m => m.name.includes('Conversion'))?.current_value || 0;
+  const conversionChange = kpiData?.kpi_metrics.find(m => m.name.includes('Conversion'))?.change_percentage || 0;
+  const activeDealCount = kpiData?.kpi_metrics.find(m => m.name.includes('Deal'))?.current_value || 0;
+  const dealsChange = kpiData?.kpi_metrics.find(m => m.name.includes('Deal'))?.change_percentage || 0;
 
   return (
     <div className="p-6 space-y-6">
@@ -470,15 +528,15 @@ export function AdvancedDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricWidget
           title="Total Revenue"
-          value="$328K"
-          change={12.5}
+          value={`$${(totalRevenue / 1000).toFixed(0)}K`}
+          change={revenueChange}
           icon={DollarSign}
           color="green"
         />
         <MetricWidget
           title="New Leads"
-          value="145"
-          change={8.2}
+          value={newLeads}
+          change={leadsChange}
           icon={Users}
           color="blue"
         />

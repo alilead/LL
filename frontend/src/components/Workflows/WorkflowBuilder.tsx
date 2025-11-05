@@ -7,9 +7,11 @@
  * Automate EVERYTHING!
  */
 
-import { useState } from 'react';
-import { Zap, Plus, GitBranch, Clock, Mail, Users, Check, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Zap, Plus, GitBranch, Clock, Mail, Users, Check, X, Save, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { workflowsAPI } from '@/services/api/workflows';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 export type TriggerType = 'lead_created' | 'deal_stage_changed' | 'task_completed' | 'form_submitted' | 'email_opened' | 'field_updated';
 export type ActionType = 'send_email' | 'create_task' | 'update_field' | 'notify_slack' | 'webhook' | 'assign_owner';
@@ -65,7 +67,12 @@ const actionLabels: Record<ActionType, string> = {
   assign_owner: 'Assign Owner',
 };
 
-export function WorkflowBuilder() {
+interface WorkflowBuilderProps {
+  workflowId?: number;
+}
+
+export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps = {}) {
+  const queryClient = useQueryClient();
   const [workflow, setWorkflow] = useState<Workflow>({
     id: 'new',
     name: 'New Workflow',
@@ -80,6 +87,70 @@ export function WorkflowBuilder() {
       triggered: 0,
       succeeded: 0,
       failed: 0,
+    },
+  });
+  const [saveStatus, setSaveStatus] = useState<string>('');
+
+  // Load workflow if editing
+  const { data: existingWorkflow } = useQuery({
+    queryKey: ['workflow', workflowId],
+    queryFn: () => workflowsAPI.getById(workflowId!),
+    enabled: !!workflowId,
+  });
+
+  useEffect(() => {
+    if (existingWorkflow) {
+      // Map backend workflow to frontend format
+      setWorkflow({
+        id: String(existingWorkflow.id),
+        name: existingWorkflow.name,
+        description: existingWorkflow.description,
+        enabled: existingWorkflow.is_active,
+        trigger: {
+          type: existingWorkflow.trigger_type as TriggerType,
+          config: existingWorkflow.flow_definition || {},
+        },
+        conditions: [],
+        actions: [],
+        stats: { triggered: 0, succeeded: 0, failed: 0 },
+      });
+    }
+  }, [existingWorkflow]);
+
+  // Save workflow mutation
+  const saveWorkflowMutation = useMutation({
+    mutationFn: async (isActive: boolean) => {
+      const data = {
+        name: workflow.name,
+        description: workflow.description,
+        trigger_type: workflow.trigger.type,
+        trigger_object: 'Lead', // Default to Lead
+        flow_definition: {
+          trigger: workflow.trigger,
+          conditions: workflow.conditions,
+          actions: workflow.actions,
+        },
+        is_active: isActive,
+      };
+
+      if (workflowId) {
+        return workflowsAPI.update(workflowId, data);
+      } else {
+        return workflowsAPI.create(data);
+      }
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['workflows'] });
+      setSaveStatus('Saved successfully!');
+      setTimeout(() => setSaveStatus(''), 3000);
+      if (!workflowId) {
+        // Redirect to edit mode with the new ID
+        window.history.pushState({}, '', `/workflows/${data.id}/edit`);
+      }
+    },
+    onError: () => {
+      setSaveStatus('Failed to save');
+      setTimeout(() => setSaveStatus(''), 3000);
     },
   });
 
@@ -110,6 +181,14 @@ export function WorkflowBuilder() {
     }));
   };
 
+  const handleSaveDraft = () => {
+    saveWorkflowMutation.mutate(false);
+  };
+
+  const handlePublish = () => {
+    saveWorkflowMutation.mutate(true);
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -120,6 +199,10 @@ export function WorkflowBuilder() {
         </div>
 
         <div className="flex items-center gap-3">
+          {saveStatus && (
+            <span className="text-sm text-green-600 font-medium">{saveStatus}</span>
+          )}
+
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -130,11 +213,21 @@ export function WorkflowBuilder() {
             <span className="text-sm font-medium">Enabled</span>
           </label>
 
-          <button className="px-4 py-2 border rounded-lg hover:bg-gray-50">
-            Save Draft
+          <button
+            onClick={handleSaveDraft}
+            disabled={saveWorkflowMutation.isPending}
+            className="px-4 py-2 border rounded-lg hover:bg-gray-50 disabled:opacity-50 flex items-center gap-2"
+          >
+            <Save className="w-4 h-4" />
+            {saveWorkflowMutation.isPending ? 'Saving...' : 'Save Draft'}
           </button>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-            Publish
+          <button
+            onClick={handlePublish}
+            disabled={saveWorkflowMutation.isPending}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+          >
+            <Upload className="w-4 h-4" />
+            {saveWorkflowMutation.isPending ? 'Publishing...' : 'Publish'}
           </button>
         </div>
       </div>

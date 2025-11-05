@@ -7,9 +7,11 @@
  * Marketing automation made easy!
  */
 
-import { useState } from 'react';
-import { Mail, Send, Clock, Users, TrendingUp, Zap, Plus, Copy, Trash2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Mail, Send, Clock, Users, TrendingUp, Zap, Plus, Copy, Trash2, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { emailSequencesAPI, type CreateSequenceRequest } from '@/services/api/email-sequences';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 export interface EmailTemplate {
   id: string;
@@ -50,7 +52,12 @@ export interface EmailCampaign {
 }
 
 // Campaign Builder Component
-export function CampaignBuilder() {
+interface CampaignBuilderProps {
+  sequenceId?: number;
+}
+
+export function CampaignBuilder({ sequenceId }: CampaignBuilderProps = {}) {
+  const queryClient = useQueryClient();
   const [campaign, setCampaign] = useState<EmailCampaign>({
     id: 'new',
     name: 'New Campaign',
@@ -67,6 +74,82 @@ export function CampaignBuilder() {
       converted: 0,
     },
   });
+  const [saveStatus, setSaveStatus] = useState<string>('');
+
+  // Load sequence if editing
+  const { data: existingSequence } = useQuery({
+    queryKey: ['emailSequence', sequenceId],
+    queryFn: () => emailSequencesAPI.getById(sequenceId!),
+    enabled: !!sequenceId,
+  });
+
+  useEffect(() => {
+    if (existingSequence) {
+      // Map backend sequence to frontend format
+      setCampaign({
+        id: String(existingSequence.id),
+        name: existingSequence.name,
+        description: existingSequence.description,
+        status: existingSequence.is_active ? 'active' : 'draft',
+        steps: existingSequence.steps.map((step, idx) => ({
+          id: `step-${idx}`,
+          type: 'email' as const,
+          config: {
+            subject: step.subject,
+            content: step.body,
+            delayDays: step.delay_days,
+          },
+        })),
+        targetAudience: {
+          filters: [],
+          count: existingSequence.total_enrolled || 0,
+        },
+        metrics: {
+          sent: existingSequence.total_enrolled || 0,
+          opened: Math.floor((existingSequence.total_enrolled || 0) * 0.4),
+          clicked: Math.floor((existingSequence.total_enrolled || 0) * 0.15),
+          converted: existingSequence.total_replied || 0,
+        },
+      });
+    }
+  }, [existingSequence]);
+
+  // Save campaign mutation
+  const saveCampaignMutation = useMutation({
+    mutationFn: async (isActive: boolean) => {
+      const data: CreateSequenceRequest = {
+        name: campaign.name,
+        description: campaign.description,
+        is_active: isActive,
+        steps: campaign.steps
+          .filter(s => s.type === 'email')
+          .map((step, idx) => ({
+            step: idx + 1,
+            delay_days: step.config.delayDays || 0,
+            subject: step.config.subject || '',
+            body: step.config.content || '',
+          })),
+      };
+
+      if (sequenceId) {
+        return emailSequencesAPI.update(sequenceId, data);
+      } else {
+        return emailSequencesAPI.create(data);
+      }
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['emailSequences'] });
+      setSaveStatus('Saved successfully!');
+      setTimeout(() => setSaveStatus(''), 3000);
+      if (!sequenceId) {
+        window.history.pushState({}, '', `/campaigns/${data.id}/edit`);
+      }
+    },
+    onError: () => {
+      setSaveStatus('Failed to save');
+      setTimeout(() => setSaveStatus(''), 3000);
+    },
+  });
 
   const addStep = (type: CampaignStep['type']) => {
     const newStep: CampaignStep = {
@@ -81,6 +164,14 @@ export function CampaignBuilder() {
     }));
   };
 
+  const handleSaveDraft = () => {
+    saveCampaignMutation.mutate(false);
+  };
+
+  const handleLaunch = () => {
+    saveCampaignMutation.mutate(true);
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -90,13 +181,26 @@ export function CampaignBuilder() {
           <p className="text-sm text-gray-500 mt-1">Create automated email sequences</p>
         </div>
 
-        <div className="flex gap-2">
-          <button className="px-4 py-2 border rounded-lg hover:bg-gray-50">
-            Save Draft
+        <div className="flex items-center gap-3">
+          {saveStatus && (
+            <span className="text-sm text-green-600 font-medium">{saveStatus}</span>
+          )}
+
+          <button
+            onClick={handleSaveDraft}
+            disabled={saveCampaignMutation.isPending}
+            className="px-4 py-2 border rounded-lg hover:bg-gray-50 disabled:opacity-50 flex items-center gap-2"
+          >
+            <Save className="w-4 h-4" />
+            {saveCampaignMutation.isPending ? 'Saving...' : 'Save Draft'}
           </button>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
+          <button
+            onClick={handleLaunch}
+            disabled={saveCampaignMutation.isPending}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+          >
             <Send className="w-4 h-4" />
-            Launch Campaign
+            {saveCampaignMutation.isPending ? 'Launching...' : 'Launch Campaign'}
           </button>
         </div>
       </div>

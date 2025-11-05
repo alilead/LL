@@ -24,6 +24,8 @@ import {
   Info,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { notificationsAPI } from '@/services/api/notifications';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 export type NotificationType =
   | 'lead_assigned'
@@ -77,69 +79,61 @@ const notificationColors: Record<NotificationType, string> = {
 };
 
 export function useNotifications() {
-  const [notifications, setNotifications] = useState<Notification[]>(() => {
-    // Load from localStorage
-    const saved = localStorage.getItem('leadlab-notifications');
-    if (saved) {
-      try {
-        return JSON.parse(saved).map((n: any) => ({
-          ...n,
-          timestamp: new Date(n.timestamp),
-        }));
-      } catch (e) {
-        return [];
-      }
-    }
-    return [];
+  const queryClient = useQueryClient();
+  const [isConnected, setIsConnected] = useState(true);
+
+  // Fetch notifications from backend
+  const { data: backendNotifications = [], isLoading } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: () => notificationsAPI.getAll({ limit: 50 }),
+    refetchInterval: 30000, // Refetch every 30 seconds (simulates real-time)
   });
 
-  const [isConnected, setIsConnected] = useState(false);
+  // Map backend notifications to frontend format
+  const notifications: Notification[] = backendNotifications.map((n: any) => ({
+    id: String(n.id),
+    type: (n.type || 'info') as NotificationType,
+    title: n.title,
+    message: n.message,
+    timestamp: new Date(n.created_at),
+    read: n.is_read,
+    actionUrl: n.link || undefined,
+    actionLabel: n.link ? 'View Details' : undefined,
+    metadata: n,
+  }));
 
-  // Save to localStorage
-  useEffect(() => {
-    localStorage.setItem('leadlab-notifications', JSON.stringify(notifications));
-  }, [notifications]);
+  // Mark as read mutation
+  const markAsReadMutation = useMutation({
+    mutationFn: (id: number) => notificationsAPI.markAsRead(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
 
-  // Connect to WebSocket (mock - replace with real WebSocket)
-  useEffect(() => {
-    // Mock WebSocket connection
-    setIsConnected(true);
+  // Mark all as read mutation
+  const markAllAsReadMutation = useMutation({
+    mutationFn: () => notificationsAPI.markAllAsRead(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
 
-    // Simulate receiving notifications
-    const interval = setInterval(() => {
-      // This would be replaced with actual WebSocket messages
-      const mockNotifications: Notification[] = [
-        {
-          id: `notif-${Date.now()}`,
-          type: 'lead_assigned',
-          title: 'New Lead Assigned',
-          message: 'John Smith from Acme Corp has been assigned to you',
-          timestamp: new Date(),
-          read: false,
-          actionUrl: '/leads/123',
-          actionLabel: 'View Lead',
-        },
-      ];
-
-      // Uncomment to test
-      // setNotifications(prev => [...mockNotifications, ...prev]);
-    }, 30000); // Every 30 seconds
-
-    return () => {
-      clearInterval(interval);
-      setIsConnected(false);
-    };
-  }, []);
+  // Delete notification mutation
+  const deleteNotificationMutation = useMutation({
+    mutationFn: (id: number) => notificationsAPI.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
 
   const addNotification = useCallback((notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
+    // For now, this is client-side only. In production, you'd POST to backend
     const newNotif: Notification = {
       ...notification,
       id: `notif-${Date.now()}-${Math.random()}`,
       timestamp: new Date(),
       read: false,
     };
-
-    setNotifications(prev => [newNotif, ...prev]);
 
     // Show browser notification if permitted
     if ('Notification' in window && Notification.permission === 'granted') {
@@ -153,22 +147,32 @@ export function useNotifications() {
   }, []);
 
   const markAsRead = useCallback((id: string) => {
-    setNotifications(prev =>
-      prev.map(n => (n.id === id ? { ...n, read: true } : n))
-    );
-  }, []);
+    const numericId = parseInt(id, 10);
+    if (!isNaN(numericId)) {
+      markAsReadMutation.mutate(numericId);
+    }
+  }, [markAsReadMutation]);
 
   const markAllAsRead = useCallback(() => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  }, []);
+    markAllAsReadMutation.mutate();
+  }, [markAllAsReadMutation]);
 
   const deleteNotification = useCallback((id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
-  }, []);
+    const numericId = parseInt(id, 10);
+    if (!isNaN(numericId)) {
+      deleteNotificationMutation.mutate(numericId);
+    }
+  }, [deleteNotificationMutation]);
 
   const clearAll = useCallback(() => {
-    setNotifications([]);
-  }, []);
+    // Delete all notifications one by one (or implement bulk delete on backend)
+    notifications.forEach(n => {
+      const numericId = parseInt(n.id, 10);
+      if (!isNaN(numericId)) {
+        deleteNotificationMutation.mutate(numericId);
+      }
+    });
+  }, [notifications, deleteNotificationMutation]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -176,6 +180,7 @@ export function useNotifications() {
     notifications,
     unreadCount,
     isConnected,
+    isLoading,
     addNotification,
     markAsRead,
     markAllAsRead,
