@@ -99,14 +99,7 @@ class SequenceEnrollmentResponse(SequenceEnrollmentBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class SequenceEnrollmentDetail(SequenceEnrollmentResponse):
-    """Detailed enrollment with steps"""
-    steps: List[SequenceStepResponse] = []
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# Sequence Step Execution Schemas
+# Sequence Step Execution Schemas (MOVED BEFORE SequenceEnrollmentDetail to fix forward reference)
 class SequenceStepBase(BaseModel):
     """Base sequence step schema"""
     step_number: int = Field(..., description="Step number in sequence")
@@ -122,6 +115,14 @@ class SequenceStepResponse(SequenceStepBase):
     opened_at: Optional[datetime] = None
     clicked_at: Optional[datetime] = None
     replied_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# Now SequenceStepResponse is defined, so SequenceEnrollmentDetail can use it
+class SequenceEnrollmentDetail(SequenceEnrollmentResponse):
+    """Detailed enrollment with steps"""
+    steps: List[SequenceStepResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
 
