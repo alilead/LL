@@ -4,7 +4,7 @@ from app.api.v1.endpoints import (
     leads_import, dashboard, tasks, events, reports, advanced_reports,
     information_requests, organizations, tags, linkedin,
     tokens, notifications, contact, lead_stages, health, settings, psychometrics, files, ai_insights, messages, credits, invoices, team_invitations, email, ml,
-    territories, cpq, email_sequences, workflows, conversations, data_import, forecasting
+    territories, cpq, email_sequences, workflows, conversations, data_import, forecasting, dashboards
 )
 import logging
 
@@ -134,6 +134,9 @@ api_router.include_router(conversations.router, prefix="/conversations", tags=["
 
 # Forecasting (Collaborative Forecasting & Quota Management)
 api_router.include_router(forecasting.router, prefix="/forecasts", tags=["forecasts"])
+
+# Dashboard Builder (Custom Dashboards with Widgets)
+api_router.include_router(dashboards.router, prefix="/dashboards", tags=["dashboards"])
 
 # Data Import/Export (Salesforce, HubSpot, Pipedrive, CSV)
 api_router.include_router(data_import.router, prefix="/data-import", tags=["data-import"])
