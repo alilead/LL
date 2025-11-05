@@ -31,6 +31,8 @@ import { SettingsPage } from './pages/Settings'
 import { EmailsPage } from './pages/Emails'
 import CustomizationPage from './pages/Customization'
 import { OrganizationPage } from './pages/OrganizationPage'
+import { TerritoryList } from './pages/Territories'
+import { SequenceList } from './pages/EmailSequences'
 
 export const router = createBrowserRouter([
   {
@@ -145,6 +147,14 @@ export const router = createBrowserRouter([
           {
             path: '/organization',
             element: <OrganizationPage />
+          },
+          {
+            path: '/territories',
+            element: <TerritoryList />
+          },
+          {
+            path: '/email-sequences',
+            element: <SequenceList />
           }
         ]
       }
