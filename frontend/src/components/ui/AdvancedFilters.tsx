@@ -29,7 +29,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from './Dropdown';
+} from './dropdown-menu';
 
 export type FilterOperator =
   | 'equals'

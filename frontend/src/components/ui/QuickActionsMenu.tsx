@@ -37,7 +37,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from './Dropdown';
+} from './dropdown-menu';
 
 export interface QuickAction {
   id: string;

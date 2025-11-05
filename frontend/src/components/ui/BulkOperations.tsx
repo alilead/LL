@@ -28,7 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from './Dropdown';
+} from './dropdown-menu';
 import toast from 'react-hot-toast';
 
 export interface BulkAction {
