@@ -4,7 +4,7 @@ Data Import/Export Models
 Models for importing data from competitors (Salesforce, HubSpot, Pipedrive) and CSV files.
 """
 
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, JSON, Text, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, JSON, Text, Enum as SQLEnum, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.models.base import Base
@@ -84,7 +84,7 @@ class FieldMapping(Base):
     __tablename__ = "field_mappings"
 
     id = Column(Integer, primary_key=True, index=True)
-    import_job_id = Column(Integer, nullable=False, index=True)
+    import_job_id = Column(Integer, ForeignKey('import_jobs.id'), nullable=False, index=True)
 
     # Mapping details
     source_field = Column(String(255), nullable=False)  # External field name
@@ -109,7 +109,7 @@ class ImportRecord(Base):
     __tablename__ = "import_records"
 
     id = Column(Integer, primary_key=True, index=True)
-    import_job_id = Column(Integer, nullable=False, index=True)
+    import_job_id = Column(Integer, ForeignKey('import_jobs.id'), nullable=False, index=True)
 
     # Record details
     source_record_id = Column(String(255), nullable=True)  # ID from source system
