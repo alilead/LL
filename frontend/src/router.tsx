@@ -37,6 +37,7 @@ import { QuoteList, ProductList } from './pages/CPQ'
 import { ForecastDashboard } from './pages/Forecasting'
 import { WorkflowList } from './pages/Workflows'
 import { CallRecordings } from './pages/ConversationIntelligence'
+import { ImportWizard, ImportHistory } from './pages/DataImport'
 
 export const router = createBrowserRouter([
   {
@@ -179,6 +180,14 @@ export const router = createBrowserRouter([
           {
             path: '/conversations',
             element: <CallRecordings />
+          },
+          {
+            path: '/data-import/wizard',
+            element: <ImportWizard />
+          },
+          {
+            path: '/data-import/history',
+            element: <ImportHistory />
           }
         ]
       }
