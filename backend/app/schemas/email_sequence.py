@@ -4,6 +4,8 @@ Email Sequence Schemas
 Pydantic schemas for automated email campaigns.
 """
 
+from __future__ import annotations  # Enable forward references for type hints
+
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
@@ -99,7 +101,7 @@ class SequenceEnrollmentResponse(SequenceEnrollmentBase):
 
 class SequenceEnrollmentDetail(SequenceEnrollmentResponse):
     """Detailed enrollment with steps"""
-    steps: List['SequenceStepResponse'] = []
+    steps: List[SequenceStepResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
 
