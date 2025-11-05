@@ -40,6 +40,15 @@ from .team_invitation import TeamInvitation
 from .ai_insights import AIInsight
 from .linkedin_connection import LinkedInConnection
 
+# Enterprise features
+from .territory import Territory, TerritoryMember, TerritoryRule, TerritoryAssignment, TerritoryQuota, TerritoryType, AssignmentPriority
+from .cpq import Product, Quote, QuoteItem, PricingRule
+from .email_sequence import EmailSequence, SequenceEnrollment, SequenceStep
+from .workflow import Workflow, WorkflowExecution, WorkflowActionExecution, ApprovalProcess, ApprovalRequest, ApprovalStep, WorkflowTriggerType, WorkflowStatus, WorkflowExecutionStatus, ActionType
+from .conversation import CallRecording, ConversationInsight
+from .forecast import ForecastPeriod, Forecast, ForecastItem, ForecastHistory, ForecastRollup, ForecastComment, ForecastCategory, ForecastPeriodType, ForecastStatus
+from .data_import import ImportJob, FieldMapping, ImportRecord, ExportJob, CRMConnection, ImportStatus, ImportSource
+
 # Export all models
 __all__ = [
     # Base classes
@@ -87,7 +96,51 @@ __all__ = [
     "TeamInvitation",
     "AIInsight",
     "LinkedInConnection",
-    
+
+    # Enterprise features
+    "Territory",
+    "TerritoryMember",
+    "TerritoryRule",
+    "TerritoryAssignment",
+    "TerritoryQuota",
+    "TerritoryType",
+    "AssignmentPriority",
+    "Product",
+    "Quote",
+    "QuoteItem",
+    "PricingRule",
+    "EmailSequence",
+    "SequenceEnrollment",
+    "SequenceStep",
+    "Workflow",
+    "WorkflowExecution",
+    "WorkflowActionExecution",
+    "ApprovalProcess",
+    "ApprovalRequest",
+    "ApprovalStep",
+    "WorkflowTriggerType",
+    "WorkflowStatus",
+    "WorkflowExecutionStatus",
+    "ActionType",
+    "CallRecording",
+    "ConversationInsight",
+    "ForecastPeriod",
+    "Forecast",
+    "ForecastItem",
+    "ForecastHistory",
+    "ForecastRollup",
+    "ForecastComment",
+    "ForecastCategory",
+    "ForecastPeriodType",
+    "ForecastStatus",
+    "ImportJob",
+    "FieldMapping",
+    "ImportRecord",
+    "ExportJob",
+    "CRMConnection",
+    "ImportStatus",
+    "ImportSource",
+
     # Association tables
     "user_roles",
     "role_permissions",
