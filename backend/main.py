@@ -3,8 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.middleware.url_normalizer import URLNormalizerMiddleware
+from app.middleware.security import SecurityMiddleware
 import logging
-import pymysql
 import os
 from datetime import datetime
 
@@ -31,35 +31,33 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Sistem sağlık kontrolü"""
+    """
+    System health check endpoint
+
+    SECURITY: Uses SQLAlchemy session from dependency injection instead of hardcoded credentials.
+    Returns minimal information to avoid information disclosure.
+    """
     try:
-        # Veritabanı bağlantı testi
-        conn = pymysql.connect(
-            host='localhost',
-            user='leadlab_admin',
-            password='Oh5#Jy5#Ak3!Nw7#',
-            database='leadlab_admin'
-        )
-        
-        # Tablo sayısını al
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) as table_count FROM information_schema.tables WHERE table_schema = 'leadlab'")
-        result = cursor.fetchone()
-        table_count = result[0] if result else 0
-        
-        conn.close()
-        
+        from app.db.session import SessionLocal
+
+        # Use existing database session configuration
+        db = SessionLocal()
+
+        # Simple query to test database connection
+        db.execute("SELECT 1")
+        db.close()
+
         return {
             "status": "healthy",
             "database": "connected",
-            "tables": table_count,
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
+        # Don't expose internal error details in production
+        logger.error(f"Health check failed: {str(e)}")
         return {
             "status": "unhealthy",
             "database": "disconnected",
-            "error": str(e),
             "timestamp": datetime.now().isoformat()
         }
 
@@ -131,6 +129,13 @@ async def log_requests(request: Request, call_next):
 
 # Add URL normalizer middleware after CORS
 app.add_middleware(URLNormalizerMiddleware)
+
+# Add security middleware for rate limiting and security headers
+app.add_middleware(
+    SecurityMiddleware,
+    max_requests_per_minute=60,  # Adjust based on your needs
+    max_request_size=10 * 1024 * 1024  # 10MB
+)
 
 # Mount the API router with EXPLICIT prefix
 logger.debug("Mounting API router with routes:")
