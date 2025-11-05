@@ -322,7 +322,7 @@ class ApprovalStepResponse(BaseModel):
 
 class ApprovalDecision(BaseModel):
     """Schema for approval decision"""
-    decision: str = Field(..., regex="^(approve|reject)$")
+    decision: str = Field(..., pattern="^(approve|reject)$")  # Pydantic v2: regex → pattern
     comments: Optional[str] = None
 
 

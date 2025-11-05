@@ -26,7 +26,7 @@ class AIInsightsResponse(BaseModel):
     confidence_score: float = Field(..., description="Overall confidence score (0-1)")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {  # Pydantic v2: schema_extra → json_schema_extra
             "example": {
                 "lead_id": 123,
                 "lead_score": {
