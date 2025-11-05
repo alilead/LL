@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Numeric, DateTime, ForeignKey
 from sqlalchemy.sql import func
-from app.db.base_class import Base
+from app.models.base import Base
 import enum
 
 class TransactionType(str, enum.Enum):

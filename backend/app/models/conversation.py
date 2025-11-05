@@ -7,7 +7,7 @@ Call recording, transcription, and AI analysis.
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, JSON, Float
 from sqlalchemy.orm import relationship
-from app.db.base_class import Base
+from app.models.base import Base
 
 
 class CallRecording(Base):

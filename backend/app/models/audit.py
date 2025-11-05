@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey
 from sqlalchemy.sql import func
-from app.db.base_class import Base
+from app.models.base import Base
 from app.models.base import AuditMixin
 
 class SystemAudit(Base, AuditMixin):

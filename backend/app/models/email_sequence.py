@@ -7,7 +7,7 @@ Automated email campaigns with multi-step sequences.
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Text, JSON, Float
 from sqlalchemy.orm import relationship
-from app.db.base_class import Base
+from app.models.base import Base
 
 
 class EmailSequence(Base):
