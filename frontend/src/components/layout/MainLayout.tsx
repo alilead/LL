@@ -1,12 +1,12 @@
 import { ReactNode, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../store/auth'
-import { 
-  Home, 
-  Users, 
-  Calendar, 
-  CheckSquare, 
-  BarChart3, 
+import {
+  Home,
+  Users,
+  Calendar,
+  CheckSquare,
+  BarChart3,
   MessageSquare,
   Settings,
   Bell,
@@ -27,6 +27,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
 import { NotificationBell } from '../Notifications/NotificationBell'
+import { DarkModeToggle } from '../ui/DarkModeToggle'
 
 interface MainLayoutProps {
   children: ReactNode
@@ -244,7 +245,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           {bottomNavigationItems.map((item) => {
             const Icon = item.icon
             const isActive = location.pathname === item.href
-            
+
             return (
               <Link
                 key={item.name}
@@ -265,6 +266,11 @@ export function MainLayout({ children }: MainLayoutProps) {
             )
           })}
         </nav>
+
+        {/* Dark Mode Toggle */}
+        <div className={`mt-3 flex ${isCollapsed ? 'justify-center' : 'justify-start px-3'}`}>
+          <DarkModeToggle />
+        </div>
 
         {/* User Profile */}
         <div className="mt-4 relative">
@@ -375,9 +381,9 @@ export function MainLayout({ children }: MainLayoutProps) {
             >
               <Menu className="w-6 h-6" />
             </button>
-            
-            <div className="flex items-center space-x-4">
-              {/* Header actions can be added here */}
+
+            <div className="flex items-center space-x-2">
+              <DarkModeToggle />
             </div>
           </header>
         )}
