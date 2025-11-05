@@ -33,6 +33,10 @@ import CustomizationPage from './pages/Customization'
 import { OrganizationPage } from './pages/OrganizationPage'
 import { TerritoryList } from './pages/Territories'
 import { SequenceList } from './pages/EmailSequences'
+import { QuoteList, ProductList } from './pages/CPQ'
+import { ForecastDashboard } from './pages/Forecasting'
+import { WorkflowList } from './pages/Workflows'
+import { CallRecordings } from './pages/ConversationIntelligence'
 
 export const router = createBrowserRouter([
   {
@@ -155,6 +159,26 @@ export const router = createBrowserRouter([
           {
             path: '/email-sequences',
             element: <SequenceList />
+          },
+          {
+            path: '/cpq/quotes',
+            element: <QuoteList />
+          },
+          {
+            path: '/cpq/products',
+            element: <ProductList />
+          },
+          {
+            path: '/forecasting',
+            element: <ForecastDashboard />
+          },
+          {
+            path: '/workflows',
+            element: <WorkflowList />
+          },
+          {
+            path: '/conversations',
+            element: <CallRecordings />
           }
         ]
       }
