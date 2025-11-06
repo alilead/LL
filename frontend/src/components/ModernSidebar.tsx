@@ -13,11 +13,9 @@ import {
   Target,
   BarChart3,
   Settings,
-  HelpCircle,
   ChevronLeft,
   ChevronRight,
   Zap,
-  Bell,
   Search,
   LogOut,
   User,
@@ -25,7 +23,14 @@ import {
   Workflow,
   MessageSquare,
   FileText,
-  Database
+  Database,
+  CheckSquare,
+  Sparkles,
+  Coins,
+  Map,
+  ShoppingCart,
+  TrendingUp,
+  Phone
 } from 'lucide-react';
 
 interface NavItem {
@@ -54,14 +59,23 @@ const navigation: NavItem[] = [
     path: '/deals',
   },
   {
+    name: 'Tasks',
+    icon: CheckSquare,
+    path: '/tasks',
+  },
+  {
     name: 'Email',
     icon: Mail,
-    path: '/email',
+    path: '/emails',
     children: [
-      { name: 'Inbox', icon: Mail, path: '/email/inbox' },
-      { name: 'Campaigns', icon: Zap, path: '/email/campaigns' },
-      { name: 'Templates', icon: FileText, path: '/email/templates' },
+      { name: 'Inbox', icon: Mail, path: '/emails' },
+      { name: 'Sequences', icon: Zap, path: '/email-sequences' },
     ],
+  },
+  {
+    name: 'Messages',
+    icon: MessageSquare,
+    path: '/messages',
   },
   {
     name: 'Calendar',
@@ -69,9 +83,28 @@ const navigation: NavItem[] = [
     path: '/calendar',
   },
   {
+    name: 'Sales',
+    icon: ShoppingCart,
+    path: '/cpq',
+    children: [
+      { name: 'Quotes', icon: FileText, path: '/cpq/quotes' },
+      { name: 'Products', icon: ShoppingCart, path: '/cpq/products' },
+    ],
+  },
+  {
     name: 'Workflows',
     icon: Workflow,
     path: '/workflows',
+  },
+  {
+    name: 'Forecasting',
+    icon: TrendingUp,
+    path: '/forecasting',
+  },
+  {
+    name: 'Conversations',
+    icon: Phone,
+    path: '/conversations',
   },
   {
     name: 'Reports',
@@ -79,12 +112,26 @@ const navigation: NavItem[] = [
     path: '/reports',
   },
   {
+    name: 'AI Insights',
+    icon: Sparkles,
+    path: '/ai-insights',
+  },
+  {
+    name: 'Organization',
+    icon: Building2,
+    path: '/organization',
+    children: [
+      { name: 'Settings', icon: Building2, path: '/organization' },
+      { name: 'Territories', icon: Map, path: '/territories' },
+    ],
+  },
+  {
     name: 'Data',
     icon: Database,
-    path: '/data',
+    path: '/data-import',
     children: [
-      { name: 'Import', icon: Database, path: '/data/import' },
-      { name: 'Export', icon: Database, path: '/data/export' },
+      { name: 'Import Wizard', icon: Database, path: '/data-import/wizard' },
+      { name: 'Import History', icon: Database, path: '/data-import/history' },
     ],
   },
 ];
@@ -94,11 +141,6 @@ const bottomNavigation: NavItem[] = [
     name: 'Settings',
     icon: Settings,
     path: '/settings',
-  },
-  {
-    name: 'Help',
-    icon: HelpCircle,
-    path: '/help',
   },
 ];
 
