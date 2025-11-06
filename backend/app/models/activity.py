@@ -25,7 +25,7 @@ class Activity(Base, TimestampMixin):
     # Foreign Keys
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=True)  # Artık nullable
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=True)  # Now nullable
     deal_id = Column(Integer, ForeignKey("deals.id"), nullable=True)
     
     # Timestamps
