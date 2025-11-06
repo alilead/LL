@@ -102,6 +102,8 @@ class Event(EventBase):
     start_date: datetime
     end_date: datetime
     status: str
+    source_email_id: Optional[int] = None
+    email_account_id: Optional[int] = None
 
     class Config:
         from_attributes = True
