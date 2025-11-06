@@ -38,6 +38,9 @@ import { ModernForecasting } from './pages/ModernForecasting'
 import { ModernWorkflows } from './pages/ModernWorkflows'
 import { ModernConversations } from './pages/ModernConversations'
 import { ModernImportWizard, ModernImportHistory } from './pages/ModernDataImport'
+import { ModernTeam } from './pages/ModernTeam'
+import { ModernWorkflowNew } from './pages/ModernWorkflowNew'
+import { ModernConversationUpload } from './pages/ModernConversationUpload'
 
 export const router = createBrowserRouter([
   {
@@ -142,6 +145,14 @@ export const router = createBrowserRouter([
             element: <ModernSettings />
           },
           {
+            path: '/settings/:tab',
+            element: <ModernSettings />
+          },
+          {
+            path: '/team',
+            element: <ModernTeam />
+          },
+          {
             path: '/emails',
             element: <ModernEmails />
           },
@@ -178,8 +189,16 @@ export const router = createBrowserRouter([
             element: <ModernWorkflows />
           },
           {
+            path: '/workflows/new',
+            element: <ModernWorkflowNew />
+          },
+          {
             path: '/conversations',
             element: <ModernConversations />
+          },
+          {
+            path: '/conversations/upload',
+            element: <ModernConversationUpload />
           },
           {
             path: '/data-import/wizard',
