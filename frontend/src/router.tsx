@@ -6,12 +6,12 @@ import { ForgotPassword } from './pages/ForgotPassword'
 import { ResetPassword } from './pages/ResetPassword'
 import { Legal } from './pages/Legal'
 import { Contact } from './pages/Contact'
-import { Layout } from './components/Layout'
+import { ModernLayout } from './components/ModernLayout'
 import PrivateRoute from './components/PrivateRoute'
 import { AdminRoute } from './components/AdminRoute'
-import { LeadsPage } from './pages/Leads'
+import { ModernLeads } from './pages/ModernLeads'
 import { LeadDetail } from './pages/Leads/LeadDetail'
-import { DashboardPage } from './pages/Dashboard/index'
+import { ModernDashboard } from './pages/ModernDashboard'
 import { NotFound } from './pages/NotFound'
 import { ProfilePage } from './pages/ProfilePage'
 import { TasksPage } from './pages/Tasks'
@@ -27,7 +27,7 @@ import { ReportsPage } from './pages/Reports'
 import { CalendarPage } from './pages/Calendar'
 import { AIInsightsPage } from './pages/AIInsights'
 import { CreditsPage } from './pages/Credits'
-import { SettingsPage } from './pages/Settings'
+import { ModernSettings } from './pages/ModernSettings'
 import { EmailsPage } from './pages/Emails'
 import CustomizationPage from './pages/Customization'
 import { OrganizationPage } from './pages/OrganizationPage'
@@ -72,11 +72,11 @@ export const router = createBrowserRouter([
     element: <PrivateRoute />,
     children: [
       {
-        element: <Layout />,
+        element: <ModernLayout />,
         children: [
           {
             path: '/dashboard',
-            element: <DashboardPage />
+            element: <ModernDashboard />
           },
           {
             path: '/admin',
@@ -84,7 +84,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/leads',
-            element: <LeadsPage />
+            element: <ModernLeads />
           },
           {
             path: '/leads/form',
@@ -139,7 +139,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/settings',
-            element: <SettingsPage />
+            element: <ModernSettings />
           },
           {
             path: '/emails',
