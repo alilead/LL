@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'https://api.the-leadlab.com'),
     },
     server: {
-      port: 3000,
+      port: 5173,
       host: true,
       proxy: {
         '/api/v1': {

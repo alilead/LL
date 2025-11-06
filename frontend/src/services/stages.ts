@@ -51,7 +51,7 @@ export const updateStage = async (id: string, data: StageUpdateInput): Promise<S
 };
 
 export const deleteStage = async (id: string): Promise<{ message: string }> => {
-  const response = await api.delete(`/api/v1/stages/${id}`);
+  const response = await api.delete(`/stages/${id}`);
   return response.data;
 };
 

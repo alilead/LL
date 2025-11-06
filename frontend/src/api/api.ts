@@ -1,9 +1,9 @@
 import axios from 'axios';
 
-// API base URL'i
+// API base URL
 const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
-// Axios instance'ı oluştur
+// Create Axios instance
 export const api = axios.create({
   baseURL: `${baseURL}/api/v1`,
   timeout: 30000,
@@ -12,7 +12,7 @@ export const api = axios.create({
   },
 });
 
-// Request interceptor - token ekle
+// Request interceptor - add token
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -26,11 +26,11 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor - hata yönetimi
+// Response interceptor - error handling
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    // Token expire olduysa logout yap
+    // If token expired, logout
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       window.location.href = '/login';

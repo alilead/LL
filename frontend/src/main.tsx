@@ -16,11 +16,11 @@ if (initialPath && window.location.pathname !== initialPath) {
   window.history.replaceState(null, '', initialPath);
 }
 
-// API sağlık kontrolünü başlat
+// Start API health monitoring
 if (import.meta.env.PROD) {
-  startHealthMonitoring(60000); // Production'da her 1 dakikada bir kontrol et
+  startHealthMonitoring(60000); // Check every 1 minute in production
 } else {
-  startHealthMonitoring(300000); // Development'da her 5 dakikada bir kontrol et
+  startHealthMonitoring(300000); // Check every 5 minutes in development
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
