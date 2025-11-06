@@ -23,12 +23,12 @@ import { LeadForm } from './pages/Leads/LeadForm'
 import { AdminPanel } from './pages/Admin/AdminPanel'
 import { Navigate } from 'react-router-dom'
 import { LinkedInCallback } from './pages/Linkedin/Callback'
-import { MessagesPage } from './pages/Messages'
-import { ReportsPage } from './pages/Reports'
-import { CalendarPage } from './pages/Calendar'
-import { CreditsPage } from './pages/Credits'
+import { ModernMessages } from './pages/ModernMessages'
+import { ModernReports } from './pages/ModernReports'
+import { ModernCalendar } from './pages/ModernCalendar'
+import { ModernCredits } from './pages/ModernCredits'
 import { ModernSettings } from './pages/ModernSettings'
-import { EmailsPage } from './pages/Emails'
+import { ModernEmails } from './pages/ModernEmails'
 import CustomizationPage from './pages/Customization'
 import { OrganizationPage } from './pages/OrganizationPage'
 import { TerritoryList } from './pages/Territories'
@@ -119,15 +119,15 @@ export const router = createBrowserRouter([
           },
           {
             path: '/messages',
-            element: <MessagesPage />
+            element: <ModernMessages />
           },
           {
             path: '/reports',
-            element: <ReportsPage />
+            element: <ModernReports />
           },
           {
             path: '/calendar',
-            element: <CalendarPage />
+            element: <ModernCalendar />
           },
           {
             path: '/ai-insights',
@@ -135,7 +135,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/credits',
-            element: <CreditsPage />
+            element: <ModernCredits />
           },
           {
             path: '/settings',
@@ -143,7 +143,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/emails',
-            element: <EmailsPage />
+            element: <ModernEmails />
           },
           {
             path: '/customization',
