@@ -10,16 +10,16 @@ import { ModernLayout } from './components/ModernLayout'
 import PrivateRoute from './components/PrivateRoute'
 import { AdminRoute } from './components/AdminRoute'
 import { ModernLeads } from './pages/ModernLeads'
-import { LeadDetail } from './pages/Leads/LeadDetail'
+import { ModernLeadDetail } from './pages/ModernLeadDetail'
+import { ModernLeadForm } from './pages/ModernLeadForm'
 import { ModernDashboard } from './pages/ModernDashboard'
 import { ModernTasks } from './pages/ModernTasks'
+import { ModernNewTask } from './pages/ModernNewTask'
 import { ModernDeals } from './pages/ModernDeals'
+import { ModernNewDeal } from './pages/ModernNewDeal'
 import { ModernAIInsights } from './pages/ModernAIInsights'
 import { NotFound } from './pages/NotFound'
-import { ProfilePage } from './pages/ProfilePage'
-import NewTask from './pages/Tasks/NewTask'
-import NewDeal from './pages/Deals/NewDeal'
-import { LeadForm } from './pages/Leads/LeadForm'
+import { ModernProfile } from './pages/ModernProfile'
 import { AdminPanel } from './pages/Admin/AdminPanel'
 import { Navigate } from 'react-router-dom'
 import { LinkedInCallback } from './pages/Linkedin/Callback'
@@ -29,15 +29,15 @@ import { ModernCalendar } from './pages/ModernCalendar'
 import { ModernCredits } from './pages/ModernCredits'
 import { ModernSettings } from './pages/ModernSettings'
 import { ModernEmails } from './pages/ModernEmails'
-import CustomizationPage from './pages/Customization'
-import { OrganizationPage } from './pages/OrganizationPage'
-import { TerritoryList } from './pages/Territories'
-import { SequenceList } from './pages/EmailSequences'
-import { QuoteList, ProductList } from './pages/CPQ'
-import { ForecastDashboard } from './pages/Forecasting'
-import { WorkflowList } from './pages/Workflows'
-import { CallRecordings } from './pages/ConversationIntelligence'
-import { ImportWizard, ImportHistory } from './pages/DataImport'
+import { ModernCustomization } from './pages/ModernCustomization'
+import { ModernOrganization } from './pages/ModernOrganization'
+import { ModernTerritories } from './pages/ModernTerritories'
+import { ModernEmailSequences } from './pages/ModernEmailSequences'
+import { ModernQuoteList, ModernProductList } from './pages/ModernCPQ'
+import { ModernForecasting } from './pages/ModernForecasting'
+import { ModernWorkflows } from './pages/ModernWorkflows'
+import { ModernConversations } from './pages/ModernConversations'
+import { ModernImportWizard, ModernImportHistory } from './pages/ModernDataImport'
 
 export const router = createBrowserRouter([
   {
@@ -88,7 +88,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/leads/form',
-            element: <LeadForm />
+            element: <ModernLeadForm />
           },
           {
             path: '/leads/new',
@@ -96,13 +96,13 @@ export const router = createBrowserRouter([
           },
           {
             path: '/leads/:id',
-            element: <LeadDetail />
+            element: <ModernLeadDetail />
           },
           {
             path: '/tasks',
             children: [
               { index: true, element: <ModernTasks /> },
-              { path: 'new', element: <NewTask /> }
+              { path: 'new', element: <ModernNewTask /> }
             ]
           },
           {
@@ -111,11 +111,11 @@ export const router = createBrowserRouter([
           },
           {
             path: '/deals/new',
-            element: <NewDeal />
+            element: <ModernNewDeal />
           },
           {
             path: '/profile',
-            element: <ProfilePage />
+            element: <ModernProfile />
           },
           {
             path: '/messages',
@@ -147,47 +147,47 @@ export const router = createBrowserRouter([
           },
           {
             path: '/customization',
-            element: <CustomizationPage />
+            element: <ModernCustomization />
           },
           {
             path: '/organization',
-            element: <OrganizationPage />
+            element: <ModernOrganization />
           },
           {
             path: '/territories',
-            element: <TerritoryList />
+            element: <ModernTerritories />
           },
           {
             path: '/email-sequences',
-            element: <SequenceList />
+            element: <ModernEmailSequences />
           },
           {
             path: '/cpq/quotes',
-            element: <QuoteList />
+            element: <ModernQuoteList />
           },
           {
             path: '/cpq/products',
-            element: <ProductList />
+            element: <ModernProductList />
           },
           {
             path: '/forecasting',
-            element: <ForecastDashboard />
+            element: <ModernForecasting />
           },
           {
             path: '/workflows',
-            element: <WorkflowList />
+            element: <ModernWorkflows />
           },
           {
             path: '/conversations',
-            element: <CallRecordings />
+            element: <ModernConversations />
           },
           {
             path: '/data-import/wizard',
-            element: <ImportWizard />
+            element: <ModernImportWizard />
           },
           {
             path: '/data-import/history',
-            element: <ImportHistory />
+            element: <ModernImportHistory />
           }
         ]
       }
