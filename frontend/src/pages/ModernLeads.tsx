@@ -1,15 +1,20 @@
 /**
- * Modern Leads Page - Beats Salesforce & HubSpot
+ * Modern Leads Page - Connected to Real Backend API
  *
  * Features:
- * - Kanban Board view
+ * - Kanban Board view with real stages from backend
  * - Table view with advanced filters
  * - Quick actions
  * - Bulk operations
  * - Real-time search
+ * - Full backend integration
  */
 
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { leadsAPI, type Lead } from '@/services/api/leads';
+import { stagesAPI } from '@/services/api/stages';
 import {
   LayoutGrid,
   List,
@@ -20,83 +25,53 @@ import {
   Phone,
   Calendar,
   MoreVertical,
-  Star,
   User,
   Building2,
-  DollarSign,
-  Tag,
   Download,
-  Upload,
-  X
+  Loader2
 } from 'lucide-react';
 
-interface Lead {
-  id: string;
-  name: string;
-  company: string;
-  email: string;
-  phone: string;
-  value: string;
-  stage: string;
-  priority: 'high' | 'medium' | 'low';
-  tags: string[];
-  lastContact: string;
-  assignedTo: string;
-}
-
-const mockLeads: Lead[] = [
-  {
-    id: '1',
-    name: 'John Smith',
-    company: 'Acme Corp',
-    email: 'john@acme.com',
-    phone: '+1 234 567 8900',
-    value: '$25,000',
-    stage: 'qualified',
-    priority: 'high',
-    tags: ['Enterprise', 'Hot'],
-    lastContact: '2 hours ago',
-    assignedTo: 'You'
-  },
-  {
-    id: '2',
-    name: 'Sarah Johnson',
-    company: 'TechStart Inc',
-    email: 'sarah@techstart.com',
-    phone: '+1 234 567 8901',
-    value: '$45,000',
-    stage: 'contacted',
-    priority: 'high',
-    tags: ['SaaS', 'Demo'],
-    lastContact: '1 day ago',
-    assignedTo: 'Mike Chen'
-  },
-  {
-    id: '3',
-    name: 'David Brown',
-    company: 'Global Systems',
-    email: 'david@global.com',
-    phone: '+1 234 567 8902',
-    value: '$15,000',
-    stage: 'new',
-    priority: 'medium',
-    tags: ['SMB'],
-    lastContact: '3 days ago',
-    assignedTo: 'You'
-  },
-];
-
-const stages = [
-  { id: 'new', name: 'New Leads', color: 'blue', count: 12 },
-  { id: 'qualified', name: 'Qualified', color: 'purple', count: 8 },
-  { id: 'contacted', name: 'Contacted', color: 'green', count: 15 },
-  { id: 'proposal', name: 'Proposal', color: 'orange', count: 6 },
-];
-
 export function ModernLeads() {
+  const navigate = useNavigate();
   const [view, setView] = useState<'kanban' | 'table'>('kanban');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
+  const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
+
+  // Fetch leads from backend
+  const { data: leadsResponse, isLoading: isLoadingLeads } = useQuery({
+    queryKey: ['leads', searchQuery],
+    queryFn: async () => {
+      const params = searchQuery ? { search: searchQuery } : {};
+      return leadsAPI.getAll(params);
+    },
+  });
+
+  // Fetch stages from backend
+  const { data: stagesResponse, isLoading: isLoadingStages } = useQuery({
+    queryKey: ['stages'],
+    queryFn: stagesAPI.getAll,
+  });
+
+  const leads: Lead[] = leadsResponse?.data?.data || [];
+  const stages = stagesResponse?.data?.data || [];
+
+  // Loading state
+  if (isLoadingLeads || isLoadingStages) {
+    return (
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-8 flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+          <p className="text-neutral-600 dark:text-neutral-400">Loading leads...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Group leads by stage for Kanban view
+  const leadsByStage = stages.map((stage: any) => ({
+    ...stage,
+    leads: leads.filter((lead) => lead.stage_id === stage.id)
+  }));
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-8">
@@ -108,10 +83,13 @@ export function ModernLeads() {
               Leads
             </h1>
             <p className="text-neutral-600 dark:text-neutral-400">
-              Manage and track your sales pipeline
+              Manage and track your sales pipeline • {leads.length} total leads
             </p>
           </div>
-          <button className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-sm">
+          <button
+            onClick={() => navigate('/leads/new')}
+            className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
+          >
             <Plus className="w-5 h-5" />
             <span>Add Lead</span>
           </button>
@@ -175,97 +153,126 @@ export function ModernLeads() {
       {/* Kanban View */}
       {view === 'kanban' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stages.map((stage) => (
+          {leadsByStage.map((stage: any) => (
             <div key={stage.id} className="flex flex-col">
               {/* Stage Header */}
               <div className="flex items-center justify-between mb-4 pb-3 border-b-2 border-neutral-200 dark:border-neutral-700">
                 <div className="flex items-center space-x-2">
-                  <div className={`w-3 h-3 rounded-full bg-${stage.color}-500`} />
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: stage.color || '#6366f1' }}
+                  />
                   <h3 className="font-semibold text-neutral-900 dark:text-neutral-50">
                     {stage.name}
                   </h3>
                   <span className="text-sm text-neutral-500 dark:text-neutral-400">
-                    {stage.count}
+                    {stage.leads.length}
                   </span>
                 </div>
-                <button className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition-colors">
+                <button
+                  onClick={() => navigate('/leads/new')}
+                  className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition-colors"
+                >
                   <Plus className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
                 </button>
               </div>
 
               {/* Lead Cards */}
               <div className="space-y-3">
-                {mockLeads
-                  .filter((lead) => lead.stage === stage.id)
-                  .map((lead) => (
-                    <div
-                      key={lead.id}
-                      className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700 hover:shadow-md transition-shadow cursor-pointer group"
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/20 flex items-center justify-center">
-                            <User className="w-4 h-4 text-primary-600 dark:text-primary-400" />
-                          </div>
-                          <div>
-                            <h4 className="font-medium text-neutral-900 dark:text-neutral-50 text-sm">
-                              {lead.name}
-                            </h4>
-                            <p className="text-xs text-neutral-500 dark:text-neutral-400 flex items-center">
-                              <Building2 className="w-3 h-3 mr-1" />
-                              {lead.company}
-                            </p>
-                          </div>
+                {stage.leads.map((lead: Lead) => (
+                  <div
+                    key={lead.id}
+                    onClick={() => navigate(`/leads/${lead.id}`)}
+                    className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700 hover:shadow-md transition-shadow cursor-pointer group"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/20 flex items-center justify-center">
+                          <User className="w-4 h-4 text-primary-600 dark:text-primary-400" />
                         </div>
-                        <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition-all">
-                          <MoreVertical className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
-                        </button>
-                      </div>
-
-                      <div className="space-y-2 mb-3">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-neutral-600 dark:text-neutral-400">Value</span>
-                          <span className="font-semibold text-neutral-900 dark:text-neutral-50">
-                            {lead.value}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-neutral-600 dark:text-neutral-400">Last contact</span>
-                          <span className="text-neutral-700 dark:text-neutral-300">
-                            {lead.lastContact}
-                          </span>
+                        <div>
+                          <h4 className="font-medium text-neutral-900 dark:text-neutral-50 text-sm">
+                            {lead.full_name || `${lead.first_name} ${lead.last_name}`}
+                          </h4>
+                          <p className="text-xs text-neutral-500 dark:text-neutral-400 flex items-center">
+                            <Building2 className="w-3 h-3 mr-1" />
+                            {lead.company || 'No company'}
+                          </p>
                         </div>
                       </div>
+                      <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition-all">
+                        <MoreVertical className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
+                      </button>
+                    </div>
 
-                      <div className="flex items-center space-x-2 mb-3">
-                        {lead.tags.map((tag, idx) => (
+                    <div className="space-y-2 mb-3">
+                      {lead.email && (
+                        <div className="flex items-center text-xs text-neutral-600 dark:text-neutral-400">
+                          <Mail className="w-3 h-3 mr-1" />
+                          <span className="truncate">{lead.email}</span>
+                        </div>
+                      )}
+                      {(lead.telephone || lead.mobile) && (
+                        <div className="flex items-center text-xs text-neutral-600 dark:text-neutral-400">
+                          <Phone className="w-3 h-3 mr-1" />
+                          <span>{lead.telephone || lead.mobile}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {lead.tags && lead.tags.length > 0 && (
+                      <div className="flex items-center space-x-2 mb-3 flex-wrap gap-1">
+                        {lead.tags.slice(0, 2).map((tag) => (
                           <span
-                            key={idx}
+                            key={tag.id}
                             className="px-2 py-0.5 bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded text-xs"
                           >
-                            {tag}
+                            {tag.name}
                           </span>
                         ))}
+                        {lead.tags.length > 2 && (
+                          <span className="px-2 py-0.5 text-neutral-500 dark:text-neutral-400 text-xs">
+                            +{lead.tags.length - 2}
+                          </span>
+                        )}
                       </div>
+                    )}
 
-                      <div className="flex items-center justify-between pt-3 border-t border-neutral-100 dark:border-neutral-700">
-                        <div className="flex items-center space-x-1">
-                          <button className="p-1.5 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded transition-colors">
-                            <Mail className="w-4 h-4 text-neutral-600 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400" />
-                          </button>
-                          <button className="p-1.5 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded transition-colors">
-                            <Phone className="w-4 h-4 text-neutral-600 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400" />
-                          </button>
-                          <button className="p-1.5 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded transition-colors">
-                            <Calendar className="w-4 h-4 text-neutral-600 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400" />
-                          </button>
-                        </div>
-                        <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                          {lead.assignedTo}
-                        </span>
+                    <div className="flex items-center justify-between pt-3 border-t border-neutral-100 dark:border-neutral-700">
+                      <div className="flex items-center space-x-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (lead.email) window.location.href = `mailto:${lead.email}`;
+                          }}
+                          className="p-1.5 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded transition-colors"
+                        >
+                          <Mail className="w-4 h-4 text-neutral-600 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (lead.telephone || lead.mobile) window.location.href = `tel:${lead.telephone || lead.mobile}`;
+                          }}
+                          className="p-1.5 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded transition-colors"
+                        >
+                          <Phone className="w-4 h-4 text-neutral-600 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400" />
+                        </button>
+                        <button className="p-1.5 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded transition-colors">
+                          <Calendar className="w-4 h-4 text-neutral-600 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400" />
+                        </button>
                       </div>
+                      <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                        {lead.user?.first_name || 'Unassigned'}
+                      </span>
                     </div>
-                  ))}
+                  </div>
+                ))}
+                {stage.leads.length === 0 && (
+                  <div className="text-center py-8 text-neutral-500 dark:text-neutral-400 text-sm">
+                    No leads in this stage
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -288,13 +295,10 @@ export function ModernLeads() {
                   Contact
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                  Value
+                  Job Title
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
                   Stage
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                  Priority
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
                   Assigned
@@ -305,9 +309,13 @@ export function ModernLeads() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
-              {mockLeads.map((lead) => (
-                <tr key={lead.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-700/50 transition-colors">
-                  <td className="px-6 py-4">
+              {leads.map((lead) => (
+                <tr
+                  key={lead.id}
+                  onClick={() => navigate(`/leads/${lead.id}`)}
+                  className="hover:bg-neutral-50 dark:hover:bg-neutral-700/50 transition-colors cursor-pointer"
+                >
+                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" className="rounded" />
                   </td>
                   <td className="px-6 py-4">
@@ -317,41 +325,30 @@ export function ModernLeads() {
                       </div>
                       <div>
                         <div className="font-medium text-neutral-900 dark:text-neutral-50">
-                          {lead.name}
+                          {lead.full_name || `${lead.first_name} ${lead.last_name}`}
                         </div>
                         <div className="text-sm text-neutral-500 dark:text-neutral-400">
-                          {lead.company}
+                          {lead.company || 'No company'}
                         </div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm text-neutral-900 dark:text-neutral-50">{lead.email}</div>
-                    <div className="text-sm text-neutral-500 dark:text-neutral-400">{lead.phone}</div>
+                    <div className="text-sm text-neutral-900 dark:text-neutral-50">{lead.email || '-'}</div>
+                    <div className="text-sm text-neutral-500 dark:text-neutral-400">{lead.telephone || lead.mobile || '-'}</div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="font-semibold text-neutral-900 dark:text-neutral-50">{lead.value}</div>
+                    <div className="text-sm text-neutral-900 dark:text-neutral-50">{lead.job_title || '-'}</div>
                   </td>
                   <td className="px-6 py-4">
                     <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400">
-                      {stages.find(s => s.id === lead.stage)?.name}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      lead.priority === 'high'
-                        ? 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-                        : lead.priority === 'medium'
-                        ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
-                        : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-400'
-                    }`}>
-                      {lead.priority}
+                      {lead.stage?.name || 'No stage'}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-neutral-900 dark:text-neutral-50">
-                    {lead.assignedTo}
+                    {lead.user ? `${lead.user.first_name} ${lead.user.last_name}` : 'Unassigned'}
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                     <button className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors">
                       <MoreVertical className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
                     </button>
@@ -360,6 +357,11 @@ export function ModernLeads() {
               ))}
             </tbody>
           </table>
+          {leads.length === 0 && (
+            <div className="text-center py-12 text-neutral-500 dark:text-neutral-400">
+              No leads found. Click "Add Lead" to create your first lead.
+            </div>
+          )}
         </div>
       )}
     </div>
