@@ -26,6 +26,7 @@ router = APIRouter()
 
 
 # Email Sequence Endpoints
+@router.get("", response_model=List[EmailSequenceResponse])
 @router.get("/", response_model=List[EmailSequenceResponse])
 def list_sequences(
     db: Session = Depends(deps.get_db),

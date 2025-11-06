@@ -54,7 +54,7 @@ class ForecastPeriod(Base):
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
 
     # Period definition
-    name = Column(String(255), nullable=False)  # e.g., "Q1 2025", "January 2025"
+    name = Column(String(255), nullable=True)  # e.g., "Q1 2025", "January 2025" - TODO: DB migration needed
     period_type = Column(SQLEnum(ForecastPeriodType), nullable=False)
     year = Column(Integer, nullable=False, index=True)
     quarter = Column(Integer, nullable=True)  # 1-4 for quarterly
