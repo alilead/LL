@@ -86,7 +86,7 @@ const navigation: NavItem[] = [
   {
     name: 'Sales',
     icon: ShoppingCart,
-    path: '/cpq',
+    path: '/cpq/quotes', // Fixed: now points to actual route
     children: [
       { name: 'Quotes', icon: FileText, path: '/cpq/quotes' },
       { name: 'Products', icon: ShoppingCart, path: '/cpq/products' },
@@ -129,7 +129,7 @@ const navigation: NavItem[] = [
   {
     name: 'Data',
     icon: Database,
-    path: '/data-import',
+    path: '/data-import/wizard', // Fixed: now points to actual route
     children: [
       { name: 'Import Wizard', icon: Database, path: '/data-import/wizard' },
       { name: 'Import History', icon: Database, path: '/data-import/history' },
