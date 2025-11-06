@@ -12,10 +12,11 @@ import { AdminRoute } from './components/AdminRoute'
 import { ModernLeads } from './pages/ModernLeads'
 import { LeadDetail } from './pages/Leads/LeadDetail'
 import { ModernDashboard } from './pages/ModernDashboard'
+import { ModernTasks } from './pages/ModernTasks'
+import { ModernDeals } from './pages/ModernDeals'
+import { ModernAIInsights } from './pages/ModernAIInsights'
 import { NotFound } from './pages/NotFound'
 import { ProfilePage } from './pages/ProfilePage'
-import { TasksPage } from './pages/Tasks'
-import { DealsPage } from './pages/Deals'
 import NewTask from './pages/Tasks/NewTask'
 import NewDeal from './pages/Deals/NewDeal'
 import { LeadForm } from './pages/Leads/LeadForm'
@@ -25,7 +26,6 @@ import { LinkedInCallback } from './pages/Linkedin/Callback'
 import { MessagesPage } from './pages/Messages'
 import { ReportsPage } from './pages/Reports'
 import { CalendarPage } from './pages/Calendar'
-import { AIInsightsPage } from './pages/AIInsights'
 import { CreditsPage } from './pages/Credits'
 import { ModernSettings } from './pages/ModernSettings'
 import { EmailsPage } from './pages/Emails'
@@ -101,13 +101,13 @@ export const router = createBrowserRouter([
           {
             path: '/tasks',
             children: [
-              { index: true, element: <TasksPage /> },
+              { index: true, element: <ModernTasks /> },
               { path: 'new', element: <NewTask /> }
             ]
           },
           {
             path: '/deals',
-            element: <DealsPage />
+            element: <ModernDeals />
           },
           {
             path: '/deals/new',
@@ -131,7 +131,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/ai-insights',
-            element: <AIInsightsPage />
+            element: <ModernAIInsights />
           },
           {
             path: '/credits',

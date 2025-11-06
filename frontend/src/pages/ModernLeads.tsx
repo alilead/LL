@@ -52,8 +52,14 @@ export function ModernLeads() {
     queryFn: stagesAPI.getAll,
   });
 
-  const leads: Lead[] = leadsResponse?.data?.data || [];
-  const stages = stagesResponse?.data?.data || [];
+  // Handle different response formats from backend
+  const leads: Lead[] = Array.isArray(leadsResponse?.data)
+    ? leadsResponse.data
+    : (leadsResponse?.data?.data || leadsResponse?.data?.results || []);
+
+  const stages = Array.isArray(stagesResponse?.data)
+    ? stagesResponse.data
+    : (stagesResponse?.data?.data || stagesResponse?.data?.results || []);
 
   // Loading state
   if (isLoadingLeads || isLoadingStages) {
