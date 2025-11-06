@@ -6,10 +6,10 @@ from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from app.core.config import settings
 
-# Log formatı
+# Log format
 class JsonFormatter(logging.Formatter):
     def format(self, record):
-        # Temel log bilgileri
+        # Basic log information
         log_data = {
             "timestamp": datetime.utcnow().isoformat(),
             "level": record.levelname,
@@ -19,12 +19,12 @@ class JsonFormatter(logging.Formatter):
             "line": record.lineno,
             "env": "development" if settings.DEBUG else "production"
         }
-        
-        # Extra bilgiler
+
+        # Extra information
         if hasattr(record, "extra"):
             log_data.update(record.extra)
-            
-        # Exception bilgisi
+
+        # Exception information
         if record.exc_info:
             log_data["exception"] = {
                 "type": str(record.exc_info[0].__name__),
@@ -34,23 +34,23 @@ class JsonFormatter(logging.Formatter):
             
         return json.dumps(log_data, ensure_ascii=False)
 
-# Logger oluştur ve temel ayarları yap
+# Create logger and set basic configuration
 logger = logging.getLogger("leadlab")
 logger.setLevel(logging.DEBUG if settings.DEBUG else logging.INFO)
 
-# Her durumda console handler ekle
+# Always add console handler
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setFormatter(JsonFormatter())
 logger.addHandler(console_handler)
 
-# Production ortamında dosyaya da yaz
+# In production, also write to file
 if not settings.DEBUG:
     try:
-        # Log dizini
+        # Log directory
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         log_dir = os.path.join(base_dir, "logs")
         os.makedirs(log_dir, exist_ok=True)
-        
+
         # Rotating file handler
         file_handler = RotatingFileHandler(
             filename=os.path.join(log_dir, "app.log"),

@@ -22,7 +22,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return result
     except Exception as e:
         logger.error(f"Password verification error: {str(e)}")
-        # Hata durumunda False döndürerek authentication'ın güvenli bir şekilde başarısız olmasını sağla
+        # Return False on error to ensure authentication fails securely
         return False
 
 def get_password_hash(password: str) -> str:

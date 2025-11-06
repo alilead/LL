@@ -48,6 +48,8 @@ class LeadBase(BaseModel):
     wpi: Optional[str] = None
     source: Optional[str] = None
     est_wealth_experience: Optional[str] = None
+    email_guidelines: Optional[str] = None
+    sales_intelligence: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(from_attributes=True)
 
