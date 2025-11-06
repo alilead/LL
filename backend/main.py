@@ -63,7 +63,7 @@ async def health_check():
 
 @app.get("/api/v1/status")
 async def api_status():
-    """API durumu"""
+    """API status"""
     return {
         "api_version": "v1",
         "status": "active",
@@ -80,11 +80,14 @@ async def api_status():
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        # Development
-        "http://localhost:3000", 
+        # Development - Vite default port
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        # Development - Other ports
+        "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:3001",
-        "http://localhost:3002", 
+        "http://localhost:3002",
         "http://localhost:3003",
         # Production
         "https://the-leadlab.com",
