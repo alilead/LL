@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuthStore } from '@/store/auth';
 import {
   LayoutDashboard,
   Users,
@@ -148,6 +149,7 @@ export function ModernSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const location = useLocation();
+  const { user } = useAuthStore();
 
   const toggleExpanded = (name: string) => {
     setExpandedItems(prev =>
@@ -315,10 +317,12 @@ export function ModernSidebar() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-neutral-900 dark:text-neutral-50 truncate">
-                Firat Celik
+                {user?.first_name && user?.last_name
+                  ? `${user.first_name} ${user.last_name}`
+                  : user?.email || 'User'}
               </p>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
-                firat@the-leadlab.com
+                {user?.email || ''}
               </p>
             </div>
             <LogOut className="w-4 h-4 text-neutral-400" />
