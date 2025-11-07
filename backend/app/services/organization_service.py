@@ -74,12 +74,12 @@ class OrganizationService:
         for field, value in data.dict(exclude_unset=True).items():
             if field == "theme_settings":
                 settings.theme_settings = {
-                    **settings.theme_settings if settings.theme_settings else {},
+                    **(settings.theme_settings if settings.theme_settings else {}),
                     **value
                 }
             elif field == "email_settings":
                 settings.email_settings = {
-                    **settings.email_settings if settings.email_settings else {},
+                    **(settings.email_settings if settings.email_settings else {}),
                     **value
                 }
             else:
