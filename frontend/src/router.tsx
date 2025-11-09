@@ -193,6 +193,10 @@ export const router = createBrowserRouter([
             element: <ModernWorkflowNew />
           },
           {
+            path: '/workflows/:id',
+            element: <ModernWorkflowNew />
+          },
+          {
             path: '/conversations',
             element: <ModernConversations />
           },
