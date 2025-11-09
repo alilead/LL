@@ -3,18 +3,18 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 
-# MySQL bağlantı URL'i
+# MySQL connection URL
 SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
 
-# MySQL bağlantı ayarları
+# MySQL connection settings
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     pool_size=settings.MYSQL_POOL_SIZE,
     max_overflow=settings.MYSQL_MAX_OVERFLOW,
     pool_timeout=settings.MYSQL_POOL_TIMEOUT,
-    pool_pre_ping=True,  # Bağlantı kontrolü
-    pool_recycle=1800,   # 30 dakikada bir bağlantı yenileme
-    echo=settings.DEBUG  # Debug modunda SQL logları
+    pool_pre_ping=True,  # Connection check
+    pool_recycle=1800,   # Recycle connections every 30 minutes
+    echo=settings.DEBUG  # SQL logs in debug mode
 )
 
 # Session factory
@@ -43,7 +43,7 @@ from app.models.notification import Notification  # noqa
 from app.models.file import File  # noqa
 from app.models.team_invitation import TeamInvitation  # noqa
 
-# Database bağlantısı için dependency
+# Database dependency for dependency injection
 def get_db():
     db = SessionLocal()
     try:

@@ -1,9 +1,10 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
-    auth, leads, admin, deals, activities, notes, users, 
+    auth, leads, admin, deals, activities, notes, users,
     leads_import, dashboard, tasks, events, reports, advanced_reports,
-    information_requests, organizations, tags, linkedin, 
-    tokens, notifications, contact, lead_stages, health, settings, psychometrics, files, ai_insights, messages, credits, invoices, team_invitations, email, ml
+    information_requests, organizations, tags, linkedin,
+    tokens, notifications, contact, lead_stages, health, settings, psychometrics, files, ai_insights, messages, credits, invoices, team_invitations, email, ml,
+    territories, cpq, email_sequences, workflows, conversations, data_import, forecasting, dashboards
 )
 import logging
 
@@ -113,3 +114,29 @@ api_router.include_router(email.router, prefix="/email", tags=["email"])
 
 # ML routes (Machine Learning predictions and model management)
 api_router.include_router(ml.router, prefix="/ml", tags=["ml"])
+
+# ==================== ENTERPRISE FEATURES ====================
+
+# Territory Management (Enterprise Sales Territory Hierarchy)
+api_router.include_router(territories.router, prefix="/territories", tags=["territories"])
+
+# CPQ - Configure, Price, Quote (Product Catalog & Quote Management)
+api_router.include_router(cpq.router, prefix="/cpq", tags=["cpq"])
+
+# Email Sequences (Automated Email Campaigns)
+api_router.include_router(email_sequences.router, prefix="/email-sequences", tags=["email-sequences"])
+
+# Workflow Automation (Visual Workflow Builder & Approvals)
+api_router.include_router(workflows.router, prefix="/workflows", tags=["workflows"])
+
+# Conversation Intelligence (Call Recording & Analysis)
+api_router.include_router(conversations.router, prefix="/conversations", tags=["conversations"])
+
+# Forecasting (Collaborative Forecasting & Quota Management)
+api_router.include_router(forecasting.router, prefix="/forecasts", tags=["forecasts"])
+
+# Dashboard Builder (Custom Dashboards with Widgets)
+api_router.include_router(dashboards.router, prefix="/dashboards", tags=["dashboards"])
+
+# Data Import/Export (Salesforce, HubSpot, Pipedrive, CSV)
+api_router.include_router(data_import.router, prefix="/data-import", tags=["data-import"])

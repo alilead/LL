@@ -37,26 +37,26 @@ class Lead(Base):
     is_deleted = Column(Boolean, nullable=False, default=False)
     visible = Column(Boolean, nullable=False, default=True)
     source = Column(String(100), nullable=True)
-    email_guidelines = Column(Text, nullable=True)  # Email ile ilgili yönergeler
-    sales_intelligence = Column(JSON, nullable=True)  # AI sales intelligence verisi
+    email_guidelines = Column(Text, nullable=True)  # Email-related guidelines
+    sales_intelligence = Column(JSON, nullable=True)  # AI sales intelligence data
 
     # Hybrid property for psychometrics
     @hybrid_property
     def psychometrics(self):
         """Get the psychometrics value, ensuring it's always a dict."""
-        # Eğer None ise boş dict dön
+        # If None, return empty dict
         if self._psychometrics is None:
             return {}
-        # Eğer boş string ise boş dict dön
+        # If empty string, return empty dict
         if self._psychometrics == "":
             return {}
-        # Diğer durumlarda olduğu gibi dön
+        # Otherwise return as is
         return self._psychometrics
-    
+
     @psychometrics.setter
     def psychometrics(self, value):
         """Set the psychometrics value, ensuring it's always a dict."""
-        # Eğer None veya boş string verilirse boş dict olarak kaydet
+        # If None or empty string, save as empty dict
         if value is None or value == "":
             self._psychometrics = {}
         else:

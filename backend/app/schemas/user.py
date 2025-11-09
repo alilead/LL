@@ -28,6 +28,14 @@ class UserInDBBase(UserBase):
     created_at: datetime
     updated_at: datetime
     last_login: Optional[datetime] = None
+    organization_role: Optional[str] = None
+
+    # LinkedIn Integration fields
+    linkedin_token: Optional[str] = None
+    linkedin_refresh_token: Optional[str] = None
+    linkedin_token_expires: Optional[datetime] = None
+    linkedin_profile_id: Optional[str] = None
+    linkedin_profile_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -51,6 +59,11 @@ class UserResponse(BaseModel):
     is_admin: bool = False
     organization_role: str = "member"  # viewer, member, manager
     job_title: Optional[str] = None
+    last_login: Optional[datetime] = None
+
+    # LinkedIn Integration fields
+    linkedin_profile_id: Optional[str] = None
+    linkedin_profile_url: Optional[str] = None
 
     class Config:
         from_attributes = True

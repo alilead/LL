@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import relationship
-from app.db.base_class import Base
+from app.models.base import Base
 from app.schemas.setting import SettingType
 
 class Setting(Base):

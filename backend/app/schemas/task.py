@@ -63,12 +63,14 @@ class TaskUpdate(BaseModel):
     status: Optional[TaskStatus] = None
     lead_id: Optional[int] = None
     assigned_to_id: Optional[int] = None
+    completed_at: Optional[datetime] = None
 
 # Properties stored in DB
 class TaskInDB(TaskBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    completed_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

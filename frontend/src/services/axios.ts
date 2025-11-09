@@ -22,13 +22,13 @@ const api = axios.create({
   withCredentials: true // Include cookies in requests
 });
 
-// Yönlendirme yapıp yapılmayacağını kontrol eden değişken
+// Variable to check whether to redirect
 let isRefreshingToken = false;
 let redirectToLogin = false;
-// Bekleyen istekleri depolayacak array
+// Array to store pending requests
 let pendingRequests: Array<() => void> = [];
 
-// Kritik olmayan endpointler (401 olduğunda logout olmayalım)
+// Non-critical endpoints (don't logout on 401)
 const nonCriticalEndpoints = [
   '/notifications',
   '/leads',
@@ -44,12 +44,12 @@ const nonCriticalEndpoints = [
   '/tasks'
 ];
 
-// Task endpoint'inde özel olarak kullanılacak veri yapısı
+// Task endpoint special data structure
 const taskDefaultResponses = {
   single: {
     id: 0,
-    title: "Yetkilendirme Hatası",
-    description: "Bu göreve erişim izniniz bulunmamaktadır.",
+    title: "Authorization Error",
+    description: "You do not have permission to access this task.",
     due_date: new Date().toISOString(),
     priority: "MEDIUM",
     status: "PENDING",
@@ -63,12 +63,12 @@ const taskDefaultResponses = {
   list: { items: [], total: 0 }
 };
 
-// Son başarılı token yenileme zamanı
+// Last successful token refresh time
 let lastSuccessfulTokenRefresh = 0;
-// Token yenileme minimum aralığı (15 saniye)
+// Token refresh minimum interval (15 seconds)
 const TOKEN_REFRESH_MIN_INTERVAL = 15000; 
 
-// Request interceptor - URL'lerin sonuna / ekleyerek yönlendirmeleri önleyelim
+// Request interceptor - Add authentication token to requests
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -111,14 +111,14 @@ api.interceptors.response.use(
       }
     }
 
-    // Eğer endpoint 404 hatası veriyorsa ve kritik olmayan bir endpoint ise, sessizce hatayı geçelim
+    // If endpoint returns 404 and is non-critical, silently handle the error
     if (error.response?.status === 404) {
       const currentUrl = originalRequest?.url || '';
       const isNonCritical = nonCriticalEndpoints.some(endpoint => currentUrl.includes(endpoint));
       
       if (isNonCritical) {
         console.warn(`Endpoint not found (404): ${currentUrl}. This feature may not be implemented yet.`);
-        // Empty/default response döndür
+        // Return empty/default response
         if (currentUrl.includes('/notifications')) {
           return Promise.resolve({ data: { items: [], total: 0 } });
         }
@@ -157,8 +157,8 @@ api.interceptors.response.use(
           // For task list requests
           return Promise.resolve({ data: { items: [], total: 0 } });
         }
-        
-        // Diğer durumlar için boş bir yanıt döndür
+
+        // Return empty response for other cases
         return Promise.resolve({ data: {} });
       }
     }
@@ -169,16 +169,16 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // 401 Unauthorized hatası - Token sorunlarını ele alma
+    // 401 Unauthorized error - Handle token issues
     if (error.response.status === 401 && !originalRequest._retry) {
-      // Kritik olmayan endpointler için sessizce geçelim, kullanıcıyı logout yapmayalım
+      // For non-critical endpoints, silently handle without logging out the user
       const currentUrl = originalRequest?.url || '';
       const isNonCritical = nonCriticalEndpoints.some(endpoint => currentUrl.includes(endpoint));
       
       if (isNonCritical) {
         console.warn(`Authentication error on non-critical endpoint: ${currentUrl}`);
-        
-        // Leads veya users için boş sonuç döndürelim
+
+        // Return empty results for leads or users
         if (currentUrl.includes('/leads')) {
           return Promise.resolve({ data: { items: [], total: 0 } });
         }
@@ -214,29 +214,29 @@ api.interceptors.response.use(
         if (currentUrl.includes('/activities')) {
           return Promise.resolve({ data: { items: [] } });
         }
-        
-        // Diğer kritik olmayan endpointler için hatayı geçelim
+
+        // Reject error for other non-critical endpoints
         return Promise.reject(error);
       }
 
-      // Son token yenilemesinden bu yana yeterli zaman geçti mi?
+      // Has enough time passed since the last token refresh?
       const now = Date.now();
       if (now - lastSuccessfulTokenRefresh < TOKEN_REFRESH_MIN_INTERVAL) {
         console.warn('Token refresh attempted too soon, skipping...');
         return Promise.reject(error);
       }
 
-      // Eğer oturum yenileme işlemi zaten devam ediyorsa
+      // If token refresh is already in progress
       if (isRefreshingToken) {
         return new Promise((resolve) => {
-          // Mevcut isteği bekletme kuyruğuna ekle
+          // Add current request to the pending queue
           pendingRequests.push(() => {
             resolve(api(originalRequest));
           });
         });
       }
 
-      // Mevcut isteği yeniden deneme olarak işaretle
+      // Mark current request as retry
       originalRequest._retry = true;
       isRefreshingToken = true;
 
@@ -245,8 +245,8 @@ api.interceptors.response.use(
       try {
         // Try to refresh token
         const refreshToken = localStorage.getItem('refreshToken');
-        
-        // Refresh token yoksa, login'e yönlendir
+
+        // If no refresh token, redirect to login
         if (!refreshToken) {
           console.log('No refresh token found');
           if (!redirectToLogin) {
@@ -265,7 +265,7 @@ api.interceptors.response.use(
 
         if (response.data.access_token) {
           console.log('Token refresh successful');
-          // Token yenileme başarılı zamanını kaydet
+          // Record the time of successful token refresh
           lastSuccessfulTokenRefresh = Date.now();
           
           // Update tokens
@@ -278,7 +278,7 @@ api.interceptors.response.use(
           api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
           originalRequest.headers['Authorization'] = `Bearer ${response.data.access_token}`;
 
-          // Bekletme kuyruğundaki tüm istekleri yeni token ile yeniden yap
+          // Retry all pending requests with new token
           pendingRequests.forEach(callback => callback());
           pendingRequests = [];
           
@@ -292,8 +292,8 @@ api.interceptors.response.use(
         }
       } catch (refreshError) {
         console.error('Token refresh failed:', refreshError);
-        
-        // Login'e yönlendir
+
+        // Redirect to login
         if (!redirectToLogin) {
           redirectToLogin = true;
           useAuthStore.getState().logout();

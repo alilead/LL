@@ -1,4 +1,4 @@
-// Temel tip tanımlamaları
+// Basic type definitions
 export interface User {
   id: string;
   email: string;
@@ -53,7 +53,7 @@ export interface FormField {
   };
 }
 
-// UI bileşen tipleri
+// UI component types
 export interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'tertiary' | 'danger';
   size?: 'sm' | 'md' | 'lg';
@@ -154,7 +154,7 @@ export interface StorageService {
   clear: () => void;
 }
 
-// Yardımcı tip tanımlamaları
+// Helper type definitions
 export type DeepPartial<T> = {
   [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
 };

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional, Dict, Any
 from datetime import datetime
 
@@ -24,8 +24,7 @@ class OrganizationSettingsInDBBase(OrganizationSettingsBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class EmailSettingsBase(BaseModel):
     smtp_host: Optional[str] = None
@@ -47,8 +46,7 @@ class EmailSettingsInDBBase(EmailSettingsBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class EmailTemplateBase(BaseModel):
     name: str
@@ -68,5 +66,4 @@ class EmailTemplateInDBBase(EmailTemplateBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    class Config:
-        orm_mode = True 
+    model_config = ConfigDict(from_attributes=True) 

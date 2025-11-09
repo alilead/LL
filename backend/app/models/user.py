@@ -89,6 +89,7 @@ class User(Base):
     sent_messages: Mapped[List["Message"]] = relationship("Message", foreign_keys="[Message.sender_id]", back_populates="sender")
     received_messages: Mapped[List["Message"]] = relationship("Message", foreign_keys="[Message.receiver_id]", back_populates="receiver")
     linkedin_connection: Mapped[Optional["LinkedInConnection"]] = relationship("LinkedInConnection", back_populates="user", uselist=False)
+    territory_memberships = relationship("TerritoryMember", back_populates="user", cascade="all, delete-orphan")
 
     @property
     def hashed_password(self) -> str:

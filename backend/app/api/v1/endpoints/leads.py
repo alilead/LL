@@ -148,9 +148,9 @@ def read_leads(
             tag_id=tag_id,
             is_admin=current_user.is_admin
         )
-        
-        # Artık psychometrics hybrid_property sayesinde otomatik olarak düzeltiliyor
-        
+
+        # Psychometrics is now automatically corrected via hybrid_property
+
         logger.info(f"Total leads before pagination: {len(leads)}")
         logger.info(f"Returning {limit} leads after pagination")
         

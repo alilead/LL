@@ -106,25 +106,25 @@ export const reportsApi = {
     return response.data;
   },
 
-  // Özel rapor oluştur
+  // Generate custom report
   generateReport: async (request: ReportRequest) => {
     const response = await api.post<ReportResponse>('/reports/generate', request);
     return response.data;
   },
 
-  // Zamanlanmış raporları listele
+  // List scheduled reports
   getScheduledReports: async (skip = 0, limit = 100) => {
     const response = await api.get<ReportResponse[]>(`/reports/scheduled?skip=${skip}&limit=${limit}`);
     return response.data;
   },
 
-  // Yeni zamanlanmış rapor oluştur
+  // Create new scheduled report
   scheduleReport: async (request: ReportRequest) => {
     const response = await api.post<ReportResponse>('/reports/schedule', request);
     return response.data;
   },
 
-  // Zamanlanmış raporu sil
+  // Delete scheduled report
   deleteScheduledReport: async (reportId: number) => {
     const response = await api.delete<ReportResponse>(`/reports/schedule/${reportId}`);
     return response.data;

@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, ForeignKey, Enum, JSON, TIMESTAMP
 from sqlalchemy.sql import func
-from app.db.base_class import Base
+from app.models.base import Base
 
 class DealCustomField(Base):
     __tablename__ = "deal_custom_fields"

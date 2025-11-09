@@ -109,9 +109,9 @@ def update_current_user(
     """
     Update current user.
     """
-    # Password doğrudan CRUD servisi tarafından hash'lenecek
-    # hashed_password atamamıza gerek yok
-    
+    # Password will be hashed directly by CRUD service
+    # No need to assign hashed_password
+
     user = crud_user.user.update(db, db_obj=current_user, obj_in=user_in)
     return user
 
@@ -145,6 +145,14 @@ def get_organization_users(
         user_responses = []
         for user in users:
             try:
+                # Safely convert organization_role - handle enum, string, or None
+                org_role = "member"  # default
+                if user.organization_role:
+                    if hasattr(user.organization_role, 'value'):
+                        org_role = str(user.organization_role.value).lower()
+                    else:
+                        org_role = str(user.organization_role).lower()
+
                 user_response = UserResponse(
                     id=int(user.id),
                     email=str(user.email),
@@ -153,7 +161,11 @@ def get_organization_users(
                     is_active=bool(user.is_active),
                     is_admin=bool(user.is_admin),
                     organization_id=int(user.organization_id),
-                    organization_role=str(user.organization_role.value.lower() if hasattr(user.organization_role, 'value') else user.organization_role).lower()
+                    organization_role=org_role,
+                    job_title=user.job_title if hasattr(user, 'job_title') else None,
+                    last_login=user.last_login if hasattr(user, 'last_login') else None,
+                    linkedin_profile_id=user.linkedin_profile_id if hasattr(user, 'linkedin_profile_id') else None,
+                    linkedin_profile_url=user.linkedin_profile_url if hasattr(user, 'linkedin_profile_url') else None
                 )
                 user_responses.append(user_response)
             except (ValueError, TypeError, AttributeError) as e:
@@ -222,10 +234,10 @@ def update_user(
             status_code=404,
             detail="User not found"
         )
-    
-    # Password doğrudan CRUD servisi tarafından hash'lenecek
-    # hashed_password atamamıza gerek yok
-    
+
+    # Password will be hashed directly by CRUD service
+    # No need to assign hashed_password
+
     user = crud_user.user.update(db, db_obj=user, obj_in=user_in)
     return user
 
@@ -252,11 +264,11 @@ def patch_user(
             status_code=404,
             detail="User not found"
         )
-    
-    # Doğrudan CRUD servisine password'ü ileteceğiz, 
-    # hashed_password ataması yapmıyoruz çünkü model bu alanı desteklemiyor
-    # ve CRUD servisi zaten password'ü hash'liyor
-    
+
+    # We'll pass the password directly to the CRUD service,
+    # not assigning hashed_password because the model doesn't support this field
+    # and the CRUD service already hashes the password
+
     # Convert to dict and remove None values for partial update
     update_data = user_in.dict(exclude_unset=True)
     user = crud_user.user.update(db, db_obj=user, obj_in=update_data)
