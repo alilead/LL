@@ -69,8 +69,8 @@ class Settings(BaseSettings):
     )
 
     # LinkedIn Configuration
-    LINKEDIN_CLIENT_ID: str = Field(..., description="LinkedIn client ID - MUST be set via environment variable")
-    LINKEDIN_CLIENT_SECRET: str = Field(..., description="LinkedIn client secret - MUST be set via environment variable")
+    LINKEDIN_CLIENT_ID: Optional[str] = Field(default=None, description="LinkedIn client ID")
+    LINKEDIN_CLIENT_SECRET: Optional[str] = Field(default=None, description="LinkedIn client secret")
     LINKEDIN_REDIRECT_URI: str = Field(default="https://the-leadlab.com/linkedin/callback", description="LinkedIn redirect URI")
     LINKEDIN_SCOPE: str = Field(default="openid profile email w_member_social", description="LinkedIn OAuth scope")
     
@@ -84,9 +84,9 @@ class Settings(BaseSettings):
         return v
 
     # Stripe Configuration
-    STRIPE_PUBLISHABLE_KEY: str = Field(..., description="Stripe publishable key - MUST be set via environment variable")
-    STRIPE_SECRET_KEY: str = Field(..., description="Stripe secret key - MUST be set via environment variable")
-    STRIPE_WEBHOOK_SECRET: str = Field(..., description="Stripe webhook secret - MUST be set via environment variable")
+    STRIPE_PUBLISHABLE_KEY: Optional[str] = Field(default=None, description="Stripe publishable key")
+    STRIPE_SECRET_KEY: Optional[str] = Field(default=None, description="Stripe secret key")
+    STRIPE_WEBHOOK_SECRET: Optional[str] = Field(default=None, description="Stripe webhook secret")
     STRIPE_CURRENCY: str = Field(default="usd", description="Default currency for Stripe payments")
     
     # Email/SMTP Configuration
