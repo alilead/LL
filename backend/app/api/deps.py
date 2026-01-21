@@ -159,29 +159,50 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Get user from database
+    # Get user from database - simplified to avoid relationship loading issues
     try:
-        user = crud.user.get(db=db, id=token_data.sub)
-        if not user:
+        from sqlalchemy import text
+        logger.debug(f"Attempting to fetch user with ID: {token_data.sub}")
+        
+        # Use raw SQL first to validate user exists and is active
+        result = db.execute(
+            text("SELECT id, email, first_name, last_name, is_active, organization_id FROM users WHERE id = :user_id LIMIT 1"),
+            {"user_id": token_data.sub}
+        )
+        user_row = result.first()
+        
+        if not user_row:
             logger.error(f"User not found for token subject: {token_data.sub}")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
         
+        logger.debug(f"User found: {user_row.id} - {user_row.email}")
+        
         # Check if user is active
-        if not user.is_active:
-            logger.warning(f"Inactive user attempted access: {user.id} - {user.email}")
+        if not user_row.is_active:
+            logger.warning(f"Inactive user attempted access: {user_row.id} - {user_row.email}")
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
+        
+        # Now get the full ORM object for return (after validation)
+        user = crud.user.get(db=db, id=token_data.sub)
+        if not user:
+            logger.error(f"Failed to load ORM user object for ID: {token_data.sub}")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="User data error")
+        
+        process_time = time.time() - start_time
+        logger.debug(f"Authentication completed for user {user.id} in {process_time:.4f}s")
+        
+        return user
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Database error during user lookup: {str(e)}")
-        logger.debug(f"Stack trace: {traceback.format_exc()}")
+        logger.critical(f"Database error in get_current_user: {str(e)}")
+        logger.critical(f"Exception type: {type(e).__name__}")
+        logger.critical(traceback.format_exc())
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error during authentication"
+            detail=f"Auth database error: {str(e)}"
         )
-    
-    process_time = time.time() - start_time
-    logger.debug(f"Authentication completed for user {user.id} in {process_time:.4f}s")
-    
-    return user
 
 def get_current_active_user(
     current_user: models.User = Depends(get_current_user),

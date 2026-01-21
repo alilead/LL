@@ -39,12 +39,13 @@ async def health_check():
     """
     try:
         from app.db.session import SessionLocal
+        from sqlalchemy import text
 
         # Use existing database session configuration
         db = SessionLocal()
 
         # Simple query to test database connection
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         db.close()
 
         return {

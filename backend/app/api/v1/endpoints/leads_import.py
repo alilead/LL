@@ -27,7 +27,7 @@ def clean_value(value):
         return cleaned if cleaned else None
     return value
 
-@router.post("/csv", response_model=GenericResponse)
+@router.post("/import/csv", response_model=GenericResponse)
 async def import_leads_from_csv(
     *,
     db: Session = Depends(deps.get_db),
@@ -361,48 +361,56 @@ import csv
 
 @router.get("/template", response_class=StreamingResponse)
 async def download_csv_template(
-    current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: models.User = Depends(deps.get_current_user),
 ):
     """
     Download a CSV template with sample data for lead imports
     """
-    # Create a StringIO object to write CSV data
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    # Write headers
-    headers = [
-        'FIRSTNAME', 'LASTNAME', 'COMPANY', 'JOB_TITLE', 'LOCATION', 'COUNTRY',
-        'EMAILS', 'TELEPHONE', 'MOBILE', 'LINKEDIN', 'WEBSITE', 'SECTOR', 
-        'NOTE'
-    ]
-    writer.writerow(headers)
-    
-    # Write sample data rows
-    sample_data = [
-        [
-            'John', 'Doe', 'Tech Corp', 'Senior Developer', 'San Francisco', 'USA',
-            'john.doe@techcorp.com', '+1-555-0123', '+1-555-4567', 
-            'https://linkedin.com/in/johndoe', 'https://techcorp.com',
-            'Technology', 'Experienced developer with cloud expertise'
-        ],
-        [
-            'Jane', 'Smith', 'Finance Inc', 'Investment Manager', 'London', 'UK',
-            'jane.smith@financeinc.com', '+44-20-1234', '+44-77-5678',
-            'https://linkedin.com/in/janesmith', 'https://financeinc.com',
-            'Finance', 'Specializes in portfolio management'
+    try:
+        # Create a StringIO object to write CSV data
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write headers
+        headers = [
+            'FIRSTNAME', 'LASTNAME', 'COMPANY', 'JOB_TITLE', 'LOCATION', 'COUNTRY',
+            'EMAILS', 'TELEPHONE', 'MOBILE', 'LINKEDIN', 'WEBSITE', 'SECTOR', 
+            'NOTE'
         ]
-    ]
-    
-    for row in sample_data:
-        writer.writerow(row)
-    
-    # Create the response
-    output.seek(0)
-    return StreamingResponse(
-        iter([output.getvalue()]),
-        media_type="text/csv",
-        headers={
-            'Content-Disposition': 'attachment; filename=leads_template.csv'
-        }
-    )
+        writer.writerow(headers)
+        
+        # Write sample data rows
+        sample_data = [
+            [
+                'John', 'Doe', 'Tech Corp', 'Senior Developer', 'San Francisco', 'USA',
+                'john.doe@techcorp.com', '+1-555-0123', '+1-555-4567', 
+                'https://linkedin.com/in/johndoe', 'https://techcorp.com',
+                'Technology', 'Experienced developer with cloud expertise'
+            ],
+            [
+                'Jane', 'Smith', 'Finance Inc', 'Investment Manager', 'London', 'UK',
+                'jane.smith@financeinc.com', '+44-20-1234', '+44-77-5678',
+                'https://linkedin.com/in/janesmith', 'https://financeinc.com',
+                'Finance', 'Specializes in portfolio management'
+            ]
+        ]
+        
+        for row in sample_data:
+            writer.writerow(row)
+        
+        # Create the response
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={
+                'Content-Disposition': 'attachment; filename=leads_template.csv'
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error generating CSV template: {str(e)}")
+        logger.exception("Template generation exception:")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating template: {str(e)}"
+        )

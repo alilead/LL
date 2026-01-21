@@ -25,7 +25,7 @@ class Lead(Base):
     stage_id = Column(Integer, ForeignKey("lead_stages.id"), nullable=False)
     created_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime, nullable=True)
-    telephone = Column(String(50), nullable=True)
+    telephone = Column("phone", String(50), nullable=True)  # Database column is 'phone' not 'telephone'
     mobile = Column(String(50), nullable=True)
     sector = Column(String(200), index=True, nullable=True)
     time_in_current_role = Column(String(100), nullable=True)
@@ -35,10 +35,21 @@ class Lead(Base):
     _psychometrics = Column("psychometrics", JSON, nullable=True)
     wpi = Column(String(50), index=True, nullable=True)
     is_deleted = Column(Boolean, nullable=False, default=False)
-    visible = Column(Boolean, nullable=False, default=True)
+    # visible = Column(Boolean, nullable=False, default=True)  # Column doesn't exist in database
     source = Column(String(100), nullable=True)
-    email_guidelines = Column(Text, nullable=True)  # Email-related guidelines
+    # email_guidelines = Column(Text, nullable=True)  # Column doesn't exist in database
     sales_intelligence = Column(JSON, nullable=True)  # AI sales intelligence data
+
+    # Properties for backward compatibility
+    @property
+    def visible(self) -> bool:
+        """Visible property - column doesn't exist, always return True"""
+        return True
+    
+    @property
+    def email_guidelines(self):
+        """Email guidelines property - column doesn't exist"""
+        return None
 
     # Hybrid property for psychometrics
     @hybrid_property

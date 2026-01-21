@@ -143,6 +143,12 @@ dist/
 *.sqlite
 *.sqlite3
 
+# Local DB dumps/backups and temp clones
+backup-*.sql
+dump-*.sql
+leadlab_*.sql
+.tmp-leadlab-upstream/
+
 # Logs
 logs
 *.log

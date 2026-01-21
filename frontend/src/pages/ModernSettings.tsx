@@ -3,7 +3,7 @@
  * Tab-based, clean, professional
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   User,
   Building2,
@@ -19,6 +19,9 @@ import {
   Save,
   X
 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import { updateProfile } from '@/services/users';
+import { useAuthStore } from '@/store/auth';
 
 type Tab = 'profile' | 'organization' | 'notifications' | 'security' | 'billing' | 'team' | 'integrations';
 
@@ -93,6 +96,79 @@ export function ModernSettings() {
 }
 
 function ProfileSettings() {
+  const { user, fetchUser } = useAuthStore();
+  const [isSaving, setIsSaving] = useState(false);
+  const [formState, setFormState] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    bio: ''
+  });
+
+  useEffect(() => {
+    if (!user) {
+      fetchUser().catch(() => {
+        toast.error('Failed to load user profile');
+      });
+    }
+  }, [user, fetchUser]);
+
+  useEffect(() => {
+    if (user) {
+      setFormState((prev) => ({
+        ...prev,
+        firstName: user.first_name || '',
+        lastName: user.last_name || '',
+        email: user.email || ''
+      }));
+    }
+  }, [user]);
+
+  const handleChange = (field: keyof typeof formState, value: string) => {
+    setFormState((prev) => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleCancel = () => {
+    if (!user) {
+      return;
+    }
+    setFormState((prev) => ({
+      ...prev,
+      firstName: user.first_name || '',
+      lastName: user.last_name || '',
+      email: user.email || '',
+      phone: '',
+      bio: ''
+    }));
+  };
+
+  const handleSave = async () => {
+    if (!user) {
+      toast.error('User profile not loaded yet');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await updateProfile({
+        first_name: formState.firstName,
+        last_name: formState.lastName,
+        email: formState.email
+      });
+      await fetchUser();
+      toast.success('Profile updated successfully');
+    } catch (error: any) {
+      const message = error?.response?.data?.detail || error?.response?.data?.message || 'Failed to update profile';
+      toast.error(message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="p-8">
       <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-6">
@@ -128,7 +204,8 @@ function ProfileSettings() {
             </label>
             <input
               type="text"
-              defaultValue="Firat"
+              value={formState.firstName}
+              onChange={(event) => handleChange('firstName', event.target.value)}
               className="w-full px-4 py-2.5 bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
@@ -138,7 +215,8 @@ function ProfileSettings() {
             </label>
             <input
               type="text"
-              defaultValue="Celik"
+              value={formState.lastName}
+              onChange={(event) => handleChange('lastName', event.target.value)}
               className="w-full px-4 py-2.5 bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
@@ -151,7 +229,8 @@ function ProfileSettings() {
           </label>
           <input
             type="email"
-            defaultValue="firat@the-leadlab.com"
+            value={formState.email}
+            onChange={(event) => handleChange('email', event.target.value)}
             className="w-full px-4 py-2.5 bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
@@ -164,6 +243,8 @@ function ProfileSettings() {
           <input
             type="tel"
             placeholder="+1 (555) 000-0000"
+            value={formState.phone}
+            onChange={(event) => handleChange('phone', event.target.value)}
             className="w-full px-4 py-2.5 bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
@@ -176,18 +257,29 @@ function ProfileSettings() {
           <textarea
             rows={4}
             placeholder="Tell us about yourself..."
+            value={formState.bio}
+            onChange={(event) => handleChange('bio', event.target.value)}
             className="w-full px-4 py-2.5 bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
 
         {/* Actions */}
         <div className="flex items-center justify-end space-x-3 pt-6 border-t border-neutral-200 dark:border-neutral-700">
-          <button className="px-4 py-2 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg font-medium transition-colors">
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="px-4 py-2 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg font-medium transition-colors"
+          >
             Cancel
           </button>
-          <button className="flex items-center space-x-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex items-center space-x-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+          >
             <Save className="w-4 h-4" />
-            <span>Save Changes</span>
+            <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
           </button>
         </div>
       </div>

@@ -22,9 +22,9 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function DarkModeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
-    // Load theme from localStorage or default to system
+    // Load theme from localStorage or default to light
     const stored = localStorage.getItem('leadlab-theme') as Theme;
-    return stored || 'system';
+    return stored || 'light';
   });
 
   const [actualTheme, setActualTheme] = useState<'light' | 'dark'>('light');

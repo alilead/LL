@@ -15,6 +15,7 @@ export interface User {
 }
 
 export interface UserUpdateInput {
+  email?: string;
   first_name?: string;
   last_name?: string;
   preferences?: Record<string, any>;

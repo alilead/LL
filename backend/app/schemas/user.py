@@ -5,6 +5,7 @@ from pydantic import BaseModel, EmailStr
 # Shared properties
 class UserBase(BaseModel):
     email: EmailStr
+    username: Optional[str] = None
     first_name: str
     last_name: str
     company: Optional[str] = None
@@ -52,6 +53,7 @@ class UserInDB(UserInDBBase):
 class UserResponse(BaseModel):
     id: int
     email: str
+    username: Optional[str] = None
     first_name: str
     last_name: str
     organization_id: int

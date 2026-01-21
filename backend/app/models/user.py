@@ -37,25 +37,53 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)  # Unified password field
-    first_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    last_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    job_title: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean(), default=True, nullable=True)
-    is_superuser: Mapped[bool] = mapped_column(Boolean(), default=False, nullable=True)
-    is_admin: Mapped[bool] = mapped_column(Boolean(), default=False, nullable=True)  # Global admin (LeadLab only)
-    organization_role: Mapped[OrganizationRole] = mapped_column(Enum(OrganizationRole), default=OrganizationRole.MEMBER, nullable=False)
-    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    username: Mapped[Optional[str]] = mapped_column(String(100), unique=True, index=True, nullable=True)  # Optional username for login
+    password_hash: Mapped[str] = mapped_column("hashed_password", String(255), nullable=False)  # Unified password field - maps to hashed_password column
+    first_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    last_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    # company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Column doesn't exist in database
+    # job_title: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # Column doesn't exist in database
+    is_active: Mapped[bool] = mapped_column(Boolean(), default=True, nullable=False)
+    is_superuser: Mapped[bool] = mapped_column(Boolean(), default=False, nullable=False)
+    # is_admin: Mapped[bool] = mapped_column(Boolean(), default=False, nullable=True)  # Column doesn't exist in database
+    # organization_role: Mapped[OrganizationRole] = mapped_column(Enum(OrganizationRole), default=OrganizationRole.MEMBER, nullable=False)  # Column doesn't exist
+    role: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default='user')  # Database has 'role' not 'organization_role'
+    # last_login: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # Column doesn't exist
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
-    # LinkedIn Integration
-    linkedin_token: Mapped[Optional[str]] = mapped_column(String(500), nullable=True, default=None)
-    linkedin_refresh_token: Mapped[Optional[str]] = mapped_column(String(500), nullable=True, default=None)
-    linkedin_token_expires: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, default=None)
-    linkedin_profile_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, default=None)
-    linkedin_profile_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, default=None)
+    # LinkedIn Integration - Columns don't exist in database
+    # linkedin_token: Mapped[Optional[str]] = mapped_column(String(500), nullable=True, default=None)
+    # linkedin_refresh_token: Mapped[Optional[str]] = mapped_column(String(500), nullable=True, default=None)
+    # linkedin_token_expires: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, default=None)
+    # linkedin_profile_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, default=None)
+    # linkedin_profile_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, default=None)
+
+    # Properties for backward compatibility (columns don't exist in database)
+    @property
+    def is_admin(self) -> bool:
+        """Check if user is admin - using role field since is_admin column doesn't exist"""
+        return self.role == 'admin' if self.role else False
+    
+    @property
+    def company(self):
+        """Company property - column doesn't exist"""
+        return None
+    
+    @property
+    def job_title(self):
+        """Job title property - column doesn't exist"""
+        return None
+    
+    @property
+    def last_login(self):
+        """Last login property - column doesn't exist"""
+        return None
+    
+    @property
+    def organization_role_value(self):
+        """Organization role property - maps to role field"""
+        return self.role if self.role else 'user'
 
     # Relationships
     organization: Mapped["Organization"] = relationship("Organization", back_populates="users")

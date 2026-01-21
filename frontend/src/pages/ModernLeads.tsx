@@ -10,11 +10,12 @@
  * - Full backend integration
  */
 
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { leadsAPI, type Lead } from '@/services/api/leads';
 import { stagesAPI } from '@/services/api/stages';
+import { useToast } from '@/hooks/use-toast';
 import {
   LayoutGrid,
   List,
@@ -28,14 +29,33 @@ import {
   User,
   Building2,
   Download,
-  Loader2
+  Upload,
+  FileDown,
+  Loader2,
+  X
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/Dialog";
+import { Button } from '@/components/ui/Button';
 
 export function ModernLeads() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [view, setView] = useState<'kanban' | 'table'>('kanban');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Fetch leads from backend
   const { data: leadsResponse, isLoading: isLoadingLeads } = useQuery({
@@ -60,6 +80,99 @@ export function ModernLeads() {
   const stages = Array.isArray(stagesResponse?.data)
     ? stagesResponse.data
     : (stagesResponse?.data?.data || stagesResponse?.data?.results || []);
+
+  // Upload mutation
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('assigned_user_id', '1'); // Default user ID
+      return leadsAPI.uploadCSV(formData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      setIsUploadDialogOpen(false);
+      setSelectedFile(null);
+      toast({
+        title: "Success",
+        description: "Leads imported successfully!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.response?.data?.detail || "Failed to import leads",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Handle file selection
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type
+      const validTypes = [
+        'text/csv',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      ];
+      if (!validTypes.includes(file.type) && !file.name.endsWith('.csv') && !file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+        toast({
+          title: "Invalid file type",
+          description: "Please upload a CSV or Excel file",
+          variant: "destructive",
+        });
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  // Handle upload
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      toast({
+        title: "No file selected",
+        description: "Please select a file to upload",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsUploading(true);
+    try {
+      await uploadMutation.mutateAsync(selectedFile);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Handle download template
+  const handleDownloadTemplate = async () => {
+    try {
+      const blob = await leadsAPI.downloadTemplate();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'leads-import-template.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Success",
+        description: "Template downloaded successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to download template",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Loading state
   if (isLoadingLeads || isLoadingStages) {
@@ -148,6 +261,14 @@ export function ModernLeads() {
               </button>
             </div>
 
+            <button 
+              onClick={() => setIsUploadDialogOpen(true)}
+              className="flex items-center space-x-2 px-4 py-2.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+            >
+              <Upload className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
+              <span className="text-neutral-700 dark:text-neutral-300">Import</span>
+            </button>
+            
             <button className="flex items-center space-x-2 px-4 py-2.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
               <Download className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
               <span className="text-neutral-700 dark:text-neutral-300">Export</span>
@@ -370,6 +491,106 @@ export function ModernLeads() {
           )}
         </div>
       )}
+
+      {/* Upload Dialog */}
+      <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Import Leads</DialogTitle>
+            <DialogDescription>
+              Upload a CSV or Excel file to import leads into your system.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* File input */}
+            <div className="flex flex-col space-y-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center justify-center space-x-2 px-4 py-8 border-2 border-dashed border-neutral-300 dark:border-neutral-600 rounded-lg hover:border-primary-500 dark:hover:border-primary-400 transition-colors"
+              >
+                <Upload className="w-5 h-5 text-neutral-400" />
+                <span className="text-sm text-neutral-600 dark:text-neutral-400">
+                  {selectedFile ? selectedFile.name : 'Click to select file'}
+                </span>
+              </button>
+              
+              {selectedFile && (
+                <div className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-primary-100 dark:bg-primary-900/20 rounded flex items-center justify-center">
+                      <FileDown className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{selectedFile.name}</p>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                        {(selectedFile.size / 1024).toFixed(2)} KB
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedFile(null)}
+                    className="p-1 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded"
+                  >
+                    <X className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
+                  </button>
+                </div>
+              )}
+              
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                Supported formats: CSV, XLS, XLSX
+              </p>
+            </div>
+
+            {/* Download template button */}
+            <button
+              onClick={handleDownloadTemplate}
+              className="w-full flex items-center justify-center space-x-2 px-4 py-2 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+            >
+              <FileDown className="w-4 h-4" />
+              <span className="text-sm">Download Template</span>
+            </button>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsUploadDialogOpen(false);
+                setSelectedFile(null);
+              }}
+              disabled={isUploading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpload}
+              disabled={!selectedFile || isUploading}
+              className="bg-primary-600 hover:bg-primary-700"
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Import Leads
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

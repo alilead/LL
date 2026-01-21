@@ -114,7 +114,7 @@ export const handleLinkedInCallback = async (code: string) => {
       throw new Error('No code verifier found');
     }
 
-    const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+    const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
     const response = await axios.post(`${baseURL}/api/v1/linkedin/token`, { 
       code,
       code_verifier: codeVerifier 

@@ -36,7 +36,7 @@ import { useNavigate } from 'react-router-dom';
 import eventsAPI, { Event, EventCreateInput } from '@/services/api/events';
 import emailAPI from '../../services/emailAPI';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { toast } from '@/hooks/use-toast';
+import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/auth';
 import EventDetailModal from './EventDetailModal';
 import { Card } from '@/components/ui/Card';
@@ -286,9 +286,10 @@ export const CalendarPage = () => {
       await eventsAPI.create(formattedEvent);
       queryClient.invalidateQueries({ queryKey: ['events'] });
       toast.success('Event created successfully!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating event:', error);
-      toast.error('Failed to create event');
+      const errorMessage = error?.response?.data?.detail || 'Failed to create event';
+      toast.error(errorMessage);
     }
   };
 

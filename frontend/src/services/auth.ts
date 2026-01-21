@@ -2,7 +2,8 @@ import api from '../lib/axios';
 
 // Backend-Go compatible types
 export interface LoginCredentials {
-  email: string;
+  email?: string;
+  username?: string;
   password: string;
 }
 
@@ -17,6 +18,7 @@ export interface RegisterData {
 export interface UserInfo {
   id: string;
   email: string;
+  username?: string;
   first_name: string;
   last_name: string;
   is_active: boolean;

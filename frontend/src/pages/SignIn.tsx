@@ -7,7 +7,8 @@ import { PublicHeader } from '../components/layout/PublicHeader'
 import { motion } from 'framer-motion'
 
 interface SignInForm {
-  email: string
+  email?: string
+  username?: string
   password: string
 }
 
@@ -19,8 +20,10 @@ export function SignIn() {
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState<SignInForm>({
     email: '',
+    username: '',
     password: '',
   })
+  const [loginType, setLoginType] = useState<'email' | 'username'>('email')
   const [rememberMe, setRememberMe] = useState(false)
 
   useEffect(() => {
@@ -35,10 +38,21 @@ export function SignIn() {
     setIsLoading(true)
 
     try {
-      await login({
-        email: formData.email,
+      const loginPayload: any = {
         password: formData.password
-      })
+      }
+      
+      if (loginType === 'email' && formData.email) {
+        loginPayload.email = formData.email
+      } else if (loginType === 'username' && formData.username) {
+        loginPayload.username = formData.username
+      } else {
+        toast.error('Please enter either email or username')
+        setIsLoading(false)
+        return
+      }
+      
+      await login(loginPayload)
       toast.success('Login successful!')
     } catch (err: any) {
       console.error('Login error:', err)
@@ -81,24 +95,50 @@ export function SignIn() {
           <div className="bg-white px-6 py-12 shadow-lg sm:rounded-xl sm:px-12 border border-gray-100">
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div>
-                <label htmlFor="email" className="block text-sm font-medium leading-6 text-gray-900">
-                  Email Address
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label htmlFor={loginType} className="block text-sm font-medium leading-6 text-gray-900">
+                    {loginType === 'email' ? 'Email Address' : 'Username'}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginType(loginType === 'email' ? 'username' : 'email')
+                      setFormData({ ...formData, email: '', username: '' })
+                    }}
+                    className="text-xs text-indigo-600 hover:text-indigo-500 transition-colors"
+                  >
+                    Use {loginType === 'email' ? 'username' : 'email'} instead
+                  </button>
+                </div>
                 <div className="mt-2 relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Mail className="h-5 w-5 text-gray-400" />
                   </div>
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="you@example.com"
-                    className="block w-full rounded-md border-0 py-2 pl-10 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 transition-all duration-200"
-                  />
+                  {loginType === 'email' ? (
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={formData.email}
+                      onChange={handleChange}
+                      placeholder="you@example.com"
+                      className="block w-full rounded-md border-0 py-2 pl-10 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 transition-all duration-200"
+                    />
+                  ) : (
+                    <input
+                      id="username"
+                      name="username"
+                      type="text"
+                      autoComplete="username"
+                      required
+                      value={formData.username}
+                      onChange={handleChange}
+                      placeholder="username"
+                      className="block w-full rounded-md border-0 py-2 pl-10 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 transition-all duration-200"
+                    />
+                  )}
                 </div>
               </div>
 

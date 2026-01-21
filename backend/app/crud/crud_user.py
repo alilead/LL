@@ -18,6 +18,18 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
 
     def get_by_email(self, db: Session, *, email: str) -> Optional[User]:
         return db.query(User).filter(User.email == email).first()
+    
+    def get_by_username(self, db: Session, *, username: str) -> Optional[User]:
+        return db.query(User).filter(User.username == username).first()
+    
+    def get_by_email_or_username(self, db: Session, *, identifier: str) -> Optional[User]:
+        """Get user by email or username. Tries email first, then username."""
+        # Try email first
+        user = db.query(User).filter(User.email == identifier).first()
+        if user:
+            return user
+        # Try username
+        return db.query(User).filter(User.username == identifier).first()
 
     def get_multi_base(self, db: Session, *, skip: int = 0, limit: int = 100) -> List[User]:
         """Base get_multi method from CRUDBase"""

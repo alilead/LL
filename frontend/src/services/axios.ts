@@ -258,8 +258,10 @@ api.interceptors.response.use(
         }
 
         console.log('Calling refresh token endpoint...');
+        // Use the same baseURL logic as the main api instance
+        const refreshURL = isDevelopment ? '/api/v1/auth/refresh/' : `${API_URL}/api/v1/auth/refresh/`;
         const response = await axios.post(
-          `${API_URL}/api/v1/auth/refresh/`,
+          refreshURL,
           { refresh_token: refreshToken }
         );
 

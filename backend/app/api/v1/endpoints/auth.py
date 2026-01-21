@@ -96,39 +96,120 @@ async def login(
     OAuth2 compatible token login, get an access token for future requests.
     """
     try:
-        logger.critical(f"[DEBUG] Login attempt for: {login_in.email}")
+        # Get login identifier (email or username)
+        login_identifier = login_in.get_identifier()
+        logger.critical(f"[DEBUG] Login attempt for: {login_identifier}")
         
-        # Find user and handle invalid email
-        user = crud.user.get_by_email(db, email=login_in.email)
-        if not user:
-            logger.critical(f"[DEBUG] User not found: {login_in.email}")
+        # Find user using raw SQL to avoid relationship lazy-loading issues
+        from sqlalchemy import text
+        try:
+            # Query user directly with raw SQL to get password hash without relationships
+            # Note: is_admin column doesn't exist, so we'll omit it and default to False
+            result = db.execute(
+                text("SELECT id, email, hashed_password, first_name, last_name, is_active, organization_id, created_at, updated_at, username FROM users WHERE email = :identifier OR username = :identifier LIMIT 1"),
+                {"identifier": login_identifier}
+            )
+            user_row = result.first()
+            
+            if not user_row:
+                logger.critical(f"[DEBUG] User not found: {login_identifier}")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid email/username or password",
+                )
+            
+            logger.critical(f"[DEBUG] Found user: {user_row.email}")
+            password_hash_value = user_row.hashed_password
+            logger.critical(f"[DEBUG] Password hash retrieved, length: {len(password_hash_value) if password_hash_value else 0}")
+            
+            # Verify password
+            logger.critical(f"[DEBUG] Checking password...")
+            password_valid = security.verify_password(login_in.password, password_hash_value)
+            logger.critical(f"[DEBUG] Password verification result: {password_valid}")
+            
+            if not password_valid:
+                logger.critical(f"[DEBUG] Password verification failed for: {login_identifier}")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid email/username or password",
+                )
+            
+            logger.critical(f"[DEBUG] Password verified for: {login_identifier}")
+            
+            # Check if user is active
+            if not user_row.is_active:
+                logger.critical(f"[DEBUG] Inactive user: {login_identifier}")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Account is inactive. Please contact support."
+                )
+            
+            # Store user data from raw query for later use
+            user_id = user_row.id
+            user_email = user_row.email
+            user_org_id = user_row.organization_id
+            
+            # Get user object for token generation and last_login update
+            # Use raw SQL to update last_login to avoid relationship issues
+            user = None
+            try:
+                # Try to get user object
+                user = crud.user.get(db, id=user_id)
+                if not user:
+                    raise ValueError("User not found after password verification")
+            except Exception as user_load_error:
+                logger.warning(f"[DEBUG] Could not load user object: {str(user_load_error)}")
+                # If we can't load the user object, we'll update last_login with raw SQL
+                # and create a minimal user object for the response
+                from types import SimpleNamespace
+                try:
+                    # Update last_login with raw SQL
+                    db.execute(
+                        text("UPDATE users SET last_login = NOW() WHERE id = :user_id"),
+                        {"user_id": user_id}
+                    )
+                    db.commit()
+                except Exception as update_error:
+                    logger.warning(f"[DEBUG] Could not update last_login: {str(update_error)}")
+                    db.rollback()
+                
+                # Create a minimal user-like object from the row data
+                user = SimpleNamespace(
+                    id=user_id,
+                    email=user_email,
+                    username=user_row.username,
+                    first_name=user_row.first_name,
+                    last_name=user_row.last_name,
+                    is_active=user_row.is_active,
+                    is_admin=False,  # Column doesn't exist in database, default to False
+                    organization_id=user_org_id,
+                    created_at=user_row.created_at,
+                    updated_at=user_row.updated_at,
+                    last_login=datetime.utcnow()
+                )
+            
+        except HTTPException:
+            raise
+        except Exception as user_error:
+            logger.critical(f"[DEBUG] Error in user lookup/verification: {str(user_error)}")
+            logger.exception("[DEBUG] User lookup exception:")
+            # Return more detailed error for debugging
+            error_detail = f"Authentication error: {str(user_error)}"
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=error_detail
             )
         
-        logger.critical(f"[DEBUG] Found user: {user.email}, checking password...")
-        
-        # Verify password and handle invalid password
-        if not security.verify_password(login_in.password, user.password_hash):
-            logger.critical(f"[DEBUG] Password verification failed for: {login_in.email}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password",
-            )
-        
-        logger.critical(f"[DEBUG] Password verified for: {login_in.email}")
-        
-        # Check if user is active
+        # Check if user is active (using the user object)
         if not user.is_active:
-            logger.critical(f"[DEBUG] Inactive user: {login_in.email}")
+            logger.critical(f"[DEBUG] Inactive user: {login_identifier}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Account is inactive. Please contact support."
             )
         
         # Generate access token
-        logger.critical(f"[DEBUG] Generating token for user: {login_in.email}")
+        logger.critical(f"[DEBUG] Generating token for user: {login_identifier}")
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         expires_at = datetime.utcnow() + access_token_expires
         
@@ -138,11 +219,17 @@ async def login(
                 expires_delta=access_token_expires,
                 organization_id=user.organization_id
             )
-            logger.critical(f"[DEBUG] Token created for user: {login_in.email}")
+            logger.critical(f"[DEBUG] Token created for user: {login_identifier}")
             
-            # Update last login time
-            user.last_login = datetime.utcnow()
-            db.commit()
+            # Update last login time (only if user is a real SQLAlchemy object)
+            if hasattr(user, '__table__'):  # Check if it's a SQLAlchemy model
+                try:
+                    user.last_login = datetime.utcnow()
+                    db.commit()
+                except Exception as update_error:
+                    logger.warning(f"[DEBUG] Could not update last_login: {str(update_error)}")
+                    db.rollback()
+            # If user is SimpleNamespace, last_login was already updated with raw SQL
             
         except Exception as token_error:
             logger.critical(f"[DEBUG] Token creation error: {str(token_error)}")
@@ -154,31 +241,64 @@ async def login(
         
         # Create response object
         try:
-            logger.critical(f"[DEBUG] Creating response for user: {login_in.email}")
+            logger.critical(f"[DEBUG] Creating response for user: {login_identifier}")
             
-            # Get token balance for the user
-            token = db.query(models.Token).filter(models.Token.user_id == user.id).first()
-            token_balance = float(token.balance) if token else 0.0
+            # Get token balance for the user (tokens table may not exist, so default to 0.0)
+            token_balance = 0.0
+            # Note: Tokens table doesn't exist in this database, so we skip the query
+            # If you need token functionality, create the tokens table first
             
-            response_data = {
-                "access_token": access_token,
-                "token_type": "bearer",
-                "expires_at": expires_at.isoformat(),
-                "user": {
-                    "id": user.id,
-                    "email": user.email,
-                    "first_name": user.first_name,
-                    "last_name": user.last_name,
-                    "is_active": user.is_active,
-                    "is_admin": user.is_admin,
-                    "organization_id": user.organization_id,
-                    "created_at": user.created_at,
-                    "updated_at": user.updated_at,
+            # Safely extract user data without triggering lazy loading
+            try:
+                user_id = user.id
+                user_email = user.email
+                user_username = getattr(user, 'username', None)
+                user_first_name = getattr(user, 'first_name', None)
+                user_last_name = getattr(user, 'last_name', None)
+                user_is_active = getattr(user, 'is_active', True)
+                # Use is_admin property which checks if role == 'admin' or is_superuser == 1
+                user_is_admin = user.is_admin if hasattr(user, 'is_admin') else (user.is_superuser if hasattr(user, 'is_superuser') else False)
+                user_org_id = getattr(user, 'organization_id', None)
+                
+                # Safely handle datetime objects
+                created_at_str = None
+                updated_at_str = None
+                try:
+                    if hasattr(user, 'created_at') and user.created_at:
+                        created_at_str = user.created_at.isoformat() if hasattr(user.created_at, 'isoformat') else str(user.created_at)
+                except Exception as e:
+                    logger.warning(f"[DEBUG] Error serializing created_at: {str(e)}")
+                
+                try:
+                    if hasattr(user, 'updated_at') and user.updated_at:
+                        updated_at_str = user.updated_at.isoformat() if hasattr(user.updated_at, 'isoformat') else str(user.updated_at)
+                except Exception as e:
+                    logger.warning(f"[DEBUG] Error serializing updated_at: {str(e)}")
+                
+                response_data = {
+                    "access_token": access_token,
+                    "token_type": "bearer",
+                    "expires_at": expires_at.isoformat(),
+                    "user": {
+                    "id": user_id,
+                    "email": user_email,
+                    "username": user_username,
+                    "first_name": user_first_name,
+                    "last_name": user_last_name,
+                    "is_active": user_is_active,
+                    "is_admin": user_is_admin,  # Use the computed value from property
+                    "organization_id": user_org_id,
+                    "created_at": created_at_str,
+                    "updated_at": updated_at_str,
                     "token_balance": token_balance
+                    }
                 }
-            }
+            except Exception as user_data_error:
+                logger.critical(f"[DEBUG] Error extracting user data: {str(user_data_error)}")
+                logger.exception("[DEBUG] User data extraction exception:")
+                raise
             
-            logger.critical(f"[DEBUG] Response created successfully for: {login_in.email}")
+            logger.critical(f"[DEBUG] Response created successfully for: {login_identifier}")
             response.status_code = status.HTTP_200_OK
             return response_data
             

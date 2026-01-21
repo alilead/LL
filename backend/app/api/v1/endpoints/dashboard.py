@@ -74,78 +74,109 @@ async def get_dashboard_stats(
             )
         ).scalar() or 0
         
-        # TASKS - Open tasks
-        task_org_filter = True if current_user.is_admin else Task.organization_id == current_user.organization_id
-        task_count = db.query(func.count(Task.id)).filter(
-            and_(
-                task_org_filter,
-                Task.status.in_(['PENDING', 'IN_PROGRESS'])
-            )
-        ).scalar() or 0
+        # TASKS - Open tasks (table doesn't exist in database, return 0)
+        try:
+            from sqlalchemy import inspect
+            inspector = inspect(db.get_bind())
+            if 'tasks' in inspector.get_table_names():
+                task_org_filter = True if current_user.is_admin else Task.organization_id == current_user.organization_id
+                task_count = db.query(func.count(Task.id)).filter(
+                    and_(
+                        task_org_filter,
+                        Task.status.in_(['PENDING', 'IN_PROGRESS'])
+                    )
+                ).scalar() or 0
+                
+                # Overdue tasks
+                overdue_tasks = db.query(func.count(Task.id)).filter(
+                    and_(
+                        task_org_filter,
+                        Task.status.in_(['PENDING', 'IN_PROGRESS']),
+                        Task.due_date < now
+                    )
+                ).scalar() or 0
+                
+                # Upcoming tasks
+                upcoming_tasks = db.query(func.count(Task.id)).filter(
+                    and_(
+                        task_org_filter,
+                        Task.due_date >= now,
+                        Task.due_date <= now + timedelta(days=7),
+                        Task.status != TaskStatus.COMPLETED
+                    )
+                ).scalar() or 0
+            else:
+                task_count = 0
+                overdue_tasks = 0
+                upcoming_tasks = 0
+        except Exception as e:
+            logger.error(f"Error querying tasks: {str(e)}")
+            task_count = 0
+            overdue_tasks = 0
+            upcoming_tasks = 0
         
-        # Overdue tasks
-        overdue_tasks = db.query(func.count(Task.id)).filter(
-            and_(
-                task_org_filter,
-                Task.status.in_(['PENDING', 'IN_PROGRESS']),
-                Task.due_date < now
-            )
-        ).scalar() or 0
-        
-        # Upcoming tasks
-        upcoming_tasks = db.query(func.count(Task.id)).filter(
-            and_(
-                task_org_filter,
-                Task.due_date >= now,
-                Task.due_date <= now + timedelta(days=7),
-                Task.status != TaskStatus.COMPLETED
-            )
-        ).scalar() or 0
-        
-        # DEALS - Total count
-        deal_org_filter = True if current_user.is_admin else Deal.organization_id == current_user.organization_id
-        deal_count = db.query(func.count(Deal.id)).filter(deal_org_filter).scalar() or 0
-        
-        # Closed won deals
-        won_deals = db.query(func.count(Deal.id)).filter(
-            and_(
-                deal_org_filter,
-                Deal.status == 'WON'
-            )
-        ).scalar() or 0
-        
-        # Conversion rate - Fixed linter error by making it float
-        conversion_rate = 0.0
-        if deal_count > 0:
-            conversion_rate = round((won_deals / deal_count) * 100, 2)
-        
-        # Pipeline value
-        pipeline_value = db.query(func.sum(Deal.amount)).filter(
-            and_(
-                deal_org_filter,
-                Deal.status.in_(['OPEN', 'IN_PROGRESS'])
-            )
-        ).scalar()
-        pipeline_value = float(pipeline_value) if pipeline_value is not None else 0.0
-        
-        # Revenue from closed deals
-        total_revenue = db.query(func.sum(Deal.amount)).filter(
-            and_(
-                deal_org_filter,
-                Deal.status == 'WON'
-            )
-        ).scalar()
-        total_revenue = float(total_revenue) if total_revenue is not None else 0.0
-        
-        # Monthly revenue
-        monthly_revenue = db.query(func.sum(Deal.amount)).filter(
-            and_(
-                deal_org_filter,
-                Deal.status == 'WON',
-                Deal.accepted_at >= now - timedelta(days=30)
-            )
-        ).scalar()
-        monthly_revenue = float(monthly_revenue) if monthly_revenue is not None else 0.0
+        # DEALS - Total count (table doesn't exist in database, return 0)
+        try:
+            inspector = inspect(db.get_bind())
+            if 'deals' in inspector.get_table_names():
+                deal_org_filter = True if current_user.is_admin else Deal.organization_id == current_user.organization_id
+                deal_count = db.query(func.count(Deal.id)).filter(deal_org_filter).scalar() or 0
+                
+                # Closed won deals
+                won_deals = db.query(func.count(Deal.id)).filter(
+                    and_(
+                        deal_org_filter,
+                        Deal.status == 'WON'
+                    )
+                ).scalar() or 0
+                
+                # Conversion rate
+                conversion_rate = 0.0
+                if deal_count > 0:
+                    conversion_rate = round((won_deals / deal_count) * 100, 2)
+                
+                # Pipeline value
+                pipeline_value = db.query(func.sum(Deal.amount)).filter(
+                    and_(
+                        deal_org_filter,
+                        Deal.status.in_(['OPEN', 'IN_PROGRESS'])
+                    )
+                ).scalar()
+                pipeline_value = float(pipeline_value) if pipeline_value is not None else 0.0
+                
+                # Revenue from closed deals
+                total_revenue = db.query(func.sum(Deal.amount)).filter(
+                    and_(
+                        deal_org_filter,
+                        Deal.status == 'WON'
+                    )
+                ).scalar()
+                total_revenue = float(total_revenue) if total_revenue is not None else 0.0
+                
+                # Monthly revenue
+                monthly_revenue = db.query(func.sum(Deal.amount)).filter(
+                    and_(
+                        deal_org_filter,
+                        Deal.status == 'WON',
+                        Deal.accepted_at >= now - timedelta(days=30)
+                    )
+                ).scalar()
+                monthly_revenue = float(monthly_revenue) if monthly_revenue is not None else 0.0
+            else:
+                deal_count = 0
+                won_deals = 0
+                conversion_rate = 0.0
+                pipeline_value = 0.0
+                total_revenue = 0.0
+                monthly_revenue = 0.0
+        except Exception as e:
+            logger.error(f"Error querying deals: {str(e)}")
+            deal_count = 0
+            won_deals = 0
+            conversion_rate = 0.0
+            pipeline_value = 0.0
+            total_revenue = 0.0
+            monthly_revenue = 0.0
         
         # EVENTS - Total count
         event_count = db.query(func.count(Event.id)).filter(
@@ -159,9 +190,17 @@ async def get_dashboard_stats(
             Event.start_date <= now + timedelta(days=7)
         ).scalar() or 0
         
-        # ACTIVITIES - Get recent activities
-        activity_org_filter = True if current_user.is_admin else Activity.organization_id == current_user.organization_id
-        recent_activities = db.query(Activity).filter(activity_org_filter).order_by(Activity.created_at.desc()).limit(10).all()
+        # ACTIVITIES - Get recent activities (table may not exist)
+        try:
+            inspector = inspect(db.get_bind())
+            if 'activities' in inspector.get_table_names():
+                activity_org_filter = True if current_user.is_admin else Activity.organization_id == current_user.organization_id
+                recent_activities = db.query(Activity).filter(activity_org_filter).order_by(Activity.created_at.desc()).limit(10).all()
+            else:
+                recent_activities = []
+        except Exception as e:
+            logger.error(f"Error querying activities: {str(e)}")
+            recent_activities = []
         
         activities = []
         
@@ -179,7 +218,17 @@ async def get_dashboard_stats(
             })
 
         # Son dealleri ekle
-        recent_deals = db.query(Deal).filter(deal_org_filter).order_by(Deal.created_at.desc()).limit(5).all()
+        try:
+            inspector = inspect(db.get_bind())
+            if 'deals' in inspector.get_table_names():
+                deal_org_filter = True if current_user.is_admin else Deal.organization_id == current_user.organization_id
+                recent_deals = db.query(Deal).filter(deal_org_filter).order_by(Deal.created_at.desc()).limit(5).all()
+            else:
+                recent_deals = []
+        except Exception as e:
+            logger.error(f"Error querying recent deals: {str(e)}")
+            recent_deals = []
+            
         for deal in recent_deals:
             activities.append({
                 "id": f"deal_{deal.id}",

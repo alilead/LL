@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth';
 import {
   LayoutDashboard,
@@ -52,7 +52,6 @@ const navigation: NavItem[] = [
     name: 'Leads',
     icon: Users,
     path: '/leads',
-    badge: '12',
   },
   {
     name: 'Deals',
@@ -149,7 +148,13 @@ export function ModernSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const location = useLocation();
-  const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const { user, logout } = useAuthStore();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/signin');
+  };
 
   const toggleExpanded = (name: string) => {
     setExpandedItems(prev =>
@@ -311,11 +316,14 @@ export function ModernSidebar() {
       {/* User Profile */}
       {!collapsed && (
         <div className="p-4 border-t border-neutral-200 dark:border-neutral-800">
-          <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+          >
             <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-full flex items-center justify-center">
               <User className="w-5 h-5 text-white" />
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 text-left">
               <p className="text-sm font-medium text-neutral-900 dark:text-neutral-50 truncate">
                 {user?.first_name && user?.last_name
                   ? `${user.first_name} ${user.last_name}`
@@ -325,8 +333,8 @@ export function ModernSidebar() {
                 {user?.email || ''}
               </p>
             </div>
-            <LogOut className="w-4 h-4 text-neutral-400" />
-          </div>
+            <LogOut className="w-4 h-4 text-neutral-400 hover:text-red-500" />
+          </button>
         </div>
       )}
     </div>
