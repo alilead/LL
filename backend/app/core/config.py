@@ -97,6 +97,7 @@ class Settings(BaseSettings):
     SMTP_TLS: bool = Field(default=True, description="Use TLS for SMTP")
     EMAILS_FROM_EMAIL: str = Field(default="no-reply@the-leadlab.com", description="Default from email")
     SMTP_FROM_NAME: str = Field(default="LeadLab", description="Default from name")
+    RESEND_API_KEY: Optional[str] = Field(default=None, description="Resend API key for HTTP email sending")
 
     # Invoice Email Configuration (separate from auth emails)
     INVOICE_EMAIL: str = Field(default="invoice@the-leadlab.com", description="Invoice-specific email")

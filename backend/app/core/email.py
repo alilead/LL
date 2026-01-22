@@ -4,6 +4,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import List, Optional
 from app.core.config import settings
+import httpx
 import asyncio
 from email.mime.base import MIMEBase
 from email import encoders
@@ -28,7 +29,14 @@ class EmailSender:
         attachments: List[dict] = None
     ) -> bool:
         """Send email using configured SMTP settings"""
-        
+        if settings.RESEND_API_KEY:
+            return await self._send_via_resend_api(
+                to_email=to_email,
+                subject=subject,
+                html_content=html_content,
+                text_content=text_content
+            )
+
         # Check if SMTP is properly configured
         if not self.smtp_user or not self.smtp_password:
             print(f"📧 SMTP credentials not configured, running in mock mode")
@@ -85,6 +93,45 @@ class EmailSender:
             )
 
             print(f"✅ Email sent successfully to {to_email}")
+            return True
+
+    async def _send_via_resend_api(
+        self,
+        *,
+        to_email: str,
+        subject: str,
+        html_content: str,
+        text_content: Optional[str] = None
+    ) -> bool:
+        payload = {
+            "from": f"{self.from_name} <{self.from_email}>",
+            "to": [to_email],
+            "subject": subject,
+            "html": html_content,
+        }
+        if text_content:
+            payload["text"] = text_content
+
+        headers = {
+            "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.post(
+                    "https://api.resend.com/emails",
+                    json=payload,
+                    headers=headers,
+                )
+                response.raise_for_status()
+            print(f"✅ Email sent successfully to {to_email} via Resend API")
+            return True
+        except Exception as e:
+            print(f"❌ Failed to send email via Resend API to {to_email}: {str(e)}")
+            print(f"📧 MOCK: Email to {to_email}")
+            print(f"📧 MOCK: Subject: {subject}")
+            print(f"📧 MOCK: Content: {html_content[:100]}...")
             return True
 
         except Exception as e:
