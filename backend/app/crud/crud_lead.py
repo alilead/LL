@@ -52,11 +52,11 @@ class CRUDLead(CRUDBase[Lead, LeadCreate, LeadUpdate]):
             query = (
                 db.query(Lead)
                 .filter(Lead.id.in_(lead_ids_with_tag))
-                .filter(Lead.is_deleted == False, Lead.visible == True)
+                .filter(Lead.is_deleted == False)
             )
         else:
             # If no tag filter, start with normal query
-            query = db.query(Lead).filter(Lead.is_deleted == False, Lead.visible == True)
+            query = db.query(Lead).filter(Lead.is_deleted == False)
         
         # Add organization filter only if user is not admin
         if organization_id is not None and not is_admin:
@@ -119,10 +119,9 @@ class CRUDLead(CRUDBase[Lead, LeadCreate, LeadUpdate]):
         
         # Admin users can see all leads in the database (including deleted ones)
         if not is_admin:
-            # Normal users can only see visible and non-deleted leads from their organization
+            # Normal users can only see non-deleted leads from their organization
             query = query.filter(
                 Lead.organization_id == organization_id,
-                Lead.visible == True,
                 Lead.is_deleted == False
             )
 

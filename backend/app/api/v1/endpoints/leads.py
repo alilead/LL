@@ -38,8 +38,7 @@ def get_lead_statistics(
     try:
         # Build organization filter
         filters = [
-            models.Lead.is_deleted == False,
-            models.Lead.visible == True
+            models.Lead.is_deleted == False
         ]
         
         # Add organization filter for non-admin users

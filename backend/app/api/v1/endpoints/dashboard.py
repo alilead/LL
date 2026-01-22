@@ -6,7 +6,7 @@ from typing import Dict, Any, List
 from sqlalchemy import func, and_, or_, text, desc
 from app.models.lead import Lead
 from app.models.task import Task, TaskStatus
-from app.models.deal import Deal
+from app.models.deal import Deal, DealStatus
 from app.models.event import Event
 from app.models.activity import Activity, ActivityType
 from app.models.lead_stage import LeadStage
@@ -126,7 +126,7 @@ async def get_dashboard_stats(
                 won_deals = db.query(func.count(Deal.id)).filter(
                     and_(
                         deal_org_filter,
-                        Deal.status == 'WON'
+                        Deal.status == DealStatus.Closed_Won
                     )
                 ).scalar() or 0
                 
@@ -135,11 +135,11 @@ async def get_dashboard_stats(
                 if deal_count > 0:
                     conversion_rate = round((won_deals / deal_count) * 100, 2)
                 
-                # Pipeline value
+                # Pipeline value (all non-closed deals)
                 pipeline_value = db.query(func.sum(Deal.amount)).filter(
                     and_(
                         deal_org_filter,
-                        Deal.status.in_(['OPEN', 'IN_PROGRESS'])
+                        Deal.status.in_([DealStatus.Lead, DealStatus.Qualified, DealStatus.Proposal, DealStatus.Negotiation])
                     )
                 ).scalar()
                 pipeline_value = float(pipeline_value) if pipeline_value is not None else 0.0
@@ -148,7 +148,7 @@ async def get_dashboard_stats(
                 total_revenue = db.query(func.sum(Deal.amount)).filter(
                     and_(
                         deal_org_filter,
-                        Deal.status == 'WON'
+                        Deal.status == DealStatus.Closed_Won
                     )
                 ).scalar()
                 total_revenue = float(total_revenue) if total_revenue is not None else 0.0
@@ -157,7 +157,7 @@ async def get_dashboard_stats(
                 monthly_revenue = db.query(func.sum(Deal.amount)).filter(
                     and_(
                         deal_org_filter,
-                        Deal.status == 'WON',
+                        Deal.status == DealStatus.Closed_Won,
                         Deal.accepted_at >= now - timedelta(days=30)
                     )
                 ).scalar()
