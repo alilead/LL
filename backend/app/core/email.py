@@ -95,6 +95,14 @@ class EmailSender:
             print(f"✅ Email sent successfully to {to_email}")
             return True
 
+        except Exception as e:
+            print(f"❌ Failed to send email to {to_email}: {str(e)}")
+            # Fall back to mock mode
+            print(f"📧 MOCK: Email to {to_email}")
+            print(f"📧 MOCK: Subject: {subject}")
+            print(f"📧 MOCK: Content: {html_content[:100]}...")
+            return True
+
     async def _send_via_resend_api(
         self,
         *,
@@ -129,14 +137,6 @@ class EmailSender:
             return True
         except Exception as e:
             print(f"❌ Failed to send email via Resend API to {to_email}: {str(e)}")
-            print(f"📧 MOCK: Email to {to_email}")
-            print(f"📧 MOCK: Subject: {subject}")
-            print(f"📧 MOCK: Content: {html_content[:100]}...")
-            return True
-
-        except Exception as e:
-            print(f"❌ Failed to send email to {to_email}: {str(e)}")
-            # Fall back to mock mode
             print(f"📧 MOCK: Email to {to_email}")
             print(f"📧 MOCK: Subject: {subject}")
             print(f"📧 MOCK: Content: {html_content[:100]}...")
