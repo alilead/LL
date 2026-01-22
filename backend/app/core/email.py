@@ -68,6 +68,10 @@ class EmailSender:
             # Create SSL context
             context = ssl.create_default_context()
 
+            # Gmail often works better with STARTTLS on 587 in cloud hosts.
+            use_tls = self.smtp_tls and self.smtp_port == 465
+            start_tls = self.smtp_tls and self.smtp_port != 465
+
             # Send email
             await aiosmtplib.send(
                 message,
@@ -75,8 +79,8 @@ class EmailSender:
                 port=self.smtp_port,
                 username=self.smtp_user,
                 password=self.smtp_password,
-                use_tls=True,  # Use SSL for port 465
-                start_tls=False,  # Don't use STARTTLS
+                use_tls=use_tls,
+                start_tls=start_tls,
                 tls_context=context
             )
 
