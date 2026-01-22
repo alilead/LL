@@ -226,7 +226,7 @@ async def import_leads_from_csv(
                 for index, row in df.iterrows():
                     try:
                         # Map CSV columns to database fields
-                        lead_data = {}
+                        lead_data = {"email": None}  # Initialize email to None
                         for db_field, possible_names in field_mappings.items():
                             # Find the first matching column name in the CSV
                             matching_col = next((col for col in possible_names if col in df.columns), None)
@@ -240,10 +240,6 @@ async def import_leads_from_csv(
                                 else:
                                     value = clean_value(value)
                                 lead_data[db_field] = value
-
-                        # Ensure email is set (None if not found)
-                        if "email" not in lead_data:
-                            lead_data["email"] = None
                         
                         # Add required and special fields
                         lead_data.update({
@@ -257,15 +253,22 @@ async def import_leads_from_csv(
                             "source": lead_data.get("source", "Partner")  # Set default source for imported leads
                         })
 
-                        # Check for duplicate email only if email is provided
-                        if lead_data.get("email"):
-                            existing_lead = crud.lead.get_by_email(db, email=lead_data["email"])
+                        # Normalize email - handle empty strings, NaN, etc.
+                        email_value = lead_data.get("email")
+                        if email_value and str(email_value).strip() and str(email_value).lower() != "nan":
+                            email_value = str(email_value).strip()
+                            lead_data["email"] = email_value
+                            
+                            # Check for duplicate email only if email is provided
+                            existing_lead = crud.lead.get_by_email(db, email=email_value)
                             if existing_lead:
                                 failed_imports.append({
                                     "row": index + 2,
-                                    "error": f"Lead with email {lead_data['email']} already exists"
+                                    "error": f"Lead with email {email_value} already exists"
                                 })
                                 continue
+                        else:
+                            lead_data["email"] = None
 
                         # Create LeadCreate instance
                         lead_create = schemas.LeadCreate(**lead_data)
@@ -273,7 +276,11 @@ async def import_leads_from_csv(
                         successful_imports.append(index + 2)
 
                     except Exception as e:
+                        import traceback
+                        error_details = traceback.format_exc()
                         logger.error(f"Error processing row {index + 2}: {str(e)}")
+                        logger.error(f"Error details: {error_details}")
+                        logger.error(f"Lead data keys: {list(lead_data.keys()) if 'lead_data' in locals() else 'N/A'}")
                         failed_imports.append({
                             "row": index + 2,
                             "error": str(e)
