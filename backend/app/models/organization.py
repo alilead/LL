@@ -41,8 +41,8 @@ class Organization(Base, TimestampMixin):
     # team_invitations = relationship("TeamInvitation", back_populates="organization", cascade="all, delete-orphan")
     territories = relationship("Territory", back_populates="organization", cascade="all, delete-orphan")
     workflows = relationship("Workflow", back_populates="organization", cascade="all, delete-orphan")
-    dashboards = relationship("Dashboard", cascade="all, delete-orphan")
-    forecast_periods = relationship("ForecastPeriod", cascade="all, delete-orphan")
+    dashboards = relationship("Dashboard", back_populates="organization", cascade="all, delete-orphan")
+    forecast_periods = relationship("ForecastPeriod", back_populates="organization", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Organization {self.name}>"

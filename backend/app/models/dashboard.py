@@ -31,7 +31,7 @@ class Dashboard(Base):
     updated_at = Column(DateTime, default=datetime.utcnow)
 
     widgets = relationship("DashboardWidget", back_populates="dashboard", cascade="all, delete-orphan")
-    organization = relationship("Organization")
+    organization = relationship("Organization", back_populates="dashboards")
 
 
 class DashboardWidget(Base):

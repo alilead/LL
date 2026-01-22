@@ -74,7 +74,7 @@ class ForecastPeriod(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    organization = relationship("Organization")
+    organization = relationship("Organization", back_populates="forecast_periods")
     forecasts = relationship("Forecast", back_populates="period", cascade="all, delete-orphan")
 
     __table_args__ = (
