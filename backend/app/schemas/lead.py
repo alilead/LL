@@ -1,5 +1,5 @@
 from typing import Optional, List, Dict, Any, Union
-from pydantic import BaseModel, Field, ConfigDict, HttpUrl, constr, condecimal
+from pydantic import BaseModel, Field, ConfigDict, HttpUrl, constr, condecimal, field_validator
 from datetime import datetime
 from .note import Note as NoteSchema
 from .tag import Tag as TagSchema
@@ -50,6 +50,25 @@ class LeadBase(BaseModel):
     est_wealth_experience: Optional[str] = None
     email_guidelines: Optional[str] = None
     sales_intelligence: Optional[Dict[str, Any]] = None
+
+    @field_validator('psychometrics', mode='before')
+    @classmethod
+    def validate_psychometrics(cls, v):
+        """Ensure psychometrics is always a dict, not a string"""
+        import json
+        if v is None:
+            return {}
+        if isinstance(v, dict):
+            return v
+        if isinstance(v, str):
+            if v == '' or v == '{}':
+                return {}
+            try:
+                parsed = json.loads(v)
+                return parsed if isinstance(parsed, dict) else {}
+            except (json.JSONDecodeError, ValueError):
+                return {}
+        return {}
 
     model_config = ConfigDict(from_attributes=True)
 
