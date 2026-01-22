@@ -55,14 +55,25 @@ class Lead(Base):
     @hybrid_property
     def psychometrics(self):
         """Get the psychometrics value, ensuring it's always a dict."""
+        import json
         # If None, return empty dict
         if self._psychometrics is None:
             return {}
         # If empty string, return empty dict
         if self._psychometrics == "":
             return {}
-        # Otherwise return as is
-        return self._psychometrics
+        # If it's a string (like '{}'), try to parse it as JSON
+        if isinstance(self._psychometrics, str):
+            try:
+                parsed = json.loads(self._psychometrics)
+                return parsed if isinstance(parsed, dict) else {}
+            except (json.JSONDecodeError, ValueError):
+                return {}
+        # If it's already a dict, return it
+        if isinstance(self._psychometrics, dict):
+            return self._psychometrics
+        # Otherwise return empty dict
+        return {}
 
     @psychometrics.setter
     def psychometrics(self, value):
