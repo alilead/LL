@@ -206,7 +206,7 @@ async def import_leads_from_csv(
                 field_mappings = {
                     "first_name": ["first_name", "firstname", "first"],
                     "last_name": ["last_name", "lastname", "last"],
-                    "email": ["email", "email_address"],
+                    "email": ["email", "email_address", "emails"],
                     "job_title": ["job_title", "jobtitle", "title", "position"],
                     "company": ["company", "organization"],
                     "linkedin": ["linkedin", "linkedin_url", "linkedinurl"],
@@ -241,6 +241,10 @@ async def import_leads_from_csv(
                                     value = clean_value(value)
                                 lead_data[db_field] = value
 
+                        # Ensure email is set (None if not found)
+                        if "email" not in lead_data:
+                            lead_data["email"] = None
+                        
                         # Add required and special fields
                         lead_data.update({
                             "psychometrics": None,  # Initialize as None since it's JSON field
@@ -250,12 +254,11 @@ async def import_leads_from_csv(
                             "organization_id": assigned_user.organization_id,
                             "created_by": current_user.id,
                             "created_at": datetime.utcnow(),
-                            "visible": True,
                             "source": lead_data.get("source", "Partner")  # Set default source for imported leads
                         })
 
                         # Check for duplicate email only if email is provided
-                        if lead_data["email"]:
+                        if lead_data.get("email"):
                             existing_lead = crud.lead.get_by_email(db, email=lead_data["email"])
                             if existing_lead:
                                 failed_imports.append({
