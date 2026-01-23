@@ -93,6 +93,11 @@ export const forgotPassword = async (data: ForgotPasswordData): Promise<{ messag
   return response.data;
 };
 
+export const resendPasswordReset = async (data: ForgotPasswordData): Promise<{ message: string }> => {
+  const response = await api.post('/auth/resend-password-reset', data);
+  return response.data;
+};
+
 export const resetPassword = async (data: ResetPasswordData): Promise<{ message: string }> => {
   const response = await api.post('/auth/reset-password', data);
   return response.data;
@@ -116,6 +121,7 @@ export default {
   logout,
   refreshToken,
   forgotPassword,
+  resendPasswordReset,
   resetPassword,
   verifyEmail,
   resendVerification,

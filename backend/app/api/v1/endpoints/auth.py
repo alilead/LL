@@ -439,6 +439,42 @@ async def forgot_password(
             detail="Error sending password reset email"
         )
 
+@router.post("/resend-password-reset")
+async def resend_password_reset(
+    *,
+    db: Session = Depends(deps.get_db),
+    background_tasks: BackgroundTasks,
+    forgot_password_in: ForgotPasswordInput,
+) -> Any:
+    """
+    Resend password reset email (useful if email bounced or wasn't received)
+    """
+    try:
+        user = crud.user.get_by_email(db, email=forgot_password_in.email)
+        if not user:
+            # For security, don't reveal if email exists or not
+            return {"message": "If the email exists, password reset instructions have been sent"}
+        
+        # Generate new reset token
+        reset_token = generate_password_reset_token(forgot_password_in.email)
+        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
+        
+        # Send email in background
+        background_tasks.add_task(
+            email_sender.send_password_reset,
+            user.email,
+            reset_link
+        )
+        
+        return {"message": "If the email exists, password reset instructions have been sent"}
+    
+    except Exception as e:
+        logger.error(f"Resend password reset error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error resending password reset email"
+        )
+
 @router.post("/reset-password")
 async def reset_password(
     *,

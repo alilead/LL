@@ -126,21 +126,35 @@ class EmailSender:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
+            async with httpx.AsyncClient(timeout=30) as client:
                 response = await client.post(
                     "https://api.resend.com/emails",
                     json=payload,
                     headers=headers,
                 )
                 response.raise_for_status()
-            print(f"✅ Email sent successfully to {to_email} via Resend API")
-            return True
+                response_data = response.json()
+                
+                # Log the email ID for tracking
+                email_id = response_data.get("id", "unknown")
+                print(f"✅ Email sent successfully to {to_email} via Resend API (ID: {email_id})")
+                return True
+        except httpx.HTTPStatusError as e:
+            error_detail = "Unknown error"
+            try:
+                error_data = e.response.json()
+                error_detail = error_data.get("message", str(e))
+            except:
+                error_detail = str(e)
+            
+            print(f"❌ Failed to send email via Resend API to {to_email}: {error_detail}")
+            print(f"   Status: {e.response.status_code}")
+            
+            # Don't fall back to mock mode for API errors - let the caller handle it
+            raise Exception(f"Resend API error: {error_detail}")
         except Exception as e:
             print(f"❌ Failed to send email via Resend API to {to_email}: {str(e)}")
-            print(f"📧 MOCK: Email to {to_email}")
-            print(f"📧 MOCK: Subject: {subject}")
-            print(f"📧 MOCK: Content: {html_content[:100]}...")
-            return True
+            raise
 
     async def send_welcome_email(self, to_email: str, first_name: str, login_link: str) -> bool:
         """Send welcome email to new users"""
