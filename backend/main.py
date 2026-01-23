@@ -12,7 +12,6 @@ if os.path.exists('clean_files.py'):
             print("File cleaning completed:", result.stdout.strip())
     except Exception as e:
         print(f"Warning: Could not run clean_files.py: {e}")
-
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import api_router
