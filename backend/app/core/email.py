@@ -30,12 +30,17 @@ class EmailSender:
     ) -> bool:
         """Send email using configured SMTP settings"""
         if settings.RESEND_API_KEY:
-            return await self._send_via_resend_api(
-                to_email=to_email,
-                subject=subject,
-                html_content=html_content,
-                text_content=text_content
-            )
+            try:
+                return await self._send_via_resend_api(
+                    to_email=to_email,
+                    subject=subject,
+                    html_content=html_content,
+                    text_content=text_content
+                )
+            except Exception as e:
+                # If Resend API fails, log the error but don't fall back to mock
+                print(f"❌ Resend API failed for {to_email}: {str(e)}")
+                raise
 
         # Check if SMTP is properly configured
         if not self.smtp_user or not self.smtp_password:
