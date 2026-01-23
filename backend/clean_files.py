@@ -46,17 +46,30 @@ def clean_directory(directory):
     return cleaned_count
 
 if __name__ == '__main__':
-    # Clean the app directory
-    app_dir = os.path.join(os.path.dirname(__file__), 'app')
+    # Clean the current directory and app directory
+    current_dir = os.path.dirname(__file__)
+    app_dir = os.path.join(current_dir, 'app')
+    
+    total_cleaned = 0
+    
+    # Clean current directory Python files
+    if os.path.exists(current_dir):
+        print(f"Cleaning Python files in {current_dir}...")
+        for file in os.listdir(current_dir):
+            if file.endswith('.py'):
+                filepath = os.path.join(current_dir, file)
+                if clean_file(filepath):
+                    total_cleaned += 1
+    
+    # Clean app directory
     if os.path.exists(app_dir):
         print(f"Cleaning Python files in {app_dir}...")
         cleaned = clean_directory(app_dir)
-        if cleaned > 0:
-            print(f"SUCCESS: Cleaned {cleaned} file(s)")
-            sys.exit(0)
-        else:
-            print("SUCCESS: No files needed cleaning")
-            sys.exit(0)
+        total_cleaned += cleaned
+    
+    if total_cleaned > 0:
+        print(f"SUCCESS: Cleaned {total_cleaned} file(s)")
+        sys.exit(0)
     else:
-        print(f"ERROR: Directory {app_dir} not found")
-        sys.exit(1)
+        print("SUCCESS: No files needed cleaning")
+        sys.exit(0)
