@@ -5,7 +5,7 @@ services:
     region: frankfurt
     plan: free
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
+    buildCommand: find . -type d -name __pycache__ -exec rm -r {} + 2>/dev/null || true; find . -name "*.pyc" -delete 2>/dev/null || true; pip install -r requirements.txt
     startCommand: gunicorn main:app -k uvicorn.workers.UvicornWorker -w 2 --bind 0.0.0.0:$PORT
     autoDeploy: true
     envVars:
