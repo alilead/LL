@@ -213,14 +213,14 @@ async def import_leads_from_csv(
                     detail="The CSV file contains no data rows"
                 )
             logger.info(f"Successfully read CSV file with {len(df)} rows")
-                
-                # Clean column names: convert to lowercase and replace spaces/special chars with underscores
-                df.columns = [col.strip().lower().replace(" ", "_").replace("-", "_") for col in df.columns]
-                
-                # Initialize lists for successful and failed imports
-                successful_imports = []
-                failed_imports = []
-                leads_to_create = []
+            
+            # Clean column names: convert to lowercase and replace spaces/special chars with underscores
+            df.columns = [col.strip().lower().replace(" ", "_").replace("-", "_") for col in df.columns]
+            
+            # Initialize lists for successful and failed imports
+            successful_imports = []
+            failed_imports = []
+            leads_to_create = []
 
                 # Define field mappings from CSV columns to database fields
                 field_mappings = {
