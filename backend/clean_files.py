@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Clean Python files by removing null bytes and ensuring UTF-8 encoding.
 This script should be run before deployment to fix any file corruption issues.
@@ -15,18 +16,18 @@ def clean_file(filepath):
         
         # Check for null bytes
         if b'\x00' in content:
-            print(f"⚠️  Found null bytes in {filepath}, cleaning...")
+            print(f"WARNING: Found null bytes in {filepath}, cleaning...")
             # Remove null bytes
             content = content.replace(b'\x00', b'')
             
             # Write back
             with open(filepath, 'wb') as f:
                 f.write(content)
-            print(f"✅ Cleaned {filepath}")
+            print(f"SUCCESS: Cleaned {filepath}")
             return True
         return False
     except Exception as e:
-        print(f"❌ Error processing {filepath}: {e}")
+        print(f"ERROR: Error processing {filepath}: {e}")
         return False
 
 def clean_directory(directory):
@@ -51,11 +52,11 @@ if __name__ == '__main__':
         print(f"Cleaning Python files in {app_dir}...")
         cleaned = clean_directory(app_dir)
         if cleaned > 0:
-            print(f"✅ Cleaned {cleaned} file(s)")
+            print(f"SUCCESS: Cleaned {cleaned} file(s)")
             sys.exit(0)
         else:
-            print("✅ No files needed cleaning")
+            print("SUCCESS: No files needed cleaning")
             sys.exit(0)
     else:
-        print(f"❌ Directory {app_dir} not found")
+        print(f"ERROR: Directory {app_dir} not found")
         sys.exit(1)
