@@ -1,0 +1,454 @@
+from typing import Any, List
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from sqlalchemy.orm import Session
+from datetime import datetime
+
+from app.api import deps
+from app.models.user import User as UserModel
+from app.models.organization import Organization
+from app.crud.crud_team_invitation import team_invitation
+from app.crud import crud_user
+from app.schemas.team_invitation import (
+    TeamInvitationCreate,
+    TeamInvitationUpdate,
+    TeamInvitation,
+    TeamInvitationWithInviter,
+    TeamInvitationToken,
+    TeamInvitationAccept
+)
+from app.schemas.user import UserCreate
+from app.core.email import email_sender
+from app.core.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+@router.post("", response_model=TeamInvitation)
+@router.post("/", response_model=TeamInvitation)
+async def create_team_invitation(
+    *,
+    db: Session = Depends(deps.get_db),
+    background_tasks: BackgroundTasks,
+    invitation_in: TeamInvitationCreate,
+    current_user: UserModel = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Create a new team invitation.
+    """
+    try:
+        # Only admins can invite users
+        if not current_user.is_admin:
+            raise HTTPException(
+                status_code=403,
+                detail="Only administrators can invite team members"
+            )
+        
+        # Get organization details
+        organization = db.query(Organization).filter(
+            Organization.id == current_user.organization_id
+        ).first()
+        
+        if not organization:
+            raise HTTPException(
+                status_code=404,
+                detail="Organization not found"
+            )
+        
+        # Create invitation
+        invitation = team_invitation.create_invitation(
+            db=db,
+            invitation_data=invitation_in,
+            organization_id=current_user.organization_id,
+            invited_by_id=current_user.id
+        )
+        
+        # Send invitation email in background
+        invitation_link = f"{settings.FRONTEND_URL}/invite/{invitation.invitation_token}"
+        inviter_name = f"{current_user.first_name} {current_user.last_name}".strip()
+        
+        background_tasks.add_task(
+            email_sender.send_team_invitation,
+            invitation.email,
+            inviter_name,
+            organization.name,
+            invitation_link,
+            invitation.role,
+            invitation.message
+        )
+        
+        return invitation
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error creating invitation: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("", response_model=List[TeamInvitationWithInviter])
+@router.get("/", response_model=List[TeamInvitationWithInviter])
+def get_team_invitations(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+    status: str = None
+) -> Any:
+    """
+    Get all team invitations for the current organization.
+    """
+    try:
+        # Only admins can view invitations
+        if not current_user.is_admin:
+            raise HTTPException(
+                status_code=403,
+                detail="Only administrators can view team invitations"
+            )
+        
+        invitations = team_invitation.get_organization_invitations(
+            db=db,
+            organization_id=current_user.organization_id,
+            status=status
+        )
+        
+        # Transform to include inviter and organization names
+        result = []
+        for inv in invitations:
+            # Get inviter name manually
+            inviter = db.query(UserModel).filter(UserModel.id == inv.invited_by_id).first()
+            inviter_name = f"{inviter.first_name} {inviter.last_name}".strip() if inviter else "Unknown"
+            
+            # Get organization name manually
+            org = db.query(Organization).filter(Organization.id == inv.organization_id).first()
+            org_name = org.name if org else "Unknown"
+            
+            result.append({
+                **inv.__dict__,
+                "invited_by_name": inviter_name,
+                "organization_name": org_name
+            })
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error fetching invitations: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("/token/{token}", response_model=TeamInvitationToken)
+def get_invitation_by_token(
+    *,
+    db: Session = Depends(deps.get_db),
+    token: str
+) -> Any:
+    """
+    Get invitation details by token (public endpoint for accepting invitations).
+    """
+    try:
+        invitation = team_invitation.get_by_token(db=db, token=token)
+        
+        if not invitation:
+            raise HTTPException(
+                status_code=404,
+                detail="Invitation not found"
+            )
+        
+        # Check if invitation is expired
+        if invitation.expires_at < datetime.utcnow():
+            invitation.status = "expired"
+            db.commit()
+            raise HTTPException(
+                status_code=410,
+                detail="Invitation has expired"
+            )
+        
+        if invitation.status != "pending":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invitation is {invitation.status} and cannot be accepted"
+            )
+        
+        # Return public information only
+        inviter = db.query(UserModel).filter(UserModel.id == invitation.invited_by_id).first()
+        inviter_name = f"{inviter.first_name} {inviter.last_name}".strip() if inviter else "Unknown"
+        
+        org = db.query(Organization).filter(Organization.id == invitation.organization_id).first()
+        org_name = org.name if org else "Unknown"
+        
+        return TeamInvitationToken(
+            id=invitation.id,
+            email=invitation.email,
+            first_name=invitation.first_name,
+            last_name=invitation.last_name,
+            role=invitation.role,
+            organization_name=org_name,
+            invited_by_name=inviter_name,
+            status=invitation.status,
+            expires_at=invitation.expires_at,
+            message=invitation.message
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching invitation by token: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.post("/accept/{token}")
+async def accept_team_invitation(
+    *,
+    db: Session = Depends(deps.get_db),
+    background_tasks: BackgroundTasks,
+    token: str,
+    accept_data: TeamInvitationAccept
+) -> Any:
+    """
+    Accept a team invitation and create user account.
+    """
+    try:
+        invitation = team_invitation.get_by_token(db=db, token=token)
+        
+        if not invitation:
+            raise HTTPException(
+                status_code=404,
+                detail="Invitation not found"
+            )
+        
+        # Check if invitation is expired
+        if invitation.expires_at < datetime.utcnow():
+            invitation.status = "expired"
+            db.commit()
+            raise HTTPException(
+                status_code=410,
+                detail="Invitation has expired"
+            )
+        
+        if invitation.status != "pending":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invitation is {invitation.status} and cannot be accepted"
+            )
+        
+        # Check if user already exists
+        existing_user = crud_user.user.get_by_email(db, email=invitation.email)
+        if existing_user:
+            raise HTTPException(
+                status_code=400,
+                detail="User with this email already exists"
+            )
+        
+        # Create new user
+        user_data = UserCreate(
+            email=invitation.email,
+            password=accept_data.password,
+            first_name=accept_data.first_name or invitation.first_name or "",
+            last_name=accept_data.last_name or invitation.last_name or "",
+            organization_id=invitation.organization_id,
+            is_active=True,
+            is_admin=(invitation.role == "admin")
+        )
+        
+        user = crud_user.user.create(db, obj_in=user_data)
+        
+        # Mark invitation as accepted
+        team_invitation.accept_invitation(db=db, invitation=invitation)
+        
+        # Send welcome email
+        login_link = f"{settings.FRONTEND_URL}/signin"
+        background_tasks.add_task(
+            email_sender.send_welcome_email,
+            user.email,
+            user.first_name,
+            login_link
+        )
+        
+        return {"message": "Invitation accepted successfully", "user_id": user.id}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error accepting invitation: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.patch("/{invitation_id}", response_model=TeamInvitation)
+def update_team_invitation(
+    *,
+    db: Session = Depends(deps.get_db),
+    invitation_id: int,
+    invitation_update: TeamInvitationUpdate,
+    current_user: UserModel = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Update a team invitation (cancel, change role, etc).
+    """
+    try:
+        # Only admins can update invitations
+        if not current_user.is_admin:
+            raise HTTPException(
+                status_code=403,
+                detail="Only administrators can update team invitations"
+            )
+        
+        invitation = team_invitation.get(db=db, id=invitation_id)
+        if not invitation:
+            raise HTTPException(
+                status_code=404,
+                detail="Invitation not found"
+            )
+        
+        # Check if invitation belongs to current user's organization
+        if invitation.organization_id != current_user.organization_id:
+            raise HTTPException(
+                status_code=403,
+                detail="You can only update invitations from your organization"
+            )
+        
+        updated_invitation = team_invitation.update(
+            db=db,
+            db_obj=invitation,
+            obj_in=invitation_update
+        )
+        
+        return updated_invitation
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating invitation: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.post("/{invitation_id}/resend")
+async def resend_team_invitation(
+    *,
+    db: Session = Depends(deps.get_db),
+    background_tasks: BackgroundTasks,
+    invitation_id: int,
+    current_user: UserModel = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Resend a team invitation.
+    """
+    try:
+        # Only admins can resend invitations
+        if not current_user.is_admin:
+            raise HTTPException(
+                status_code=403,
+                detail="Only administrators can resend team invitations"
+            )
+        
+        invitation = team_invitation.get(db=db, id=invitation_id)
+        if not invitation:
+            raise HTTPException(
+                status_code=404,
+                detail="Invitation not found"
+            )
+        
+        # Check if invitation belongs to current user's organization
+        if invitation.organization_id != current_user.organization_id:
+            raise HTTPException(
+                status_code=403,
+                detail="You can only resend invitations from your organization"
+            )
+        
+        # Resend invitation (updates token and expiration)
+        updated_invitation = team_invitation.resend_invitation(db=db, invitation=invitation)
+        
+        # Send new invitation email
+        organization = db.query(Organization).filter(
+            Organization.id == current_user.organization_id
+        ).first()
+        
+        invitation_link = f"{settings.FRONTEND_URL}/invite/{updated_invitation.invitation_token}"
+        inviter_name = f"{current_user.first_name} {current_user.last_name}".strip()
+        
+        background_tasks.add_task(
+            email_sender.send_team_invitation,
+            updated_invitation.email,
+            inviter_name,
+            organization.name,
+            invitation_link,
+            updated_invitation.role,
+            updated_invitation.message
+        )
+        
+        return {"message": "Invitation resent successfully"}
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resending invitation: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.delete("/{invitation_id}")
+def cancel_team_invitation(
+    *,
+    db: Session = Depends(deps.get_db),
+    invitation_id: int,
+    current_user: UserModel = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Cancel a team invitation.
+    """
+    try:
+        # Only admins can cancel invitations
+        if not current_user.is_admin:
+            raise HTTPException(
+                status_code=403,
+                detail="Only administrators can cancel team invitations"
+            )
+        
+        invitation = team_invitation.get(db=db, id=invitation_id)
+        if not invitation:
+            raise HTTPException(
+                status_code=404,
+                detail="Invitation not found"
+            )
+        
+        # Check if invitation belongs to current user's organization
+        if invitation.organization_id != current_user.organization_id:
+            raise HTTPException(
+                status_code=403,
+                detail="You can only cancel invitations from your organization"
+            )
+        
+        # Cancel invitation
+        team_invitation.cancel_invitation(db=db, invitation=invitation)
+        
+        return {"message": "Invitation cancelled successfully"}
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error cancelling invitation: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("/stats", response_model=dict)
+def get_invitation_stats(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Get invitation statistics for the current organization.
+    """
+    try:
+        # Only admins can view stats
+        if not current_user.is_admin:
+            raise HTTPException(
+                status_code=403,
+                detail="Only administrators can view invitation statistics"
+            )
+        
+        stats = team_invitation.get_invitation_stats(
+            db=db,
+            organization_id=current_user.organization_id
+        )
+        
+        return stats
+        
+    except Exception as e:
+        logger.error(f"Error fetching invitation stats: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error") 

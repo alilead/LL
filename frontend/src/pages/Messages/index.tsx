@@ -1,0 +1,872 @@
+import { useState, useEffect, useRef } from 'react';
+import { Search, Send, Plus, Users, MoreVertical, Phone, Video, Info, Smile, Paperclip, Hash, AtSign, ExternalLink } from 'lucide-react';
+import { messagesApi, ConversationSummary, ConversationMessages, Message, ConversationUser } from '../../api/messages';
+import { Button } from '../../components/ui/Button';
+import { Card } from '../../components/ui/Card';
+import { useAuth } from '../../hooks/useAuth';
+import { onlineActivityService } from '../../services/onlineActivityService';
+
+export function MessagesPage() {
+  const { user } = useAuth();
+  const [searchText, setSearchText] = useState('');
+  const [selectedContact, setSelectedContact] = useState<ConversationUser | null>(null);
+  const [messageText, setMessageText] = useState('');
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [currentConversation, setCurrentConversation] = useState<ConversationMessages | null>(null);
+  const [organizationUsers, setOrganizationUsers] = useState<ConversationUser[]>([]);
+  const [showNewConversation, setShowNewConversation] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState<Set<number>>(new Set());
+  const [isCallActive, setIsCallActive] = useState(false);
+  const [callType, setCallType] = useState<'voice' | 'video' | null>(null);
+  const [showUserInfo, setShowUserInfo] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto scroll to bottom when new messages arrive
+  useEffect(() => {
+    scrollToBottom();
+  }, [currentConversation?.messages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Initialize online tracking when user is authenticated
+  useEffect(() => {
+    if (user?.id) {
+      onlineActivityService.startTracking(user.id);
+      // Load data after tracking starts
+    loadConversations();
+    loadOrganizationUsers();
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      onlineActivityService.stopTracking();
+    };
+  }, [user?.id]);
+
+  // Listen for online users updates
+  useEffect(() => {
+    updateOnlineUsers();
+    
+    const handleOnlineUsersUpdate = () => {
+      updateOnlineUsers();
+    };
+
+    window.addEventListener('onlineUsersUpdated', handleOnlineUsersUpdate);
+    
+    // Also update periodically
+    const interval = setInterval(updateOnlineUsers, 30000);
+
+    return () => {
+      window.removeEventListener('onlineUsersUpdated', handleOnlineUsersUpdate);
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setShowMoreMenu(false);
+    };
+
+    if (showMoreMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showMoreMenu]);
+
+  // Get real online users from tracking service
+  const updateOnlineUsers = () => {
+    const onlineUserIds = onlineActivityService.getOnlineUserIds();
+    setOnlineUsers(onlineUserIds);
+  };
+
+  // Load conversation messages when contact is selected
+  useEffect(() => {
+    if (selectedContact) {
+      loadConversationMessages(selectedContact.id);
+      // Mark messages as read
+      messagesApi.markAsRead(selectedContact.id).catch(console.error);
+    }
+  }, [selectedContact]);
+
+  const loadConversations = async () => {
+    try {
+      setLoading(true);
+      const data = await messagesApi.getConversations();
+      setConversations(data);
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadOrganizationUsers = async () => {
+    try {
+      const data = await messagesApi.getOrganizationUsers();
+      setOrganizationUsers(data);
+    } catch (error) {
+      console.error('Error loading organization users:', error);
+    }
+  };
+
+  const loadConversationMessages = async (partnerId: number) => {
+    try {
+      const data = await messagesApi.getConversation(partnerId);
+      setCurrentConversation(data);
+    } catch (error) {
+      console.error('Error loading conversation:', error);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || !selectedContact || sending) return;
+
+    try {
+      setSending(true);
+      await messagesApi.sendMessage({
+        content: messageText.trim(),
+        receiver_id: selectedContact.id
+      });
+      
+      setMessageText('');
+      // Reload conversation to show new message
+      await loadConversationMessages(selectedContact.id);
+      // Reload conversations to update last message
+      await loadConversations();
+      // Record activity after sending message
+      onlineActivityService.recordActivity();
+    } catch (error) {
+      console.error('Error sending message:', error);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+    // Record activity on any key press
+    onlineActivityService.recordActivity();
+  };
+
+  const handleSelectContact = async (user: ConversationUser) => {
+    setSelectedContact(user);
+    setShowNewConversation(false);
+    
+    // Record activity when selecting contact
+    onlineActivityService.recordActivity();
+    
+    // Update conversations list to mark as read
+    const updatedConversations = conversations.map(conv => 
+      conv.user.id === user.id 
+        ? { ...conv, unread_count: 0 }
+        : conv
+    );
+    setConversations(updatedConversations);
+  };
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    const diffInDays = Math.floor(diffInHours / 24);
+    
+    if (diffInMinutes < 1) {
+      return 'now';
+    } else if (diffInMinutes < 60) {
+      return `${diffInMinutes}m`;
+    } else if (diffInHours < 24) {
+      return `${diffInHours}h`;
+    } else if (diffInDays === 1) {
+      return 'yesterday';
+    } else if (diffInDays < 7) {
+      return date.toLocaleDateString('en-US', { weekday: 'short' });
+    } else {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+  };
+
+  const formatMessageTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    });
+  };
+
+  const filteredConversations = conversations.filter(conv =>
+    conv.user.first_name.toLowerCase().includes(searchText.toLowerCase()) ||
+    conv.user.last_name.toLowerCase().includes(searchText.toLowerCase()) ||
+    conv.user.email.toLowerCase().includes(searchText.toLowerCase())
+  );
+
+  const filteredUsers = organizationUsers.filter(user =>
+    user.first_name.toLowerCase().includes(searchText.toLowerCase()) ||
+    user.last_name.toLowerCase().includes(searchText.toLowerCase()) ||
+    user.email.toLowerCase().includes(searchText.toLowerCase())
+  );
+
+  const getInitials = (firstName: string, lastName: string) => {
+    return `${firstName[0] || ''}${lastName[0] || ''}`.toUpperCase();
+  };
+
+  const isToday = (dateString: string) => {
+    const messageDate = new Date(dateString);
+    const today = new Date();
+    return messageDate.toDateString() === today.toDateString();
+  };
+
+  const isYesterday = (dateString: string) => {
+    const messageDate = new Date(dateString);
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return messageDate.toDateString() === yesterday.toDateString();
+  };
+
+  const formatMessageDate = (dateString: string) => {
+    if (isToday(dateString)) return 'Today';
+    if (isYesterday(dateString)) return 'Yesterday';
+    return new Date(dateString).toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  };
+
+  // Call handlers - FREE Jitsi Meet Integration
+  const handleVoiceCall = async () => {
+    if (!selectedContact) return;
+    setIsCallActive(true);
+    setCallType('voice');
+    
+    // Create unique room name
+    const roomName = `leadlab-voice-${selectedContact.id}-${Date.now()}`;
+    const jitsiUrl = `https://meet.jit.si/${roomName}#config.startAudioOnly=true`;
+    
+    try {
+      // Send call invitation message to chat
+      await messagesApi.sendMessage({
+        content: `📞 Voice Call Invitation\n\n🎧 Join the voice call: ${jitsiUrl}\n\n📋 Room: ${roomName}\n\n⏰ Started at ${new Date().toLocaleTimeString()}`,
+        receiver_id: selectedContact.id
+      });
+      
+      // Reload conversation to show the invitation message
+      await loadConversationMessages(selectedContact.id);
+      await loadConversations();
+      
+      // Open call for initiator
+      window.open(jitsiUrl, '_blank', 'width=800,height=600');
+      
+    } catch (error) {
+      console.error('Error sending call invitation:', error);
+    }
+    
+    // Reset call state after a moment
+    setTimeout(() => {
+      setIsCallActive(false);
+      setCallType(null);
+    }, 1000);
+  };
+
+  const handleVideoCall = async () => {
+    if (!selectedContact) return;
+    setIsCallActive(true);
+    setCallType('video');
+    
+    // Create unique room name
+    const roomName = `leadlab-video-${selectedContact.id}-${Date.now()}`;
+    const jitsiUrl = `https://meet.jit.si/${roomName}`;
+    
+    try {
+      // Send call invitation message to chat
+      await messagesApi.sendMessage({
+        content: `📹 Video Call Invitation\n\n🎥 Join the video call: ${jitsiUrl}\n\n📋 Room: ${roomName}\n\n⏰ Started at ${new Date().toLocaleTimeString()}`,
+        receiver_id: selectedContact.id
+      });
+      
+      // Reload conversation to show the invitation message
+      await loadConversationMessages(selectedContact.id);
+      await loadConversations();
+      
+      // Open call for initiator
+      window.open(jitsiUrl, '_blank', 'width=1200,height=800');
+      
+    } catch (error) {
+      console.error('Error sending call invitation:', error);
+    }
+    
+    // Reset call state after a moment
+    setTimeout(() => {
+      setIsCallActive(false);
+      setCallType(null);
+    }, 1000);
+  };
+
+  const handleEndCall = () => {
+    setIsCallActive(false);
+    setCallType(null);
+  };
+
+  const handleShowInfo = () => {
+    if (!selectedContact) return;
+    setShowUserInfo(!showUserInfo);
+  };
+
+  const handleMoreOptions = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMoreMenu(!showMoreMenu);
+  };
+
+  const isUserOnline = (userId: number) => {
+    return onlineUsers.has(userId);
+  };
+
+  // Check if message is a call invitation
+  const isCallInvitation = (content: string) => {
+    return content.includes('Call Invitation') && content.includes('meet.jit.si');
+  };
+
+  // Extract call URL from message
+  const extractCallUrl = (content: string) => {
+    const match = content.match(/https:\/\/meet\.jit\.si\/[^\s\n]+/);
+    return match ? match[0] : null;
+  };
+
+  // Check if it's voice or video call
+  const getCallType = (content: string) => {
+    if (content.includes('📞 Voice Call')) return 'voice';
+    if (content.includes('📹 Video Call')) return 'video';
+    return null;
+  };
+
+  return (
+    <div className="h-[calc(100vh-4rem)] bg-gray-50 flex">
+      {/* Sidebar */}
+      <div className="w-80 bg-white border-r border-gray-200 flex flex-col shadow-sm">
+        {/* Header */}
+        <div className="px-4 py-4 border-b border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-xl font-bold text-gray-900 flex items-center">
+              <Hash className="h-5 w-5 mr-2 text-purple-600" />
+              Messages
+            </h1>
+            <button
+              onClick={() => setShowNewConversation(!showNewConversation)}
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              {showNewConversation ? <Users className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
+            </button>
+          </div>
+          
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              placeholder={showNewConversation ? "Find teammates..." : "Search conversations..."}
+              className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-sm"
+            />
+          </div>
+        </div>
+        
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+            </div>
+          ) : showNewConversation ? (
+            // Team Members List
+            <div className="p-2">
+              <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Team Members ({filteredUsers.length})
+              </div>
+              {filteredUsers.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  <Users className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                  <p className="text-sm">{searchText ? 'No teammates found' : 'No teammates available'}</p>
+                </div>
+              ) : (
+                filteredUsers.map((user) => (
+                  <button
+                    key={user.id}
+                    onClick={() => handleSelectContact(user)}
+                    className="w-full p-3 hover:bg-gray-50 rounded-lg transition-colors text-left group"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="relative">
+                        <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-medium text-sm shadow-sm">
+                          {getInitials(user.first_name, user.last_name)}
+                        </div>
+                        {isUserOnline(user.id) && (
+                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 border-2 border-white rounded-full"></div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2">
+                        <h3 className="font-medium text-gray-900 group-hover:text-purple-600 truncate">
+                          {user.first_name} {user.last_name}
+                        </h3>
+                          {isUserOnline(user.id) ? (
+                            <span className="text-xs text-green-600 font-medium">● Online</span>
+                          ) : (
+                            <span className="text-xs text-gray-400 font-medium">● Offline</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          ) : (
+            // Conversations List
+            <div className="p-2">
+              <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Recent ({filteredConversations.length})
+              </div>
+              {filteredConversations.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  <Hash className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                  <p className="text-sm">{searchText ? 'No conversations found' : 'No conversations yet'}</p>
+                  <p className="text-xs text-gray-400 mt-1">Start a new conversation to get started</p>
+                </div>
+              ) : (
+                filteredConversations.map((conv) => (
+                  <button
+                    key={conv.user.id}
+                    onClick={() => handleSelectContact(conv.user)}
+                    className={`w-full p-3 rounded-lg transition-colors text-left group ${
+                      selectedContact?.id === conv.user.id 
+                        ? 'bg-purple-50 border border-purple-200' 
+                        : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="relative">
+                        <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-medium text-sm shadow-sm">
+                          {getInitials(conv.user.first_name, conv.user.last_name)}
+                        </div>
+                        {conv.unread_count > 0 && (
+                          <div className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center px-1">
+                            {conv.unread_count > 99 ? '99+' : conv.unread_count}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <h3 className={`font-medium truncate ${
+                            selectedContact?.id === conv.user.id ? 'text-purple-700' : 'text-gray-900'
+                          }`}>
+                            {conv.user.first_name} {conv.user.last_name}
+                          </h3>
+                          <span className="text-xs text-gray-500 ml-2">
+                            {conv.last_message ? formatTime(conv.last_message.created_at) : ''}
+                          </span>
+                        </div>
+                        <p className={`text-sm truncate mt-1 ${
+                          conv.unread_count > 0 ? 'text-gray-900 font-medium' : 'text-gray-500'
+                        }`}>
+                          {conv.last_message?.content || 'No messages yet'}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Main Chat Area */}
+      <div className={`flex-1 flex flex-col bg-white ${showUserInfo ? 'mr-80' : ''} transition-all duration-300`}>
+        {selectedContact ? (
+          <>
+            {/* Chat Header */}
+            <div className="px-6 py-4 border-b border-gray-200 bg-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="relative">
+                    <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-medium shadow-sm">
+                      {getInitials(selectedContact.first_name, selectedContact.last_name)}
+                    </div>
+                    {isUserOnline(selectedContact.id) && (
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 border-2 border-white rounded-full"></div>
+                    )}
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">
+                      {selectedContact.first_name} {selectedContact.last_name}
+                    </h2>
+                    <p className={`text-sm font-medium ${isUserOnline(selectedContact.id) ? 'text-green-600' : 'text-gray-500'}`}>
+                      {isUserOnline(selectedContact.id) ? 'Active now' : 'Offline'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2 relative">
+                  <button 
+                    onClick={handleVoiceCall}
+                    disabled={!isUserOnline(selectedContact.id)}
+                    className={`p-2 rounded-lg transition-colors ${
+                      isUserOnline(selectedContact.id) 
+                        ? 'text-gray-500 hover:text-gray-700 hover:bg-gray-100' 
+                        : 'text-gray-300 cursor-not-allowed'
+                    }`}
+                    title={isUserOnline(selectedContact.id) ? 'Voice call' : 'User is offline'}
+                  >
+                    <Phone className="h-5 w-5" />
+                  </button>
+                  <button 
+                    onClick={handleVideoCall}
+                    disabled={!isUserOnline(selectedContact.id)}
+                    className={`p-2 rounded-lg transition-colors ${
+                      isUserOnline(selectedContact.id) 
+                        ? 'text-gray-500 hover:text-gray-700 hover:bg-gray-100' 
+                        : 'text-gray-300 cursor-not-allowed'
+                    }`}
+                    title={isUserOnline(selectedContact.id) ? 'Video call' : 'User is offline'}
+                  >
+                    <Video className="h-5 w-5" />
+                  </button>
+                  <button 
+                    onClick={handleShowInfo}
+                    className={`p-2 rounded-lg transition-colors ${
+                      showUserInfo ? 'bg-purple-100 text-purple-600' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                    }`}
+                    title="User information"
+                  >
+                    <Info className="h-5 w-5" />
+                  </button>
+                  <button 
+                    onClick={handleMoreOptions}
+                    className={`p-2 rounded-lg transition-colors ${
+                      showMoreMenu ? 'bg-purple-100 text-purple-600' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                    }`}
+                    title="More options"
+                  >
+                    <MoreVertical className="h-5 w-5" />
+                  </button>
+
+                  {/* More Options Dropdown */}
+                  {showMoreMenu && (
+                    <div className="absolute top-12 right-0 bg-white border border-gray-200 rounded-lg shadow-lg py-2 min-w-[200px] z-10">
+                      <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                        Export Chat History
+                      </button>
+                      <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                        Clear Chat History
+                      </button>
+                      <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                        Block User
+                      </button>
+                      <button className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors">
+                        Report User
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50">
+              {currentConversation?.messages && currentConversation.messages.length > 0 ? (
+                <>
+                  {/* Date separator */}
+                  {currentConversation.messages.length > 0 && (
+                    <div className="flex items-center justify-center py-4">
+                      <div className="bg-white px-4 py-2 rounded-full shadow-sm border border-gray-200">
+                        <span className="text-sm font-medium text-gray-600">
+                          {formatMessageDate(currentConversation.messages[0].created_at)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {currentConversation.messages.map((message, index) => {
+                    const isOwnMessage = message.sender_id !== selectedContact.id;
+                    const showAvatar = !isOwnMessage && (
+                      index === 0 || 
+                      currentConversation.messages[index - 1].sender_id !== message.sender_id
+                    );
+                    
+                    return (
+                      <div
+                        key={message.id}
+                        className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} ${
+                          !isOwnMessage && !showAvatar ? 'ml-12' : ''
+                        }`}
+                      >
+                        {!isOwnMessage && showAvatar && (
+                          <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-medium text-sm mr-3 mt-1 shadow-sm">
+                            {getInitials(selectedContact.first_name, selectedContact.last_name)}
+                          </div>
+                        )}
+                        {/* Call Invitation Message */}
+                        {isCallInvitation(message.content) ? (
+                          <div className={`max-w-xs lg:max-w-md rounded-2xl shadow-sm border-2 ${
+                            isOwnMessage
+                              ? 'bg-purple-50 border-purple-200 rounded-br-md'
+                              : 'bg-blue-50 border-blue-200 rounded-bl-md'
+                          }`}>
+                            <div className="p-4">
+                              <div className="flex items-center mb-3">
+                                {getCallType(message.content) === 'voice' ? (
+                                  <Phone className="h-5 w-5 mr-2 text-blue-600" />
+                                ) : (
+                                  <Video className="h-5 w-5 mr-2 text-blue-600" />
+                                )}
+                                <span className="font-semibold text-gray-900">
+                                  {getCallType(message.content) === 'voice' ? 'Voice Call' : 'Video Call'} Invitation
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-600 mb-3">
+                                {isOwnMessage ? 'You' : selectedContact.first_name} started a call
+                              </p>
+                              {extractCallUrl(message.content) && (
+                                <button
+                                  onClick={() => window.open(extractCallUrl(message.content)!, '_blank')}
+                                  className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                                >
+                                  <ExternalLink className="h-4 w-4 mr-2" />
+                                  Join Call
+                                </button>
+                              )}
+                              <p className={`text-xs mt-2 ${
+                                isOwnMessage ? 'text-purple-500' : 'text-gray-500'
+                              }`}>
+                                {formatMessageTime(message.created_at)}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          /* Regular Message */
+                        <div
+                          className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${
+                            isOwnMessage
+                              ? 'bg-purple-600 text-white rounded-br-md'
+                              : 'bg-white text-gray-900 border border-gray-200 rounded-bl-md'
+                          }`}
+                        >
+                          <p className="text-sm leading-relaxed">{message.content}</p>
+                          <p
+                            className={`text-xs mt-2 ${
+                              isOwnMessage ? 'text-purple-200' : 'text-gray-500'
+                            }`}
+                          >
+                            {formatMessageTime(message.created_at)}
+                          </p>
+                        </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              ) : (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold text-xl mx-auto mb-4 shadow-lg">
+                      {getInitials(selectedContact.first_name, selectedContact.last_name)}
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Start a conversation with {selectedContact.first_name}
+                    </h3>
+                    <p className="text-gray-500 text-sm">
+                      Send a message to begin your conversation
+                    </p>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Message Input */}
+            <div className="p-4 border-t border-gray-200 bg-white">
+              <div className="flex items-end space-x-3">
+                <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                  <Paperclip className="h-5 w-5" />
+                </button>
+                <div className="flex-1 relative">
+                  <textarea
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder={`Message ${selectedContact.first_name}...`}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none max-h-32 text-sm"
+                    rows={1}
+                    style={{ minHeight: '48px' }}
+                  />
+                </div>
+                <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                  <Smile className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!messageText.trim() || sending}
+                  className={`p-3 rounded-lg transition-colors ${
+                    messageText.trim() && !sending
+                      ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-sm'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  {sending ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <Send className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+              <div className="mt-2 text-xs text-gray-500 px-1">
+                Press <kbd className="px-1 py-0.5 text-xs font-medium bg-gray-100 border border-gray-300 rounded">Enter</kbd> to send, <kbd className="px-1 py-0.5 text-xs font-medium bg-gray-100 border border-gray-300 rounded">Shift + Enter</kbd> for new line
+              </div>
+            </div>
+          </>
+        ) : (
+          // Welcome Screen
+          <div className="flex-1 flex items-center justify-center bg-gray-50">
+            <div className="text-center max-w-md mx-auto">
+              <div className="w-20 h-20 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold text-2xl mx-auto mb-6 shadow-lg">
+                <Hash className="h-10 w-10" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Welcome to Messages</h2>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Stay connected with your team. Select a conversation from the sidebar to start messaging, 
+                or create a new conversation with any team member.
+              </p>
+              <button
+                onClick={() => setShowNewConversation(true)}
+                className="inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-sm font-medium"
+              >
+                <Plus className="h-5 w-5 mr-2" />
+                Start New Conversation
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* User Info Panel */}
+      {showUserInfo && selectedContact && (
+        <div className="w-80 bg-white border-l border-gray-200 flex flex-col shadow-sm">
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">User Information</h3>
+              <button
+                onClick={() => setShowUserInfo(false)}
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          {/* User Profile */}
+          <div className="px-6 py-6 border-b border-gray-200">
+            <div className="text-center">
+              <div className="relative inline-block">
+                <div className="w-20 h-20 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold text-2xl mx-auto mb-4 shadow-lg">
+                  {getInitials(selectedContact.first_name, selectedContact.last_name)}
+                </div>
+                {isUserOnline(selectedContact.id) && (
+                  <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-400 border-3 border-white rounded-full"></div>
+                )}
+              </div>
+              <h4 className="text-xl font-semibold text-gray-900 mb-1">
+                {selectedContact.first_name} {selectedContact.last_name}
+              </h4>
+              <p className={`text-sm font-medium mb-2 ${
+                isUserOnline(selectedContact.id) ? 'text-green-600' : 'text-gray-500'
+              }`}>
+                {isUserOnline(selectedContact.id) ? '● Active now' : '● Offline'}
+              </p>
+              <p className="text-sm text-gray-600">{selectedContact.email}</p>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h5 className="text-sm font-semibold text-gray-900 mb-3">Quick Actions</h5>
+            <div className="space-y-2">
+              <button 
+                onClick={handleVoiceCall}
+                disabled={!isUserOnline(selectedContact.id)}
+                className={`w-full flex items-center px-4 py-3 rounded-lg transition-colors ${
+                  isUserOnline(selectedContact.id)
+                    ? 'bg-gray-50 hover:bg-gray-100 text-gray-700'
+                    : 'bg-gray-25 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                <Phone className="h-5 w-5 mr-3" />
+                Voice Call
+              </button>
+              <button 
+                onClick={handleVideoCall}
+                disabled={!isUserOnline(selectedContact.id)}
+                className={`w-full flex items-center px-4 py-3 rounded-lg transition-colors ${
+                  isUserOnline(selectedContact.id)
+                    ? 'bg-gray-50 hover:bg-gray-100 text-gray-700'
+                    : 'bg-gray-25 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                <Video className="h-5 w-5 mr-3" />
+                Video Call
+              </button>
+            </div>
+          </div>
+
+          {/* User Details */}
+          <div className="px-6 py-4 flex-1">
+            <h5 className="text-sm font-semibold text-gray-900 mb-3">Details</h5>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Email</label>
+                <p className="text-sm text-gray-900 mt-1">{selectedContact.email}</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {isUserOnline(selectedContact.id) ? 'Online' : 'Offline'}
+                </p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">User ID</label>
+                <p className="text-sm text-gray-900 mt-1">#{selectedContact.id}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="px-6 py-4 border-t border-gray-200">
+            <div className="space-y-2">
+              <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+                Export Chat History
+              </button>
+              <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+                Clear Chat History
+              </button>
+              <button className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                Block User
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
