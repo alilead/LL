@@ -279,33 +279,38 @@ export function ModernLeads() {
 
       {/* Kanban View */}
       {view === 'kanban' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {leadsByStage.map((stage: any) => (
-            <div key={stage.id} className="flex flex-col">
-              {/* Stage Header */}
-              <div className="flex items-center justify-between mb-4 pb-3 border-b-2 border-neutral-200 dark:border-neutral-700">
-                <div className="flex items-center space-x-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: stage.color || '#6366f1' }}
-                  />
-                  <h3 className="font-semibold text-neutral-900 dark:text-neutral-50">
-                    {stage.name}
-                  </h3>
-                  <span className="text-sm text-neutral-500 dark:text-neutral-400">
-                    {stage.leads.length}
-                  </span>
-                </div>
-                <button
-                  onClick={() => navigate('/leads/new')}
-                  className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition-colors"
-                >
-                  <Plus className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
-                </button>
-              </div>
+        <div className="overflow-x-auto pb-4">
+          <div className="flex gap-6 min-w-max">
+            {leadsByStage.map((stage: any) => {
+              // Normalize stage name: replace "aaaa" with "New"
+              const stageName = stage.name === 'aaaa' || stage.name === 'AAAA' ? 'New' : stage.name;
+              
+              return (
+                <div key={stage.id} className="flex flex-col w-80 flex-shrink-0">
+                  {/* Stage Header */}
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b-2 border-neutral-200 dark:border-neutral-700">
+                    <div className="flex items-center space-x-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: stage.color || '#6366f1' }}
+                      />
+                      <h3 className="font-semibold text-neutral-900 dark:text-neutral-50">
+                        {stageName}
+                      </h3>
+                      <span className="text-sm text-neutral-500 dark:text-neutral-400">
+                        {stage.leads.length}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => navigate('/leads/new')}
+                      className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition-colors"
+                    >
+                      <Plus className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
+                    </button>
+                  </div>
 
-              {/* Lead Cards */}
-              <div className="space-y-3">
+                  {/* Lead Cards - Scrollable container */}
+                  <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
                 {stage.leads.map((lead: Lead) => (
                   <div
                     key={lead.id}
@@ -400,9 +405,11 @@ export function ModernLeads() {
                     No leads in this stage
                   </div>
                 )}
-              </div>
-            </div>
-          ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

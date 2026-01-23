@@ -616,7 +616,8 @@ def delete_lead(
     lead = crud.lead.get(db=db, id=lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
-    if lead.organization_id != current_user.organization_id:
+    # Check permissions: Admin can delete any lead, regular users can only delete leads in their organization
+    if not current_user.is_admin and lead.organization_id != current_user.organization_id:
         raise HTTPException(status_code=403, detail="Not enough permissions")
     
     # If not confirmed, return a confirmation request

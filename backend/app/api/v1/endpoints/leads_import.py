@@ -42,12 +42,8 @@ async def import_leads_from_csv(
     The leads will be assigned to the specified user.
     Optionally, a tag can be assigned to all imported leads.
     """
-    # Check if current user is admin
-    if not current_user.is_admin:
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have enough privileges"
-        )
+    # Allow all authenticated users to import leads
+    # No admin check needed
     
     # Get the assigned user
     try:
@@ -183,16 +179,40 @@ async def import_leads_from_csv(
             # Reset file pointer to beginning
             await file.seek(0)
             
-            # Try to read CSV
-            try:
-                df = pd.read_csv(file.file)
-                if len(df) == 0:
-                    logger.error("CSV file has no data rows")
-                    raise HTTPException(
-                        status_code=400,
-                        detail="The CSV file contains no data rows"
-                    )
-                logger.info(f"Successfully read CSV file with {len(df)} rows")
+            # Try to read CSV with multiple encoding attempts
+            df = None
+            encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1', 'utf-16']
+            last_error = None
+            
+            for encoding in encodings:
+                try:
+                    await file.seek(0)  # Reset file pointer
+                    df = pd.read_csv(file.file, encoding=encoding)
+                    logger.info(f"Successfully read CSV file with encoding: {encoding}")
+                    break
+                except UnicodeDecodeError as e:
+                    last_error = e
+                    logger.warning(f"Failed to read CSV with encoding {encoding}: {str(e)}")
+                    continue
+                except Exception as e:
+                    last_error = e
+                    logger.warning(f"Error reading CSV with encoding {encoding}: {str(e)}")
+                    continue
+            
+            if df is None:
+                logger.error(f"Failed to read CSV file with any encoding. Last error: {last_error}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Error reading CSV file: Could not decode file with any supported encoding (utf-8, latin-1, cp1252, iso-8859-1, utf-16). Please ensure your CSV file is properly encoded."
+                )
+            
+            if len(df) == 0:
+                logger.error("CSV file has no data rows")
+                raise HTTPException(
+                    status_code=400,
+                    detail="The CSV file contains no data rows"
+                )
+            logger.info(f"Successfully read CSV file with {len(df)} rows")
                 
                 # Clean column names: convert to lowercase and replace spaces/special chars with underscores
                 df.columns = [col.strip().lower().replace(" ", "_").replace("-", "_") for col in df.columns]
