@@ -97,20 +97,15 @@ If admin button does not appear:
 To use Resend for email delivery (recommended):
 
 1) **Set environment variables in Render:**
-   - `EMAILS_FROM_EMAIL=onboarding@resend.dev` (Resend's default domain - no verification needed)
-   - OR `EMAILS_FROM_EMAIL=noreply@your-verified-domain.com` (if you have a verified domain)
+   - `EMAILS_FROM_EMAIL=noreply@send.the-leadlab.com` (Resend's send.the-leadlab.com domain - no verification needed)
    - `RESEND_API_KEY=<your-resend-api-key>`
    - `SMTP_FROM_NAME=LeadLab` (optional, defaults to "LeadLab")
 
-2) **Option A: Use Resend's default domain (easiest, no setup):**
-   - Use `onboarding@resend.dev` as the from email
-   - No domain verification needed
-   - Works immediately
-
-3) **Option B: Use your own verified domain (better deliverability):**
-   - Add and verify your domain in Resend dashboard
-   - Add DNS records (SPF, DKIM, DMARC) as shown in Resend
-   - Use `noreply@your-verified-domain.com` format
+2) **About send.the-leadlab.com:**
+   - This is Resend's provided domain - already verified by Resend
+   - You don't need to verify it yourself
+   - DNS records are already configured by Resend
+   - Just use `noreply@send.the-leadlab.com` as the from email
 
 **Note:** The code automatically uses Resend API when `RESEND_API_KEY` is set. No SMTP configuration needed.
 
