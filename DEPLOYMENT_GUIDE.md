@@ -41,6 +41,8 @@ Required environment variables:
 - `TOKEN_ENCRYPTION_KEY`
 - `API_SECRET_KEY`
 - `ENV=production`
+- `EMAILS_FROM_EMAIL=noreply@send.the-leadlab.com` (Resend verified domain)
+- `RESEND_API_KEY` (Resend API key for email sending)
 
 Optional environment variables (can be added later):
 - `LINKEDIN_CLIENT_ID`
@@ -48,6 +50,7 @@ Optional environment variables (can be added later):
 - `STRIPE_PUBLISHABLE_KEY`
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` (only if not using Resend)
 
 Render health check:
 - `https://api.the-leadlab.com/api/v1/health`
@@ -89,6 +92,25 @@ If admin button does not appear:
 1) Log out and back in
 2) Hard refresh browser
 3) Verify frontend points to correct API (`VITE_API_URL`)
+
+## Email Configuration (Resend)
+To use Resend for email delivery (recommended):
+
+1) **Set environment variables in Render:**
+   - `EMAILS_FROM_EMAIL=noreply@send.the-leadlab.com`
+   - `RESEND_API_KEY=<your-resend-api-key>`
+   - `SMTP_FROM_NAME=LeadLab` (optional, defaults to "LeadLab")
+
+2) **Verify domain in Resend:**
+   - Domain: `send.the-leadlab.com`
+   - DNS records should already be configured (MX, TXT for SPF, DKIM)
+
+3) **Why use Resend domain:**
+   - `noreply@send.the-leadlab.com` is a Resend-verified domain
+   - Reduces bounce rates compared to using `info@the-leadlab.com`
+   - Better deliverability with proper SPF/DKIM/DMARC records
+
+**Note:** The code automatically uses Resend API when `RESEND_API_KEY` is set. No SMTP configuration needed.
 
 ## Custom API Domain
 To enable `api.the-leadlab.com`:
