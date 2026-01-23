@@ -1,3 +1,18 @@
+# Clean files before any imports to prevent null bytes errors
+import os
+import sys
+import subprocess
+
+# Run cleaning script before imports
+if os.path.exists('clean_files.py'):
+    try:
+        result = subprocess.run([sys.executable, 'clean_files.py'], 
+                              capture_output=True, text=True, timeout=30)
+        if result.returncode == 0 and result.stdout:
+            print("File cleaning completed:", result.stdout.strip())
+    except Exception as e:
+        print(f"Warning: Could not run clean_files.py: {e}")
+
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import api_router
@@ -5,7 +20,6 @@ from app.core.config import settings
 from app.middleware.url_normalizer import URLNormalizerMiddleware
 from app.middleware.security import SecurityMiddleware
 import logging
-import os
 from datetime import datetime
 
 # Configure logging
