@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
 def clean_value(value):
     """Clean value from NaN, empty strings, and whitespace"""
     if pd.isna(value) or value == "" or (isinstance(value, str) and value.strip() == ""):
@@ -26,6 +27,7 @@ def clean_value(value):
         cleaned = value.strip()
         return cleaned if cleaned else None
     return value
+
 
 @router.post("/import/csv", response_model=GenericResponse)
 async def import_leads_from_csv(
@@ -48,7 +50,7 @@ async def import_leads_from_csv(
             status_code=403,
             detail="You don't have enough privileges"
         )
-    
+
     # Get the assigned user
     try:
         assigned_user = crud.user.get(db, id=assigned_user_id)
@@ -73,8 +75,8 @@ async def import_leads_from_csv(
     try:
         # Get or create a default stage for this organization
         default_stage = crud.lead_stage.get_by_order_index(
-            db, 
-            order_index=1, 
+            db,
+            order_index=1,
             organization_id=assigned_user.organization_id
         )
         if not default_stage:
@@ -111,7 +113,7 @@ async def import_leads_from_csv(
         tag = crud.tag.get(db, id=tag_id)
         if not tag:
             raise HTTPException(
-                status_code=404, 
+                status_code=404,
                 detail=f"Tag with ID {tag_id} not found"
             )
         logger.info(f"Leads will be tagged with existing tag '{tag.name}'")
@@ -124,7 +126,7 @@ async def import_leads_from_csv(
                 name=new_tag_name,
                 organization_id=current_user.organization_id
             )
-            
+
             if existing_tag:
                 # If tag already exists, use it instead of creating a new one
                 tag = existing_tag
@@ -136,10 +138,10 @@ async def import_leads_from_csv(
                     "organization_id": current_user.organization_id,
                     "created_at": datetime.utcnow()
                 }
-                
+
                 # Log the tag data being created
                 logger.info(f"Attempting to create new tag with data: {tag_data}")
-                
+
                 try:
                     # Directly use the model to create the tag to bypass validation issues
                     new_tag = models.Tag(**tag_data)
@@ -160,7 +162,7 @@ async def import_leads_from_csv(
             # Just log the error and continue without a tag
             tag = None
 
-    if not file.filename.endswith('.csv'):
+    if not file.filename.endswith(".csv"):
         raise HTTPException(
             status_code=400,
             detail="Only CSV files are allowed"
@@ -168,7 +170,7 @@ async def import_leads_from_csv(
 
     try:
         logger.info(f"Starting CSV import for file: {file.filename}")
-        
+
         # Read CSV file
         try:
             # Check if file is empty
@@ -179,10 +181,10 @@ async def import_leads_from_csv(
                     status_code=400,
                     detail="The uploaded file is empty"
                 )
-            
+
             # Reset file pointer to beginning
             await file.seek(0)
-            
+
             # Try to read CSV
             try:
                 df = pd.read_csv(file.file)
@@ -193,10 +195,10 @@ async def import_leads_from_csv(
                         detail="The CSV file contains no data rows"
                     )
                 logger.info(f"Successfully read CSV file with {len(df)} rows")
-                
+
                 # Clean column names: convert to lowercase and replace spaces/special chars with underscores
                 df.columns = [col.strip().lower().replace(" ", "_").replace("-", "_") for col in df.columns]
-                
+
                 # Initialize lists for successful and failed imports
                 successful_imports = []
                 failed_imports = []
@@ -233,9 +235,9 @@ async def import_leads_from_csv(
                             if matching_col:
                                 value = row[matching_col]
                                 # Special handling for mobile and telephone fields
-                                if db_field in ['mobile', 'telephone']:
+                                if db_field in ["mobile", "telephone"]:
                                     if isinstance(value, (int, float)) and not pd.isna(value):
-                                        value = str(int(value))  # Convert to int first to remove decimal
+                                        value = str(int(value))
                                     value = clean_value(value)
                                 else:
                                     value = clean_value(value)
@@ -244,17 +246,17 @@ async def import_leads_from_csv(
                         # Ensure email is set (None if not found)
                         if "email" not in lead_data:
                             lead_data["email"] = None
-                        
+
                         # Add required and special fields
                         lead_data.update({
-                            "psychometrics": None,  # Initialize as None since it's JSON field
+                            "psychometrics": None,
                             "wpi": float(clean_value(row.get("wpi", 0))) if clean_value(row.get("wpi", "")) else None,
                             "stage_id": default_stage.id,
                             "user_id": assigned_user_id,
                             "organization_id": assigned_user.organization_id,
                             "created_by": current_user.id,
                             "created_at": datetime.utcnow(),
-                            "source": lead_data.get("source", "Partner")  # Set default source for imported leads
+                            "source": lead_data.get("source", "Partner")
                         })
 
                         # Check for duplicate email only if email is provided
@@ -284,11 +286,10 @@ async def import_leads_from_csv(
                     try:
                         created_leads = crud.lead.create_bulk(db, obj_in_list=leads_to_create)
                         logger.info(f"Successfully created {len(created_leads)} leads")
-                        
+
                         # Add tag to created leads if a tag is provided
                         if tag and created_leads:
                             try:
-                                # Add tag to each created lead
                                 for lead in created_leads:
                                     db.execute(
                                         models.associations.lead_tags.insert().values(
@@ -302,8 +303,6 @@ async def import_leads_from_csv(
                                 logger.info(f"Successfully tagged {len(created_leads)} leads with tag '{tag.name}'")
                             except Exception as tag_error:
                                 logger.error(f"Error tagging leads: {str(tag_error)}")
-                                # We don't want to fail the whole import if tagging fails
-                                # Just log the error and continue
                     except Exception as e:
                         logger.error(f"Error during bulk creation: {str(e)}")
                         raise HTTPException(
@@ -339,7 +338,7 @@ async def import_leads_from_csv(
                     status_code=400,
                     detail=f"Error parsing CSV file. Please ensure it's a valid CSV format: {str(e)}"
                 )
-                
+
         except HTTPException:
             raise
         except Exception as e:
@@ -349,7 +348,7 @@ async def import_leads_from_csv(
                 status_code=400,
                 detail=f"Error reading CSV file: {str(e)}"
             )
-        
+
     except Exception as e:
         logger.error(f"Unexpected error during CSV import: {str(e)}")
         logger.error(traceback.format_exc())
@@ -358,9 +357,11 @@ async def import_leads_from_csv(
             detail=f"Error importing leads: {str(e)}"
         )
 
+
 from fastapi.responses import StreamingResponse
 import io
 import csv
+
 
 @router.get("/template", response_class=StreamingResponse)
 async def download_csv_template(
@@ -373,41 +374,41 @@ async def download_csv_template(
         # Create a StringIO object to write CSV data
         output = io.StringIO()
         writer = csv.writer(output)
-        
+
         # Write headers
         headers = [
-            'FIRSTNAME', 'LASTNAME', 'COMPANY', 'JOB_TITLE', 'LOCATION', 'COUNTRY',
-            'EMAILS', 'TELEPHONE', 'MOBILE', 'LINKEDIN', 'WEBSITE', 'SECTOR', 
-            'NOTE'
+            "FIRSTNAME", "LASTNAME", "COMPANY", "JOB_TITLE", "LOCATION", "COUNTRY",
+            "EMAILS", "TELEPHONE", "MOBILE", "LINKEDIN", "WEBSITE", "SECTOR",
+            "NOTE"
         ]
         writer.writerow(headers)
-        
+
         # Write sample data rows
         sample_data = [
             [
-                'John', 'Doe', 'Tech Corp', 'Senior Developer', 'San Francisco', 'USA',
-                'john.doe@techcorp.com', '+1-555-0123', '+1-555-4567', 
-                'https://linkedin.com/in/johndoe', 'https://techcorp.com',
-                'Technology', 'Experienced developer with cloud expertise'
+                "John", "Doe", "Tech Corp", "Senior Developer", "San Francisco", "USA",
+                "john.doe@techcorp.com", "+1-555-0123", "+1-555-4567",
+                "https://linkedin.com/in/johndoe", "https://techcorp.com",
+                "Technology", "Experienced developer with cloud expertise"
             ],
             [
-                'Jane', 'Smith', 'Finance Inc', 'Investment Manager', 'London', 'UK',
-                'jane.smith@financeinc.com', '+44-20-1234', '+44-77-5678',
-                'https://linkedin.com/in/janesmith', 'https://financeinc.com',
-                'Finance', 'Specializes in portfolio management'
+                "Jane", "Smith", "Finance Inc", "Investment Manager", "London", "UK",
+                "jane.smith@financeinc.com", "+44-20-1234", "+44-77-5678",
+                "https://linkedin.com/in/janesmith", "https://financeinc.com",
+                "Finance", "Specializes in portfolio management"
             ]
         ]
-        
+
         for row in sample_data:
             writer.writerow(row)
-        
+
         # Create the response
         output.seek(0)
         return StreamingResponse(
             iter([output.getvalue()]),
             media_type="text/csv",
             headers={
-                'Content-Disposition': 'attachment; filename=leads_template.csv'
+                "Content-Disposition": "attachment; filename=leads_template.csv"
             }
         )
     except Exception as e:
@@ -417,4 +418,3 @@ async def download_csv_template(
             status_code=500,
             detail=f"Error generating template: {str(e)}"
         )
-

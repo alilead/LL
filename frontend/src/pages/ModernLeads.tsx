@@ -187,10 +187,12 @@ export function ModernLeads() {
   }
 
   // Group leads by stage for Kanban view
-  const leadsByStage = stages.map((stage: any) => ({
-    ...stage,
-    leads: leads.filter((lead) => lead.stage_id === stage.id)
-  }));
+  const leadsByStage = stages
+    .map((stage: any) => ({
+      ...stage,
+      leads: leads.filter((lead) => lead.stage_id === stage.id)
+    }))
+    .sort((a: any, b: any) => b.leads.length - a.leads.length);
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-8">

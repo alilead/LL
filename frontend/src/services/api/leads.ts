@@ -132,45 +132,6 @@ interface LeadResponse {
   data: Lead | Lead[]; 
 }
 
-// Geliştirilmiş mock leads verisi
-const mockLeads: Lead[] = Array.from({ length: 10 }, (_, i) => ({
-  id: i + 1,
-  first_name: `Lead ${i + 1}`,
-  last_name: `Sample`,
-  email: `lead${i + 1}@example.com`,
-  company: `Company ${i + 1}`,
-  job_title: `Position ${i + 1}`,
-  telephone: null,
-  mobile: null,
-  location: null,
-  linkedin: null, 
-  country: null,
-  website: null,
-  sector: null,
-  unique_lead_id: `LEAD-${i + 1000}`,
-  time_in_current_role: null,
-  lab_comments: null,
-  client_comments: null,
-  psychometrics: null,
-  wpi: null,
-  source: null,
-  est_wealth_experience: null,
-  organization_id: 1,
-  user_id: 1,
-  stage_id: 1,
-  created_by: 1,
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-  is_deleted: false,
-  visible: true,
-  full_name: `Lead ${i + 1} Sample`,
-  stage: { id: 1, name: 'New' },
-  user: { id: 1, email: 'admin@example.com', first_name: 'Admin', last_name: 'User' },
-  creator: { id: 1, email: 'admin@example.com', first_name: 'Admin', last_name: 'User' },
-  tags: [],
-  notes: []
-}));
-
 // Her zaman response verecek şekilde API çağrıları
 export const getLeads = async (params: LeadQueryParams = {}): Promise<any> => {
   console.log('Getting leads with params:', params);
