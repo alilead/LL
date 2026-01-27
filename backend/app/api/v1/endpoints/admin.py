@@ -15,6 +15,18 @@ import io
 
 router = APIRouter()
 
+def _decode_csv_bytes(content: bytes) -> str:
+    """Decode CSV content using common encodings with fallback."""
+    for encoding in ("utf-8", "utf-8-sig", "cp1252", "latin-1", "utf-16"):
+        try:
+            return content.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    raise HTTPException(
+        status_code=400,
+        detail="Error reading CSV file: unsupported encoding. Please save as UTF-8."
+    )
+
 def check_admin_access(current_user: User = Depends(get_current_user)):
     """Check admin access"""
     if not current_user.is_superuser:
@@ -158,7 +170,7 @@ async def import_leads(
     """Import leads from CSV file"""
     try:
         content = await file.read()
-        csv_content = content.decode()
+        csv_content = _decode_csv_bytes(content)
         errors = []
         
         # Process assigned user if provided
@@ -290,7 +302,7 @@ async def validate_csv(
     try:
         # Read file content
         content = await file.read()
-        file_content = content.decode('utf-8')
+        file_content = _decode_csv_bytes(content)
 
         # Initialize CSV importer and validate
         importer = AdminService(db)
