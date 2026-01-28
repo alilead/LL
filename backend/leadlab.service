@@ -1,0 +1,15 @@
+[Unit]
+Description=LeadLab API Service
+After=network.target
+
+[Service]
+User=the-leadlab-firat
+Group=psacln
+WorkingDirectory=/var/www/vhosts/the-leadlab.com/backend
+ExecStart=/var/www/vhosts/the-leadlab.com/backend/venv/bin/gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker -b 127.0.0.1:8000 --access-logfile logs/access.log --error-logfile logs/error.log
+Restart=always
+RestartSec=5s
+Environment="PYTHONPATH=/var/www/vhosts/the-leadlab.com/backend"
+
+[Install]
+WantedBy=multi-user.target
