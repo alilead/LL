@@ -51,6 +51,11 @@ class Lead(Base):
         """Email guidelines property - column doesn't exist"""
         return None
 
+    @email_guidelines.setter
+    def email_guidelines(self, value):
+        """No-op setter so import/update can set without error; value is ignored."""
+        pass
+
     # Hybrid property for psychometrics
     @hybrid_property
     def psychometrics(self):

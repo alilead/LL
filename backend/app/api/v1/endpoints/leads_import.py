@@ -332,7 +332,7 @@ async def import_leads_from_csv(
                                 # We don't want to fail the whole import if tagging fails
                                 # Just log the error and continue
                     except Exception as e:
-                        logger.error(f"Error during bulk creation: {str(e)}")
+                        logger.exception("Error during bulk creation")
                         raise HTTPException(
                             status_code=500,
                             detail=f"Error creating leads: {str(e)}"

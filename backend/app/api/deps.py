@@ -11,7 +11,6 @@ from app.core.config import settings
 from app.db.base import SessionLocal
 import logging
 import time
-import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +59,7 @@ def get_db() -> Generator:
             raise e
         else:
             # Diğer hatalar veritabanı hatası olarak işlensin
-            logger.error(f"Database connection error: {str(e)}")
+            logger.exception("Database connection error")
             raise HTTPException(
                 status_code=500,
                 detail="Database connection error. Please try again later."
@@ -152,7 +151,7 @@ async def get_current_user(
                 )
     except (JWTError, ValidationError) as e:
         logger.error(f"Token validation error for path {request_path}: {str(e)}")
-        logger.debug(f"Stack trace: {traceback.format_exc()}")
+        logger.exception("Token validation failed")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Could not validate credentials: {str(e)}",
@@ -196,9 +195,7 @@ async def get_current_user(
     except HTTPException:
         raise
     except Exception as e:
-        logger.critical(f"Database error in get_current_user: {str(e)}")
-        logger.critical(f"Exception type: {type(e).__name__}")
-        logger.critical(traceback.format_exc())
+        logger.exception("Database error in get_current_user")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Auth database error: {str(e)}"
