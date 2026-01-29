@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Diagnostic Assessment - The Leadlab</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-dark: #4338ca;
+            --accent: #ec4899;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --bg-light: #f8fafc;
+            --bg-white: #ffffff;
+            --text-dark: #1e293b;
+            --text-gray: #64748b;
+            --border: #e2e8f0;
+            --border-dark: #cbd5e1;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            color: var(--text-dark);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--bg-white);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.95;
+            margin-bottom: 10px;
+        }
+
+        .header-subtext {
+            font-size: 13px;
+            opacity: 0.85;
+            font-style: italic;
+            margin-top: 12px;
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+            margin-top: 15px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: white;
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        .form-content {
+            padding: 40px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 500;
+            font-size: 14px;
+            margin-bottom: 8px;
+            color: var(--text-dark);
+        }
+
+        .required::after {
+            content: " *";
+            color: var(--error);
+        }
+
+        .form-input,
+        .form-textarea,
+        .form-select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border-dark);
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .form-input:focus,
+        .form-textarea:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
+        }
+
+        .form-textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .checkbox-group {
+            display: grid;
+            gap: 12px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+        }
+
+        .checkbox-item input[type="checkbox"],
+        .checkbox-item input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            margin-right: 10px;
+            cursor: pointer;
+            accent-color: var(--primary);
+        }
+
+        .checkbox-item label {
+            cursor: pointer;
+            font-size: 14px;
+            flex: 1;
+        }
+
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .three-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 24px;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: var(--text-gray);
+            margin-top: 6px;
+        }
+
+        .conditional-field {
+            display: none;
+            margin-top: 16px;
+            padding: 16px;
+            background: var(--bg-light);
+            border-radius: 6px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .conditional-field.show {
+            display: block;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 40px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            flex: 1;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--border);
+            color: var(--text-dark);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-dark);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .summary-section {
+            background: var(--bg-light);
+            padding: 24px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+
+        .summary-item {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 16px;
+            margin-bottom: 12px;
+            font-size: 13px;
+        }
+
+        .summary-label {
+            font-weight: 600;
+            color: var(--text-gray);
+        }
+
+        .summary-value {
+            color: var(--text-dark);
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-bottom: 16px;
+        }
+
+        .alert-info {
+            background: rgba(2, 132, 199, 0.1);
+            color: var(--primary-dark);
+            border-left: 4px solid var(--primary);
+        }
+
+        .success-message {
+            text-align: center;
+            padding: 60px 30px;
+            color: var(--success);
+        }
+
+        .success-message h2 {
+            font-size: 24px;
+            margin-bottom: 12px;
+        }
+
+        .section-subtitle {
+            font-size: 13px;
+            color: var(--text-gray);
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+
+        .cta-box {
+            background: linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(236, 72, 153, 0.08) 100%);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 24px;
+            font-size: 13px;
+            color: var(--text-dark);
+        }
+
+        .export-button {
+            background: var(--accent);
+            color: white;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 16px;
+            transition: all 0.2s;
+        }
+
+        .export-button:hover {
+            background: #d946a6;
+            transform: translateY(-1px);
+        }
+
+        .score-display {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .score-card {
+            background: var(--bg-light);
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .score-number {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 4px;
+        }
+
+        .score-label {
+            font-size: 12px;
+            color: var(--text-gray);
+            font-weight: 500;
+        }
+
+        @media (max-width: 768px) {
+            .two-column,
+            .three-column {
+                grid-template-columns: 1fr;
+            }
+
+            .form-content {
+                padding: 24px;
+            }
+
+            .header {
+                padding: 30px 20px;
+            }
+
+            .header h1 {
+                font-size: 22px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Business Diagnostic Assessment</h1>
+            <p>The Leadlab • Honest answers. Honest solutions.</p>
+            <div class="header-subtext">Complete this assessment to identify what's really holding your business back.</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+
+        <form id="diagnosticForm" class="form-content">
+            <!-- SECTION 1: BUSINESS BASICS -->
+            <section class="section active" data-section="1">
+                <h2 class="section-title">About Your Business</h2>
+                <p class="section-subtitle">Let's start with the fundamentals. We need to understand what you do and who you serve.</p>
+
+                <div class="two-column">
+                    <div class="form-group">
+                        <label class="form-label required">Business Name</label>
+                        <input type="text" name="businessName" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label required">Website</label>
+                        <input type="url" name="website" class="form-input" placeholder="https://example.com">
+                    </div>
+                </div>
+
+                <div class="two-column">
+                    <div class="form-group">
+                        <label class="form-label required">Contact Name</label>
+                        <input type="text" name="contactName" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Your Role</label>
+                        <input type="text" name="contactRole" class="form-input" placeholder="e.g., CEO, Founder">
+                    </div>
+                </div>
+
+                <div class="two-column">
+                    <div class="form-group">
+                        <label class="form-label required">Email</label>
+                        <input type="email" name="email" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label required">Phone</label>
+                        <input type="tel" name="phone" class="form-input" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label required">Business Address</label>
+                    <input type="text" name="address" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label required">What problem does your business solve?</label>
+                    <textarea name="valueProposition" class="form-textarea" placeholder="Describe your products/services and unique value..." required></textarea>
+                </div>
+            </section>
+
+            <!-- SECTION 2: BUSINESS STRUCTURE -->
+            <section class="section" data-section="2">
+                <h2 class="section-title">Business Structure & Reach</h2>
+
+                <div class="form-group">
+                    <label class="form-label required">Business Type</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="type1" name="businessType" value="Local service">
+                            <label for="type1">Local service business</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="type2" name="businessType" value="E-commerce">
+                            <label for="type2">E-commerce</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="type3" name="businessType" value="B2B SaaS">
+                            <label for="type3">B2B SaaS / Software</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="type4" name="businessType" value="Consulting">
+                            <label for="type4">Consulting / Professional Services</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="type5" name="businessType" value="Hybrid">
+                            <label for="type5">Hybrid (online & offline)</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="typeOther" name="businessType" value="Other">
+                            <label for="typeOther">Other</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label required">Primary Sales Channels</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="salesChannel" value="Direct sales">
+                            <label>Direct sales / In-person</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="salesChannel" value="Website">
+                            <label>Website / Online platform</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="salesChannel" value="Marketplace">
+                            <label>Marketplace (Amazon, Etsy, etc.)</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="salesChannel" value="Partners/Resellers">
+                            <label>Partners / Resellers / Distributors</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="salesChannel" value="Other">
+                            <label>Other</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label required">Geographic Reach</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="radio" name="geoReach" value="Local" id="geo1">
+                            <label for="geo1">Local</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="radio" name="geoReach" value="Regional" id="geo2">
+                            <label for="geo2">Regional</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="radio" name="geoReach" value="National" id="geo3">
+                            <label for="geo3">National</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="radio" name="geoReach" value="International" id="geo4">
+                            <label for="geo4">International</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Key countries/regions (if applicable)</label>
+                    <input type="text" name="geoRegions" class="form-input" placeholder="e.g., Switzerland, EU, USA">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label required">Industry / Sector</label>
+                    <input type="text" name="industry" class="form-input" placeholder="e.g., SaaS, Retail, Consulting" required>
+                </div>
+            </section>
+
+            <!-- SECTION 3: MARKET & CUSTOMERS -->
+            <section class="section" data-section="3">
+                <h2 class="section-title">Market & Customers</h2>
+
+                <div class="form-group">
+                    <label class="form-label required">Customer Type</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="radio" name="customerType" value="B2B" id="cust1">
+                            <label for="cust1">B2B (Business to Business)</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="radio" name="customerType" value="B2C" id="cust2">
+                            <label for="cust2">B2C (Business to Consumer)</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="radio" name="customerType" value="Both" id="cust3">
+                            <label for="cust3">Both</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label required">Target Customer Profile</label>
+                    <textarea name="targetCustomer" class="form-textarea" placeholder="Age, industry, role, company size, pain points, etc." required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Do you have recurring/repeat customers?</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="radio" name="recurringCustomers" value="Yes" id="recurring1" onchange="toggleField('recurringDetail', this.checked)">
+                            <label for="recurring1">Yes</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="radio" name="recurringCustomers" value="No" id="recurring2">
+                            <label for="recurring2">No</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="conditional-field" id="recurringDetail">
+                    <label class="form-label">Describe your recurring customer base</label>
+                    <textarea name="recurringDetail" class="form-textarea" placeholder="Frequency, retention rate, examples of key clients..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label required">Key Competitors</label>
+                    <textarea name="competitors" class="form-textarea" placeholder="List 2-3 main competitors and what differentiates you" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Market Research Conducted</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="marketResearch" value="Customer feedback">
+                            <label>Customer feedback & surveys</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="marketResearch" value="Competitor analysis">
+                            <label>Competitor analysis</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="marketResearch" value="Industry reports">
+                            <label>Industry reports</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="marketResearch" value="None formal">
+                            <label>None formal yet</label>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 4: TEAM & OPERATIONS -->
+            <section class="section" data-section="4">
+                <h2 class="section-title">Team & Operations</h2>
+
+                <div class="alert alert-info">
+                    <strong>Tip:</strong> Help us understand your organizational capacity and structure.
+                </div>
+
+                <div class="three-column">
+                    <div class="form-group">
+                        <label class="form-label required">Full-time Employees</label>
+                        <input type="number" name="fullTimeEmployees" class="form-input" min="0" value="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label required">Part-time Employees</label>
+                        <input type="number" name="partTimeEmployees" class="form-input" min="0" value="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Contractors/Freelancers</label>
+                        <input type="number" name="contractors" class="form-input" min="0" value="0">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Key Roles & Departments</label>
+                    <input type="text" name="keyRoles" class="form-input" placeholder="e.g., Sales, Marketing, Operations, Product Development">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label required">Who makes key strategic decisions?</label>
+                    <input type="text" name="decisionMakers" class="form-input" placeholder="Name(s) and role(s)" required>
+                </div>
+            </section>
+
+            <!-- SECTION 5: FINANCIAL & PRICING -->
+            <section class="section" data-section="5">
+                <h2 class="section-title">Financial Overview</h2>
+
+                <div class="alert alert-info">
+                    <strong>Privacy Notice:</strong> This section is confidential. Your financial information helps us understand your business's health and growth potential.
+                </div>
+
+                <div class="two-column">
+                    <div class="form-group">
+                        <label class="form-label required">Annual Revenue (approx.)</label>
+                        <select name="annualRevenue" class="form-select" required>
+                            <option value="">Select range...</option>
+                            <option value="Under €50k">Under €50k</option>
+                            <option value="€50k - €250k">€50k - €250k</option>
+                            <option value="€250k - €1M">€250k - €1M</option>
+                            <option value="€1M - €5M">€1M - €5M</option>
+                            <option value="€5M - €10M">€5M - €10M</option>
+                            <option value="Over €10M">Over €10M</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label required">Profit/Loss Status</label>
+                        <select name="profitStatus" class="form-select" required>
+                            <option value="">Select status...</option>
+                            <option value="Profitable">Profitable</option>
+                            <option value="Break-even">Break-even</option>
+                            <option value="Loss">Operating at a loss</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Primary Pricing Model</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="pricingModel" value="One-off payments">
+                            <label>One-off payments</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="pricingModel" value="Subscription">
+                            <label>Subscription / Monthly recurring</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="pricingModel" value="Retainer">
+                            <label>Retainer</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="pricingModel" value="Commission-based">
+                            <label>Commission-based</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="pricingModel" value="Other">
+                            <label>Other model</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Average Customer Lifetime Value (if known)</label>
+                    <input type="text" name="customerLTV" class="form-input" placeholder="€ amount or 'Not calculated yet'">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Do you have external investors?</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="radio" name="hasInvestors" value="Yes" id="inv1" onchange="toggleField('investorDetail', this.checked)">
+                            <label for="inv1">Yes</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="radio" name="hasInvestors" value="No" id="inv2">
+                            <label for="inv2">No</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="conditional-field" id="investorDetail">
+                    <label class="form-label">Investor Details</label>
+                    <textarea name="investorDetail" class="form-textarea" placeholder="Name, type (Angel/VC/etc), amount, date invested..."></textarea>
+                </div>
+            </section>
+
+            <!-- SECTION 6: KEY ISSUES & CHALLENGES -->
+            <section class="section" data-section="6">
+                <h2 class="section-title">Identify Your Business Challenges</h2>
+                <p class="section-subtitle">This is where honesty matters most. The more specific you are, the better we can help.</p>
+
+                <div class="alert alert-info">
+                    <strong>Real challenges = Real solutions.</strong> Don't sugarcoat—tell us what's actually wrong so we can fix it.
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label required">Internal Challenges</label>
+                    <p class="help-text">Issues within your control: team, cash flow, systems, sales execution, operational efficiency, product quality, etc.</p>
+                    <textarea name="internalChallenges" class="form-textarea" placeholder="What's holding your business back internally?" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label required">External Challenges</label>
+                    <p class="help-text">External factors: market conditions, competition, regulation, supplier issues, economic pressures, customer demand shifts, etc.</p>
+                    <textarea name="externalChallenges" class="form-textarea" placeholder="What external factors are impacting your business?" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label required">Top Priority Issue</label>
+                    <p class="help-text">What's the ONE biggest issue you need to solve in the next 90 days?</p>
+                    <textarea name="topPriority" class="form-textarea" placeholder="Describe your most urgent challenge..." required></textarea>
+                </div>
+            </section>
+
+            <!-- SECTION 7: GOALS & SUPPORT -->
+            <section class="section" data-section="7">
+                <h2 class="section-title">Goals & Support Needed</h2>
+                <p class="section-subtitle">Now we align your goals with the support you actually need to get there.</p>
+
+                <div class="form-group">
+                    <label class="form-label required">What's your biggest goal for the next 6 months?</label>
+                    <textarea name="shortTermGoal" class="form-textarea" placeholder="Specific, measurable outcome..." required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">12-month vision</label>
+                    <textarea name="mediumTermGoal" class="form-textarea" placeholder="Where do you want the business to be?"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label required">Where do you need the most help right now?</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="supportArea" value="Sales & lead generation">
+                            <label>Sales & lead generation</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="supportArea" value="Marketing & positioning">
+                            <label>Marketing & brand positioning</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="supportArea" value="Financial management">
+                            <label>Financial management & cash flow</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="supportArea" value="Operations & systems">
+                            <label>Operations & systems setup</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="supportArea" value="Team & leadership">
+                            <label>Team building & leadership</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" name="supportArea" value="Strategy & growth">
+                            <label>Strategy & growth planning</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Any other comments or context?</label>
+                    <textarea name="additionalComments" class="form-textarea" placeholder="Anything else we should know?"></textarea>
+                </div>
+            </section>
+
+            <!-- SECTION 8: SUMMARY & SUBMIT -->
+            <section class="section" data-section="8">
+                <h2 class="section-title">Review & Submit</h2>
+                <p class="section-subtitle">Here's your assessment snapshot. Review and submit when ready.</p>
+
+                <button type="button" class="export-button" onclick="exportToPDF()">📥 Download PDF Report</button>
+
+                <div id="scoreDisplay" class="score-display"></div>
+
+                <div class="summary-section" id="summaryContent">
+                    <p style="text-align: center; color: var(--text-gray);">Summary will appear here...</p>
+                </div>
+
+                <div class="cta-box">
+                    <strong>What happens next?</strong> Submit this assessment and our team will analyze your responses within 48 hours. We'll identify your key opportunities and send you personalized recommendations—no fluff, just actionable insights.
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="dataConsent" required>
+                        <span>I confirm this information is accurate and authorize The Leadlab to use it for business diagnostics and follow-up recommendations.</span>
+                    </label>
+                </div>
+            </section>
+
+            <!-- SUCCESS MESSAGE -->
+            <div class="section" id="successSection" style="text-align: center;">
+                <div class="success-message">
+                    <h2>✓ Assessment Submitted</h2>
+                    <p style="font-size: 16px; margin-top: 12px;">Your honest answers are being reviewed.</p>
+                    <p style="margin-top: 20px; color: var(--text-gray); font-size: 14px;">We'll analyze your responses and send personalized, no-nonsense recommendations within 48 hours. Check your email—nothing generic, just solutions tailored to your real challenges.</p>
+                    <div class="cta-box" style="margin-top: 30px; text-align: left;">
+                        <strong>In the meantime:</strong>
+                        <ul style="margin: 10px 0 0 20px; font-size: 13px; line-height: 1.6;">
+                            <li>Review your assessment PDF (check your downloads)</li>
+                            <li>Prepare any additional context for our team</li>
+                            <li>Have questions? Reply to the email we send</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NAVIGATION -->
+            <div class="button-group" id="navigationButtons">
+                <button type="button" class="btn btn-secondary" id="prevBtn" onclick="changeSection(-1)" style="display: none;">← Previous</button>
+                <button type="button" class="btn btn-primary" id="nextBtn" onclick="changeSection(1)">Next →</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        let currentSection = 1;
+        const totalSections = 8;
+
+        function showSection(n) {
+            const sections = document.querySelectorAll('.section');
+            const navigationButtons = document.getElementById('navigationButtons');
+
+            if (n > totalSections) n = totalSections;
+            if (n < 1) n = 1;
+            currentSection = n;
+
+            sections.forEach(section => section.classList.remove('active'));
+            if (sections[n - 1]) {
+                sections[n - 1].classList.add('active');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+
+            // Update progress bar
+            const progress = ((n - 1) / totalSections) * 100;
+            document.getElementById('progressFill').style.width = progress + '%';
+
+            // Update buttons
+            document.getElementById('prevBtn').style.display = n === 1 ? 'none' : 'block';
+
+            if (n === totalSections) {
+                document.getElementById('nextBtn').textContent = 'Submit';
+                document.getElementById('nextBtn').onclick = () => submitForm();
+            } else {
+                document.getElementById('nextBtn').textContent = 'Next →';
+                document.getElementById('nextBtn').onclick = () => changeSection(1);
+            }
+
+            if (n === totalSections) {
+                generateSummary();
+            }
+
+            navigationButtons.style.display = n === totalSections + 1 ? 'none' : 'flex';
+        }
+
+        function changeSection(direction) {
+            if (validateSection(currentSection)) {
+                showSection(currentSection + direction);
+            }
+        }
+
+        function validateSection(n) {
+            const section = document.querySelectorAll('.section')[n - 1];
+            const requiredFields = section.querySelectorAll('[required]');
+
+            for (let field of requiredFields) {
+                if (!field.value || (field.type === 'checkbox' && !field.checked)) {
+                    alert('Please fill in all required fields before proceeding.');
+                    field.focus();
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function toggleField(fieldId, show) {
+            const field = document.getElementById(fieldId);
+            if (show) {
+                field.classList.add('show');
+            } else {
+                field.classList.remove('show');
+            }
+        }
+
+        function generateSummary() {
+            const formData = new FormData(document.getElementById('diagnosticForm'));
+            let summary = '';
+
+            // Calculate health score (0-100)
+            const healthScore = calculateHealthScore(formData);
+            const urgencyScore = calculateUrgencyScore(formData);
+
+            // Display scores
+            const scoreHTML = `
+                <div class="score-card">
+                    <div class="score-number">${healthScore}</div>
+                    <div class="score-label">Business Health</div>
+                </div>
+                <div class="score-card">
+                    <div class="score-number">${urgencyScore}</div>
+                    <div class="score-label">Priority Level</div>
+                </div>
+            `;
+            document.getElementById('scoreDisplay').innerHTML = scoreHTML;
+
+            summary = `
+                <h3 style="margin-bottom: 16px; color: var(--text-dark);">Your Assessment Snapshot</h3>
+                <div class="summary-item">
+                    <div class="summary-label">Business Name</div>
+                    <div class="summary-value">${formData.get('businessName') || 'Not provided'}</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">Industry</div>
+                    <div class="summary-value">${formData.get('industry') || 'Not provided'}</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">Team Size</div>
+                    <div class="summary-value">${formData.get('fullTimeEmployees') || '0'} full-time, ${formData.get('partTimeEmployees') || '0'} part-time</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">Annual Revenue</div>
+                    <div class="summary-value">${formData.get('annualRevenue') || 'Not provided'}</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">Geographic Reach</div>
+                    <div class="summary-value">${formData.get('geoReach') || 'Not provided'}</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">Top Priority</div>
+                    <div class="summary-value" style="font-weight: 500;">${formData.get('topPriority') || 'Not provided'}</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">Support Needed</div>
+                    <div class="summary-value">${Array.from(formData.getAll('supportArea')).join(', ') || 'Not specified'}</div>
+                </div>
+            `;
+
+            document.getElementById('summaryContent').innerHTML = summary;
+        }
+
+        function calculateHealthScore(formData) {
+            let score = 100;
+            
+            // Deduct points based on status
+            if (formData.get('profitStatus') === 'Loss') score -= 25;
+            else if (formData.get('profitStatus') === 'Break-even') score -= 12;
+            
+            if (formData.get('annualRevenue') === 'Under €50k') score -= 15;
+            
+            const ftEmployees = parseInt(formData.get('fullTimeEmployees')) || 0;
+            if (ftEmployees === 0) score -= 10;
+            
+            return Math.max(10, score);
+        }
+
+        function calculateUrgencyScore(formData) {
+            let urgency = 0;
+            
+            if (formData.get('profitStatus') === 'Loss') urgency += 30;
+            if (formData.get('profitStatus') === 'Break-even') urgency += 20;
+            
+            if (formData.get('recurringCustomers') === 'No') urgency += 15;
+            
+            const supportAreas = formData.getAll('supportArea');
+            if (supportAreas.length >= 4) urgency += 20;
+            if (supportAreas.length >= 2) urgency += 10;
+            
+            return Math.min(100, urgency);
+        }
+
+        function exportToPDF() {
+            const formData = new FormData(document.getElementById('diagnosticForm'));
+            const timestamp = new Date().toLocaleDateString();
+            
+            let pdfContent = `BUSINESS DIAGNOSTIC ASSESSMENT REPORT
+The Leadlab • ${timestamp}
+
+BUSINESS OVERVIEW
+================
+Business Name: ${formData.get('businessName') || 'Not provided'}
+Website: ${formData.get('website') || 'Not provided'}
+Industry: ${formData.get('industry') || 'Not provided'}
+Geographic Reach: ${formData.get('geoReach') || 'Not provided'}
+
+FINANCIAL SNAPSHOT
+==================
+Annual Revenue: ${formData.get('annualRevenue') || 'Not provided'}
+Profit Status: ${formData.get('profitStatus') || 'Not provided'}
+Team Size: ${formData.get('fullTimeEmployees') || '0'} FT, ${formData.get('partTimeEmployees') || '0'} PT
+
+KEY CHALLENGES
+==============
+Top Priority: ${formData.get('topPriority') || 'Not provided'}
+
+Internal Challenges:
+${formData.get('internalChallenges') || 'Not provided'}
+
+External Challenges:
+${formData.get('externalChallenges') || 'Not provided'}
+
+SUPPORT NEEDED
+==============
+${Array.from(formData.getAll('supportArea')).join('\n') || 'Not specified'}
+
+---
+Assessment submitted on ${timestamp}
+`;
+
+            const element = document.createElement('a');
+            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(pdfContent));
+            element.setAttribute('download', `business-diagnostic-${Date.now()}.txt`);
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        }
+
+        function submitForm() {
+            if (validateSection(currentSection)) {
+                const form = document.getElementById('diagnosticForm');
+                const formData = new FormData(form);
+
+                // Here you would normally send data to a server
+                console.log('Form Data:', Object.fromEntries(formData));
+
+                // Show success
+                document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+                document.getElementById('successSection').classList.add('active');
+                document.getElementById('navigationButtons').style.display = 'none';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+
+                // Optional: Send to backend
+                // fetch('/api/diagnostic-form', { method: 'POST', body: formData })
+                //     .then(r => r.json())
+                //     .then(data => console.log(data));
+            }
+        }
+
+        // Initialize
+        showSection(1);
+
+        // Real-time character counting for textareas
+        document.querySelectorAll('.form-textarea').forEach(textarea => {
+            textarea.addEventListener('input', function() {
+                const chars = this.value.length;
+                if (chars > 500 && chars % 50 === 0) {
+                    this.style.minHeight = Math.min(this.scrollHeight + 10, 300) + 'px';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
