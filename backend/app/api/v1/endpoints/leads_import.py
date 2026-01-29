@@ -221,7 +221,6 @@ async def import_leads_from_csv(
             successful_imports = []
             failed_imports = []
             leads_to_create = []
-
             # Define field mappings from CSV columns to database fields
             field_mappings = {
                 "first_name": ["first_name", "firstname", "first"],
@@ -260,7 +259,7 @@ async def import_leads_from_csv(
                             else:
                                 value = clean_value(value)
                             lead_data[db_field] = value
-
+                    
                     # Add required and special fields
                     lead_data.update({
                         "psychometrics": None,  # Initialize as None since it's JSON field
@@ -278,7 +277,7 @@ async def import_leads_from_csv(
                     if email_value and str(email_value).strip() and str(email_value).lower() != "nan":
                         email_value = str(email_value).strip()
                         lead_data["email"] = email_value
-
+                        
                         # Check for duplicate email only if email is provided
                         existing_lead = crud.lead.get_by_email(db, email=email_value)
                         if existing_lead:
@@ -296,11 +295,7 @@ async def import_leads_from_csv(
                     successful_imports.append(index + 2)
 
                 except Exception as e:
-                    import traceback
-                    error_details = traceback.format_exc()
-                    logger.error(f"Error processing row {index + 2}: {str(e)}")
-                    logger.error(f"Error details: {error_details}")
-                    logger.error(f"Lead data keys: {list(lead_data.keys()) if 'lead_data' in locals() else 'N/A'}")
+                    logger.exception(f"Error processing row {index + 2}: {str(e)}")
                     failed_imports.append({
                         "row": index + 2,
                         "error": str(e)
@@ -311,7 +306,7 @@ async def import_leads_from_csv(
                 try:
                     created_leads = crud.lead.create_bulk(db, obj_in_list=leads_to_create)
                     logger.info(f"Successfully created {len(created_leads)} leads")
-
+                    
                     # Add tag to created leads if a tag is provided
                     if tag and created_leads:
                         try:
