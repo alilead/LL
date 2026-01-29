@@ -1,7 +1,19 @@
-from typing import Optional, List
-from pydantic import BaseModel, Field
+from typing import Optional, List, Any
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 from app.models.task import TaskPriority, TaskStatus
+
+
+def _normalize_priority(v: Any) -> Any:
+    if isinstance(v, str):
+        return v.upper().strip()
+    return v
+
+
+def _normalize_status(v: Any) -> Any:
+    if isinstance(v, str):
+        return v.upper().strip().replace("-", "_")
+    return v
 
 # Lead information schema
 class LeadInfo(BaseModel):
@@ -39,7 +51,17 @@ class TaskBase(BaseModel):
 # Properties to receive via API on creation
 class TaskCreate(TaskBase):
     organization_id: int = Field(..., description="Organization ID is required for task creation")
-    
+
+    @field_validator("priority", mode="before")
+    @classmethod
+    def priority_upper(cls, v: Any) -> Any:
+        return _normalize_priority(v)
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def status_upper(cls, v: Any) -> Any:
+        return _normalize_status(v)
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -61,6 +83,21 @@ class TaskUpdate(BaseModel):
     due_date: Optional[datetime] = None
     priority: Optional[TaskPriority] = None
     status: Optional[TaskStatus] = None
+
+    @field_validator("priority", mode="before")
+    @classmethod
+    def priority_upper(cls, v: Any) -> Any:
+        if v is None:
+            return v
+        return _normalize_priority(v)
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def status_upper(cls, v: Any) -> Any:
+        if v is None:
+            return v
+        return _normalize_status(v)
+
     lead_id: Optional[int] = None
     assigned_to_id: Optional[int] = None
     completed_at: Optional[datetime] = None

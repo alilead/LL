@@ -120,36 +120,38 @@ export function ModernDashboard() {
           <p className="text-sm text-neutral-600 dark:text-neutral-400">Total Leads</p>
         </div>
 
-        {/* Pipeline Value */}
+        {/* Pipeline Value - from API */}
         <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 border border-neutral-200 dark:border-neutral-700 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
               <DollarSign className="w-6 h-6 text-green-600 dark:text-green-400" />
             </div>
-            <span className="flex items-center text-sm font-medium text-green-600 dark:text-green-400">
-              <ArrowUp className="w-4 h-4 mr-1" />
-              15%
-            </span>
+            {dashboardStats.opportunities?.total != null && (
+              <span className="text-sm font-medium text-neutral-600 dark:text-neutral-400">
+                {dashboardStats.opportunities.total} deals
+              </span>
+            )}
           </div>
           <h3 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-1">
-            ${(pipelineValue / 1000).toFixed(1)}K
+            ${typeof pipelineValue === 'number' ? (pipelineValue / 1000).toFixed(1) : '0'}K
           </h3>
           <p className="text-sm text-neutral-600 dark:text-neutral-400">Pipeline Value</p>
         </div>
 
-        {/* Conversion Rate */}
+        {/* Conversion Rate - from API */}
         <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 border border-neutral-200 dark:border-neutral-700 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center">
               <TrendingUp className="w-6 h-6 text-purple-600 dark:text-purple-400" />
             </div>
-            <span className="flex items-center text-sm font-medium text-green-600 dark:text-green-400">
-              <ArrowUp className="w-4 h-4 mr-1" />
-              3.2%
-            </span>
+            {dashboardStats.opportunities?.won != null && (
+              <span className="text-sm font-medium text-neutral-600 dark:text-neutral-400">
+                {dashboardStats.opportunities.won} won
+              </span>
+            )}
           </div>
           <h3 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-1">
-            {conversionRate.toFixed(1)}%
+            {typeof conversionRate === 'number' ? conversionRate.toFixed(1) : '0'}%
           </h3>
           <p className="text-sm text-neutral-600 dark:text-neutral-400">Conversion Rate</p>
         </div>

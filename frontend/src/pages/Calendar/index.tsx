@@ -909,10 +909,10 @@ export const CalendarPage = () => {
           }}
         >
           <DialogContent 
-            className="sm:max-w-[600px] p-0 overflow-hidden rounded-2xl border-0 shadow-xl"
+            className="sm:max-w-[600px] max-h-[90vh] p-0 overflow-hidden rounded-2xl border-0 shadow-xl flex flex-col"
             showCloseButton={false}
           >
-            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-5 border-b border-gray-100 relative">
+            <div className="flex-shrink-0 bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-5 border-b border-gray-100 relative">
               <DialogTitle className="text-xl font-semibold text-gray-900 flex items-center gap-3">
                 <div className="p-2 bg-indigo-100 rounded-lg">
                   <CalendarIcon className="h-5 w-5 text-indigo-600" />
@@ -929,7 +929,7 @@ export const CalendarPage = () => {
               </Button>
             </div>
             
-            <div className="px-6 py-6">
+            <div className="flex-1 overflow-y-auto min-h-0 px-6 py-6">
               <div className="space-y-6">
                 <div>
                   <Label htmlFor="title" className="text-sm font-semibold text-gray-700 block mb-2">
@@ -1067,7 +1067,7 @@ export const CalendarPage = () => {
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3">
+            <div className="flex-shrink-0 px-6 py-4 border-t bg-gray-50 flex justify-end gap-3">
               <Button 
                 variant="outline" 
                 onClick={() => setNewEventDialogOpen(false)}

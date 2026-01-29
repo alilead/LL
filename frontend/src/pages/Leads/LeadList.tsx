@@ -834,9 +834,15 @@ export function LeadList() {
       setIsImportDialogOpen(false);
       setSelectedFile(null);
       refetch(); // Refresh the leads list
-    } catch (error) {
+    } catch (error: any) {
       console.error('Import error:', error);
-      toast.error('Failed to import leads');
+      const detail = error?.response?.data?.detail;
+      const message = typeof detail === 'string'
+        ? (detail.length > 300 ? detail.slice(0, 300) + '…' : detail)
+        : Array.isArray(detail)
+          ? detail.map((e: any) => e?.msg || JSON.stringify(e)).join('; ').slice(0, 300)
+          : 'Failed to import leads. Check file format and that required columns (e.g. email) are present.';
+      toast.error(message);
     } finally {
       setIsImporting(false);
     }

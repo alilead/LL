@@ -27,6 +27,21 @@ def clean_value(value):
         return cleaned if cleaned else None
     return value
 
+
+# String fields that should show "N/A" when empty (email excluded to avoid duplicate placeholder)
+_STRING_FIELDS_FOR_NA = {
+    "first_name", "last_name", "job_title", "company", "linkedin", "location",
+    "country", "website", "telephone", "mobile", "sector", "time_in_current_role",
+    "lab_comments", "client_comments", "source",
+}
+
+
+def _empty_cells_as_na(lead_data: dict) -> None:
+    """Replace None in string fields with 'N/A' so leads are created and display N/A for empty cells."""
+    for key in _STRING_FIELDS_FOR_NA:
+        if key in lead_data and lead_data[key] is None:
+            lead_data[key] = "N/A"
+
 @router.post("/import/csv", response_model=GenericResponse)
 async def import_leads_from_csv(
     *,
@@ -288,6 +303,9 @@ async def import_leads_from_csv(
                             continue
                     else:
                         lead_data["email"] = None
+
+                    # Put empty cells as N/A so leads are created and display N/A in the UI
+                    _empty_cells_as_na(lead_data)
 
                     # Create LeadCreate instance
                     lead_create = schemas.LeadCreate(**lead_data)
