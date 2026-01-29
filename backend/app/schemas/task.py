@@ -1,5 +1,5 @@
-from typing import Optional, List
-from pydantic import BaseModel, Field
+from typing import Optional, List, Any
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 from app.models.task import TaskPriority, TaskStatus
 
@@ -36,10 +36,42 @@ class TaskBase(BaseModel):
     assigned_to_id: Optional[int] = None
     organization_id: int
 
+def _normalize_priority(v: Any) -> Any:
+    """Normalize priority string to enum (e.g. low, Medium, high, urgent -> LOW, MEDIUM, HIGH, URGENT)."""
+    if isinstance(v, str):
+        s = v.upper().strip()
+        try:
+            return TaskPriority(s)
+        except ValueError:
+            return v
+    return v
+
+
+def _normalize_status(v: Any) -> Any:
+    """Normalize status string to enum (e.g. pending, in_progress, completed, cancelled)."""
+    if isinstance(v, str):
+        s = v.upper().strip().replace("-", "_")
+        try:
+            return TaskStatus(s)
+        except ValueError:
+            return v
+    return v
+
+
 # Properties to receive via API on creation
 class TaskCreate(TaskBase):
     organization_id: int = Field(..., description="Organization ID is required for task creation")
-    
+
+    @field_validator("priority", mode="before")
+    @classmethod
+    def priority_upper(cls, v: Any) -> Any:
+        return _normalize_priority(v)
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def status_upper(cls, v: Any) -> Any:
+        return _normalize_status(v)
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -64,6 +96,21 @@ class TaskUpdate(BaseModel):
     lead_id: Optional[int] = None
     assigned_to_id: Optional[int] = None
     completed_at: Optional[datetime] = None
+
+    @field_validator("priority", mode="before")
+    @classmethod
+    def priority_upper(cls, v: Any) -> Any:
+        if v is None:
+            return v
+        return _normalize_priority(v)
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def status_upper(cls, v: Any) -> Any:
+        if v is None:
+            return v
+        return _normalize_status(v)
+
 
 # Properties stored in DB
 class TaskInDB(TaskBase):
