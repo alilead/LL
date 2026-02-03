@@ -98,8 +98,7 @@ class CRUDLead(CRUDBase[Lead, LeadCreate, LeadUpdate]):
         total = query.count()
         logger.info(f"Total leads before pagination: {total}")
         logger.info(f"Returning {limit} leads after pagination")
-        
-        return query.offset(skip).limit(limit).all()
+        return query.offset(skip).limit(limit).all(), total
 
     def count(
         self,
@@ -314,7 +313,9 @@ class CRUDLead(CRUDBase[Lead, LeadCreate, LeadUpdate]):
             # Ensure tags is initialized as an empty list, not None
             if 'tags' not in obj_in_data or obj_in_data['tags'] is None:
                 obj_in_data['tags'] = []
-                
+            # Lead model has read-only property email_guidelines; do not pass it to constructor
+            obj_in_data.pop("email_guidelines", None)
+
             db_obj = Lead(**obj_in_data)
             db_objs.append(db_obj)
             

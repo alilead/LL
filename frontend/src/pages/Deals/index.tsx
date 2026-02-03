@@ -179,18 +179,9 @@ export const DealsPage = () => {
     },
   });
 
-  // Data processing - Fix the data extraction
-  const rawDeals = dealsData?.items || dealsData?.data?.items || dealsData?.data || [];
-  console.log('=== DEALS DEBUG ===');
-  console.log('Full dealsData:', dealsData);
-  console.log('dealsData?.data:', dealsData?.data);
-  console.log('dealsData?.items:', dealsData?.items);
-  console.log('dealsData?.data?.items:', dealsData?.data?.items);
-  console.log('rawDeals:', rawDeals);
+  // Data processing - support both { items, total } and nested { data: { items } }
+  const rawDeals = dealsData?.items ?? dealsData?.data?.items ?? (Array.isArray(dealsData?.data) ? dealsData.data : []) ?? [];
   const allDeals: Deal[] = Array.isArray(rawDeals) ? rawDeals : [];
-  console.log('Final deals array:', allDeals);
-  console.log('Deals length:', allDeals.length);
-  console.log('=== END DEBUG ===');
 
   // Filter deals based on search term and selected filter
   const deals = React.useMemo(() => {
@@ -198,7 +189,6 @@ export const DealsPage = () => {
 
     // Apply search filter
     if (searchTerm) {
-      console.log('Filtering deals with searchTerm:', searchTerm);
       filtered = filtered.filter((deal: Deal) => 
         deal.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         deal.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -276,7 +266,6 @@ export const DealsPage = () => {
       filtered = filtered.filter((deal: Deal) => selectedStages.includes(deal.status));
     }
 
-    console.log('Filtered deals result:', filtered.length);
     return filtered;
   }, [allDeals, searchTerm, selectedFilter, user?.id, dateRange, amountRange, selectedStages]);
   

@@ -105,7 +105,8 @@ export const router = createBrowserRouter([
             path: '/tasks',
             children: [
               { index: true, element: <ModernTasks /> },
-              { path: 'new', element: <ModernNewTask /> }
+              { path: 'new', element: <ModernNewTask /> },
+              { path: ':id', element: <Navigate to="/tasks" replace /> }
             ]
           },
           {

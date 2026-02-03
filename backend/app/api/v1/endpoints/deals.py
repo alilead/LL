@@ -1,7 +1,8 @@
 from typing import List, Optional, Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, Query, Body, status
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, func
+from sqlalchemy import desc, func, text
+from sqlalchemy.exc import IntegrityError
 from decimal import Decimal
 
 from app.api import deps
@@ -60,11 +61,10 @@ def create_deal(
     # Create the deal
     deal = crud_deal.deal.create(db=db, obj_in=deal_in)
     
-    # Log activity for deal creation
+    # Log activity for deal creation (non-blocking; fix sequence if UniqueViolation)
     try:
-        # Create activity for deal creation
         from app.models.activity import Activity, ActivityType
-        
+
         activity = Activity(
             type=ActivityType.NOTE,
             description=f"Deal created: {deal.name}",
@@ -75,12 +75,22 @@ def create_deal(
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
-        
         db.add(activity)
         db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        if "activities_pkey" in str(e) or "UniqueViolation" in str(e):
+            try:
+                db.execute(text(
+                    "SELECT setval(pg_get_serial_sequence('activities', 'id'), COALESCE((SELECT MAX(id) FROM activities), 1))"
+                ))
+                db.commit()
+            except Exception as seq_e:
+                logger.warning("Could not reset activities sequence: %s", seq_e)
+        logger.warning("Activity creation failed for deal (deal still created): %s", e)
     except Exception as e:
-        # Log error but don't fail the request
-        print(f"Error creating activity for deal creation: {str(e)}")
+        db.rollback()
+        logger.warning("Error creating activity for deal creation: %s", e)
     
     # Şema uyumsuzluğunu çözmek için manuel olarak DealSchema'ya dönüştürüyoruz
     deal_schema = DealSchema.model_validate(deal)
@@ -139,14 +149,12 @@ def update_deal(
     # Update the deal
     deal = crud_deal.deal.update(db=db, db_obj=deal, obj_in=deal_in)
     
-    # Log activity for deal update
+    # Log activity for deal update (non-blocking; fix sequence if UniqueViolation)
     try:
-        # Create activity for deal update
         from app.models.activity import Activity, ActivityType
-        
-        # Determine what was updated
+
         description = "Deal updated"
-        if "status" in deal_in.dict(exclude_unset=True):
+        if "status" in deal_in.model_dump(exclude_unset=True):
             description = f"Deal status changed to {deal.status}"
             if deal.status == "Closed_Won":
                 description = "Deal won"
@@ -155,7 +163,7 @@ def update_deal(
             activity_type = ActivityType.STAGE_CHANGE
         else:
             activity_type = ActivityType.NOTE
-        
+
         activity = Activity(
             type=activity_type,
             description=description,
@@ -166,12 +174,22 @@ def update_deal(
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
-        
         db.add(activity)
         db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        if "activities_pkey" in str(e) or "UniqueViolation" in str(e):
+            try:
+                db.execute(text(
+                    "SELECT setval(pg_get_serial_sequence('activities', 'id'), COALESCE((SELECT MAX(id) FROM activities), 1))"
+                ))
+                db.commit()
+            except Exception as seq_e:
+                logger.warning("Could not reset activities sequence: %s", seq_e)
+        logger.warning("Activity creation failed for deal update: %s", e)
     except Exception as e:
-        # Log error but don't fail the request
-        print(f"Error creating activity for deal update: {str(e)}")
+        db.rollback()
+        logger.warning("Error creating activity for deal update: %s", e)
     
     # Şema uyumsuzluğunu çözmek için manuel olarak DealSchema'ya dönüştürüyoruz
     deal_schema = DealSchema.model_validate(deal)

@@ -1,6 +1,8 @@
 from typing import List, Optional, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from app.api import deps
 from app.crud import crud_task
 from app.models.user import User
@@ -51,15 +53,13 @@ def create_task(
     # Create the task
     task = crud_task.task.create(db, obj_in=task_in)
     
-    # Log activity for task creation
+    # Log activity for task creation (non-blocking; fix sequence if UniqueViolation)
     try:
-        # Create activity for task creation
         from app.models.activity import Activity, ActivityType
-        
-        # Determine related entity
-        lead_id = task_in.lead_id if hasattr(task_in, 'lead_id') else None
-        deal_id = task_in.deal_id if hasattr(task_in, 'deal_id') else None
-        
+
+        lead_id = getattr(task_in, "lead_id", None)
+        deal_id = getattr(task_in, "deal_id", None)
+
         activity = Activity(
             type=ActivityType.TASK_CREATED,
             description=f"Task created: {task.title}",
@@ -70,13 +70,23 @@ def create_task(
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
-        
         db.add(activity)
         db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        if "activities_pkey" in str(e) or "UniqueViolation" in str(e):
+            try:
+                db.execute(text(
+                    "SELECT setval(pg_get_serial_sequence('activities', 'id'), COALESCE((SELECT MAX(id) FROM activities), 1))"
+                ))
+                db.commit()
+            except Exception as seq_e:
+                logger.warning("Could not reset activities sequence: %s", seq_e)
+        logger.warning("Activity creation failed for task (task still created): %s", e)
     except Exception as e:
-        # Log error but don't fail the request
-        print(f"Error creating activity for task creation: {str(e)}")
-    
+        db.rollback()
+        logger.warning("Error creating activity for task creation: %s", e)
+
     return task
 
 @router.get("/{task_id}", response_model=Task)
@@ -132,22 +142,20 @@ def update_task(
     # Update the task
     task = crud_task.task.update(db, db_obj=task, obj_in=task_in)
     
-    # Log activity for task update
+    # Log activity for task update (non-blocking; fix sequence if UniqueViolation)
     try:
-        # Create activity for task update
         from app.models.activity import Activity, ActivityType
-        
-        # Determine related entity
-        lead_id = task.lead_id if hasattr(task, 'lead_id') else None
-        deal_id = task.deal_id if hasattr(task, 'deal_id') else None
-        
+
+        lead_id = getattr(task, "lead_id", None)
+        deal_id = getattr(task, "deal_id", None)
+
         if task_completed:
             activity_type = ActivityType.TASK_COMPLETED
             description = f"Task completed: {task.title}"
         else:
             activity_type = ActivityType.NOTE
             description = f"Task updated: {task.title}"
-        
+
         activity = Activity(
             type=activity_type,
             description=description,
@@ -158,13 +166,23 @@ def update_task(
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
-        
         db.add(activity)
         db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        if "activities_pkey" in str(e) or "UniqueViolation" in str(e):
+            try:
+                db.execute(text(
+                    "SELECT setval(pg_get_serial_sequence('activities', 'id'), COALESCE((SELECT MAX(id) FROM activities), 1))"
+                ))
+                db.commit()
+            except Exception as seq_e:
+                logger.warning("Could not reset activities sequence: %s", seq_e)
+        logger.warning("Activity creation failed for task update: %s", e)
     except Exception as e:
-        # Log error but don't fail the request
-        print(f"Error creating activity for task update: {str(e)}")
-    
+        db.rollback()
+        logger.warning("Error creating activity for task update: %s", e)
+
     return task
 
 @router.delete("/{task_id}", response_model=Task)

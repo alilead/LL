@@ -255,13 +255,17 @@ export const leadsAPI = {
     assigned_to_id?: number;
     skip?: number;
     limit?: number;
+    tag_id?: number;
   }): Promise<any> => {
     const response = await api.get('/leads/', { params });
     const data = response.data;
-    // Backend returns array, wrap it in expected format
+    // Backend returns LeadListResponse { results, total, page, size, has_more } or legacy array
+    if (data && typeof data === 'object' && 'results' in data) {
+      return { results: data.results || [], total: data.total ?? 0, page: data.page ?? 0, limit: data.size ?? params?.limit ?? 20 };
+    }
     return {
-      results: Array.isArray(data) ? data : data.results || [],
-      total: Array.isArray(data) ? data.length : data.total || 0,
+      results: Array.isArray(data) ? data : [],
+      total: Array.isArray(data) ? data.length : 0,
       page: params?.skip ? Math.floor(params.skip / (params.limit || 20)) : 0,
       limit: params?.limit || 20
     };

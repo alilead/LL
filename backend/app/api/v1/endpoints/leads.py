@@ -107,8 +107,8 @@ def get_lead_statistics(
             detail=f"An error occurred while retrieving lead statistics: {str(e)}"
         )
 
-@router.get("", response_model=List[schemas.Lead])
-@router.get("/", response_model=List[schemas.Lead])
+@router.get("", response_model=schemas.LeadListResponse)
+@router.get("/", response_model=schemas.LeadListResponse)
 def read_leads(
     db: Session = Depends(deps.get_db),
     current_user: models.User = Depends(deps.get_current_user),
@@ -135,8 +135,8 @@ def read_leads(
                     detail="Invalid tag ID format"
                 )
 
-        # Get leads with organization filter
-        leads = crud.lead.get_multi(
+        # Get leads with organization filter (returns list and total count)
+        leads, total = crud.lead.get_multi(
             db=db,
             skip=skip,
             limit=limit,
@@ -148,12 +148,16 @@ def read_leads(
             is_admin=current_user.is_admin
         )
 
-        # Psychometrics is now automatically corrected via hybrid_property
+        logger.info(f"Total leads before pagination: {total}")
+        logger.info(f"Returning {len(leads)} leads after pagination")
 
-        logger.info(f"Total leads before pagination: {len(leads)}")
-        logger.info(f"Returning {limit} leads after pagination")
-        
-        return leads
+        return schemas.LeadListResponse(
+            results=leads,
+            total=total,
+            page=skip // limit if limit else 0,
+            size=limit,
+            has_more=(skip + len(leads)) < total,
+        )
         
     except Exception as e:
         logger.error(f"Error retrieving leads: {str(e)}")
