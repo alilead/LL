@@ -314,7 +314,10 @@ class CRUDLead(CRUDBase[Lead, LeadCreate, LeadUpdate]):
             # Ensure tags is initialized as an empty list, not None
             if 'tags' not in obj_in_data or obj_in_data['tags'] is None:
                 obj_in_data['tags'] = []
-                
+
+            # Exclude schema-only fields that are not DB columns
+            obj_in_data.pop("email_guidelines", None)
+
             db_obj = Lead(**obj_in_data)
             db_objs.append(db_obj)
             

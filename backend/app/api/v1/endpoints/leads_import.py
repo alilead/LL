@@ -18,13 +18,20 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Placeholders treated as empty (None); UI can show "N/A" when value is None
+EMPTY_PLACEHOLDERS = frozenset({"n/a", "na", "n.a.", "not found", "-", ".", "—", "–", ""})
+
 def clean_value(value):
-    """Clean value from NaN, empty strings, and whitespace"""
+    """Clean value: empty cells, NaN, whitespace, and placeholders like N/A or Not Found → None."""
     if pd.isna(value) or value == "" or (isinstance(value, str) and value.strip() == ""):
         return None
     if isinstance(value, str):
         cleaned = value.strip()
-        return cleaned if cleaned else None
+        if not cleaned or cleaned.lower() in EMPTY_PLACEHOLDERS:
+            return None
+        return cleaned
+    if isinstance(value, (int, float)) and pd.isna(value):
+        return None
     return value
 
 @router.post("/import/csv", response_model=GenericResponse)
@@ -222,151 +229,141 @@ async def import_leads_from_csv(
             failed_imports = []
             leads_to_create = []
 
-                # Define field mappings from CSV columns to database fields
-                field_mappings = {
-                    "first_name": ["first_name", "firstname", "first"],
-                    "last_name": ["last_name", "lastname", "last"],
-                    "email": ["email", "email_address", "emails"],
-                    "job_title": ["job_title", "jobtitle", "title", "position"],
-                    "company": ["company", "organization"],
-                    "linkedin": ["linkedin", "linkedin_url", "linkedinurl"],
-                    "location": ["location", "city"],
-                    "country": ["country"],
-                    "website": ["website", "web", "url"],
-                    "telephone": ["telephone", "phone", "tel"],
-                    "mobile": ["mobile", "cell", "mobile_phone"],
-                    "sector": ["sector", "industry"],
-                    "time_in_current_role": ["time_in_current_role", "time_in_role", "role_duration"],
-                    "lab_comments": ["lab_comments", "lab_comment", "labcomments"],
-                    "client_comments": ["client_comments", "client_comment", "clientcomments"],
-                    "source": ["source", "lead_source"]
-                }
+            # Define field mappings from CSV columns to database fields
+            field_mappings = {
+                "first_name": ["first_name", "firstname", "first"],
+                "last_name": ["last_name", "lastname", "last"],
+                "email": ["email", "email_address", "emails"],
+                "job_title": ["job_title", "jobtitle", "title", "position"],
+                "company": ["company", "organization"],
+                "linkedin": ["linkedin", "linkedin_url", "linkedinurl"],
+                "location": ["location", "city"],
+                "country": ["country"],
+                "website": ["website", "web", "url"],
+                "telephone": ["telephone", "phone", "tel"],
+                "mobile": ["mobile", "cell", "mobile_phone"],
+                "sector": ["sector", "industry"],
+                "time_in_current_role": ["time_in_current_role", "time_in_role", "role_duration"],
+                "lab_comments": ["lab_comments", "lab_comment", "labcomments", "note"],
+                "client_comments": ["client_comments", "client_comment", "clientcomments"],
+                "source": ["source", "lead_source"]
+            }
 
-                # Process each row in the DataFrame
-                for index, row in df.iterrows():
+            # Process each row in the DataFrame
+            for index, row in df.iterrows():
+                try:
+                    lead_data = {"email": None}
+                    for db_field, possible_names in field_mappings.items():
+                        matching_col = next((col for col in possible_names if col in df.columns), None)
+                        if matching_col:
+                            value = row[matching_col]
+                            if db_field in ['mobile', 'telephone']:
+                                if isinstance(value, (int, float)) and not pd.isna(value):
+                                    value = str(int(value))
+                                value = clean_value(value)
+                            else:
+                                value = clean_value(value)
+                            lead_data[db_field] = value
+
+                    wpi_raw = clean_value(row.get("wpi"))
                     try:
-                        # Map CSV columns to database fields
-                        lead_data = {"email": None}  # Initialize email to None
-                        for db_field, possible_names in field_mappings.items():
-                            # Find the first matching column name in the CSV
-                            matching_col = next((col for col in possible_names if col in df.columns), None)
-                            if matching_col:
-                                value = row[matching_col]
-                                # Special handling for mobile and telephone fields
-                                if db_field in ['mobile', 'telephone']:
-                                    if isinstance(value, (int, float)) and not pd.isna(value):
-                                        value = str(int(value))  # Convert to int first to remove decimal
-                                    value = clean_value(value)
-                                else:
-                                    value = clean_value(value)
-                                lead_data[db_field] = value
-                        
-                        # Add required and special fields
-                        lead_data.update({
-                            "psychometrics": None,  # Initialize as None since it's JSON field
-                            "wpi": float(clean_value(row.get("wpi", 0))) if clean_value(row.get("wpi", "")) else None,
-                            "stage_id": default_stage.id,
-                            "user_id": assigned_user_id,
-                            "organization_id": assigned_user.organization_id,
-                            "created_by": current_user.id,
-                            "created_at": datetime.utcnow(),
-                            "source": lead_data.get("source", "Partner")  # Set default source for imported leads
-                        })
+                        wpi_val = float(wpi_raw) if wpi_raw is not None else None
+                    except (TypeError, ValueError):
+                        wpi_val = None
+                    lead_data.update({
+                        "psychometrics": None,
+                        "wpi": wpi_val,
+                        "stage_id": default_stage.id,
+                        "user_id": assigned_user_id,
+                        "organization_id": assigned_user.organization_id,
+                        "created_by": current_user.id,
+                        "created_at": datetime.utcnow(),
+                        "source": lead_data.get("source", "Partner")
+                    })
 
-                        # Normalize email - handle empty strings, NaN, etc.
-                        email_value = lead_data.get("email")
-                        if email_value and str(email_value).strip() and str(email_value).lower() != "nan":
-                            email_value = str(email_value).strip()
-                            lead_data["email"] = email_value
-                            
-                            # Check for duplicate email only if email is provided
-                            existing_lead = crud.lead.get_by_email(db, email=email_value)
-                            if existing_lead:
-                                failed_imports.append({
-                                    "row": index + 2,
-                                    "error": f"Lead with email {email_value} already exists"
-                                })
-                                continue
-                        else:
-                            lead_data["email"] = None
+                    email_value = lead_data.get("email")
+                    if email_value and str(email_value).strip() and str(email_value).lower() != "nan":
+                        email_value = str(email_value).strip()
+                        lead_data["email"] = email_value
+                        existing_lead = crud.lead.get_by_email(db, email=email_value)
+                        if existing_lead:
+                            failed_imports.append({
+                                "row": index + 2,
+                                "error": f"Lead with email {email_value} already exists"
+                            })
+                            continue
+                    else:
+                        lead_data["email"] = None
 
-                        # Create LeadCreate instance
-                        lead_create = schemas.LeadCreate(**lead_data)
-                        leads_to_create.append(lead_create)
-                        successful_imports.append(index + 2)
+                    lead_create = schemas.LeadCreate(**lead_data)
+                    leads_to_create.append(lead_create)
+                    successful_imports.append(index + 2)
 
-                    except Exception as e:
-                        import traceback
-                        error_details = traceback.format_exc()
-                        logger.error(f"Error processing row {index + 2}: {str(e)}")
-                        logger.error(f"Error details: {error_details}")
-                        logger.error(f"Lead data keys: {list(lead_data.keys()) if 'lead_data' in locals() else 'N/A'}")
-                        failed_imports.append({
-                            "row": index + 2,
-                            "error": str(e)
-                        })
+                except Exception as e:
+                    error_details = traceback.format_exc()
+                    logger.error(f"Error processing row {index + 2}: {str(e)}")
+                    logger.error(f"Error details: {error_details}")
+                    logger.error(f"Lead data keys: {list(lead_data.keys()) if 'lead_data' in locals() else 'N/A'}")
+                    failed_imports.append({
+                        "row": index + 2,
+                        "error": str(e)
+                    })
 
-                # Bulk create all valid leads
-                if leads_to_create:
-                    try:
-                        created_leads = crud.lead.create_bulk(db, obj_in_list=leads_to_create)
-                        logger.info(f"Successfully created {len(created_leads)} leads")
-                        
-                        # Add tag to created leads if a tag is provided
-                        if tag and created_leads:
-                            try:
-                                # Add tag to each created lead
-                                for lead in created_leads:
-                                    db.execute(
-                                        models.associations.lead_tags.insert().values(
-                                            lead_id=lead.id,
-                                            tag_id=tag.id,
-                                            organization_id=lead.organization_id,
-                                            created_at=datetime.utcnow()
-                                        )
+            # Bulk create all valid leads
+            if leads_to_create:
+                try:
+                    created_leads = crud.lead.create_bulk(db, obj_in_list=leads_to_create)
+                    logger.info(f"Successfully created {len(created_leads)} leads")
+                    if tag and created_leads:
+                        try:
+                            for lead in created_leads:
+                                db.execute(
+                                    models.associations.lead_tags.insert().values(
+                                        lead_id=lead.id,
+                                        tag_id=tag.id,
+                                        organization_id=lead.organization_id,
+                                        created_at=datetime.utcnow()
                                     )
-                                db.commit()
-                                logger.info(f"Successfully tagged {len(created_leads)} leads with tag '{tag.name}'")
-                            except Exception as tag_error:
-                                logger.error(f"Error tagging leads: {str(tag_error)}")
-                                # We don't want to fail the whole import if tagging fails
-                                # Just log the error and continue
-                    except Exception as e:
-                        logger.error(f"Error during bulk creation: {str(e)}")
-                        raise HTTPException(
-                            status_code=500,
-                            detail=f"Error creating leads: {str(e)}"
-                        )
+                                )
+                            db.commit()
+                            logger.info(f"Successfully tagged {len(created_leads)} leads with tag '{tag.name}'")
+                        except Exception as tag_error:
+                            logger.error(f"Error tagging leads: {str(tag_error)}")
+                except Exception as e:
+                    logger.error(f"Error during bulk creation: {str(e)}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Error creating leads: {str(e)}"
+                    )
 
-                # Prepare response
-                total_rows = len(df)
-                successful_count = len(successful_imports)
-                failed_count = len(failed_imports)
+            total_rows = len(df)
+            successful_count = len(successful_imports)
+            failed_count = len(failed_imports)
 
-                return GenericResponse(
-                    success=True,
-                    message="Import completed",
-                    data={
-                        "total_rows": total_rows,
-                        "successful_imports": successful_count,
-                        "failed_imports": failed_count,
-                        "failed_details": failed_imports
-                    }
-                )
+            return GenericResponse(
+                success=True,
+                message="Import completed",
+                data={
+                    "total_rows": total_rows,
+                    "successful_imports": successful_count,
+                    "failed_imports": failed_count,
+                    "failed_details": failed_imports
+                }
+            )
 
-            except pd.errors.EmptyDataError:
-                logger.error("CSV file is empty or has no valid data")
-                raise HTTPException(
-                    status_code=400,
-                    detail="The CSV file is empty or has no valid data"
-                )
-            except pd.errors.ParserError as e:
-                logger.error(f"Error parsing CSV file: {str(e)}")
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Error parsing CSV file. Please ensure it's a valid CSV format: {str(e)}"
-                )
-                
+        except pd.errors.EmptyDataError:
+            logger.error("CSV file is empty or has no valid data")
+            raise HTTPException(
+                status_code=400,
+                detail="The CSV file is empty or has no valid data"
+            )
+        except pd.errors.ParserError as e:
+            logger.error(f"Error parsing CSV file: {str(e)}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Error parsing CSV file. Please ensure it's a valid CSV format: {str(e)}"
+            )
+
         except HTTPException:
             raise
         except Exception as e:
