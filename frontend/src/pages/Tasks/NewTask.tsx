@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import { ArrowLeft, Search } from 'lucide-react';
 
@@ -49,6 +49,7 @@ const TASK_STATUSES = [
 
 export const NewTaskPage = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user: currentUser, isAuthenticated, token } = useAuthStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [userSearchTerm, setUserSearchTerm] = useState('');
@@ -335,10 +336,10 @@ export const NewTaskPage = () => {
         organization_id: currentUser.organization_id
       };
       
-      const task = await tasksAPI.createTask(taskData);
-      
+      await tasksAPI.createTask(taskData);
       toast.success("Task created successfully");
-      navigate(`/tasks/${task.id}`);
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      navigate('/tasks');
     } catch (error) {
       console.error('Error creating task:', error);
       toast.error(error instanceof Error ? error.message : "Failed to create task");

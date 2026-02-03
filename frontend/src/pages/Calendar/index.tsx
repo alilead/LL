@@ -308,6 +308,7 @@ export const CalendarPage = () => {
       event_type: newEvent.event_type,
       is_all_day: newEvent.is_all_day,
       organization_id: user?.organization_id || 0,
+      user_id: user?.id ?? 0,
       timezone: selectedTimezone
     };
 
@@ -909,7 +910,7 @@ export const CalendarPage = () => {
           }}
         >
           <DialogContent 
-            className="sm:max-w-[600px] p-0 overflow-hidden rounded-2xl border-0 shadow-xl"
+            className="sm:max-w-[420px] max-h-[90vh] flex flex-col overflow-hidden p-0 rounded-2xl border-0 shadow-xl"
             showCloseButton={false}
           >
             <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-5 border-b border-gray-100 relative">
@@ -929,7 +930,7 @@ export const CalendarPage = () => {
               </Button>
             </div>
             
-            <div className="px-6 py-6">
+            <div className="px-6 py-6 overflow-y-auto flex-1 min-h-0">
               <div className="space-y-6">
                 <div>
                   <Label htmlFor="title" className="text-sm font-semibold text-gray-700 block mb-2">
