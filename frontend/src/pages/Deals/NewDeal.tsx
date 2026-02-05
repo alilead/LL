@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, ArrowLeft } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/Button';
@@ -54,6 +54,7 @@ const DEAL_STAGES = [
 
 export const NewDealPage = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user: currentUser } = useAuthStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -165,8 +166,9 @@ export const NewDealPage = () => {
       };
 
       
-      const response = await dealsAPI.create(formattedData);
-      
+      await dealsAPI.create(formattedData);
+      await queryClient.invalidateQueries({ queryKey: ['deals'] });
+
       toast({
         title: 'Success',
         description: 'Deal created successfully',

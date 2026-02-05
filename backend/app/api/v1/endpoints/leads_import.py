@@ -18,6 +18,40 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Max lengths for Lead string columns (must match backend/app/models/lead.py)
+LEAD_STRING_MAX_LENGTHS = {
+    "first_name": 100,
+    "last_name": 100,
+    "email": 255,
+    "job_title": 255,
+    "company": 200,
+    "linkedin": 500,
+    "location": 200,
+    "country": 100,
+    "website": 500,
+    "unique_lead_id": 100,
+    "est_wealth_experience": 255,
+    "telephone": 50,
+    "mobile": 50,
+    "sector": 200,
+    "time_in_current_role": 100,
+    "source": 100,
+}
+
+
+def truncate_lead_strings(lead_data: dict, row_index: int) -> int:
+    """Truncate string values in lead_data to column max lengths. Returns count truncated."""
+    truncated_count = 0
+    for field, max_len in LEAD_STRING_MAX_LENGTHS.items():
+        if field not in lead_data:
+            continue
+        value = lead_data[field]
+        if value is not None and isinstance(value, str) and len(value) > max_len:
+            lead_data[field] = value[:max_len]
+            truncated_count += 1
+            logger.debug("Truncated row=%s field=%s len %s->%s", row_index, field, len(value), max_len)
+    return truncated_count
+
 
 def clean_value(value):
     """Clean value from NaN, empty strings, and whitespace."""
@@ -256,6 +290,10 @@ async def import_leads_from_csv(
                             "error": f"Lead with email {lead_data['email']} already exists"
                         })
                         continue
+
+                truncated = truncate_lead_strings(lead_data, index + 2)
+                if truncated:
+                    logger.info("Row %s: truncated %s field(s) to fit column limits", index + 2, truncated)
 
                 lead_create = schemas.LeadCreate(**lead_data)
                 leads_to_create.append(lead_create)
