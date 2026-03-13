@@ -228,12 +228,22 @@ async def import_leads_from_csv(
 
         logger.info(f"Successfully read CSV file with {len(df)} rows")
 
-        df.columns = [col.strip().lower().replace(" ", "_").replace("-", "_") for col in df.columns]
+        # Normalize headers: strip, lowercase, spaces and dashes to underscores (so Excel template columns match)
+        def normalize_header(col):
+            if not isinstance(col, str):
+                col = str(col).strip()
+            s = col.strip().lower().replace(" ", "_").replace("-", "_")
+            while "__" in s:
+                s = s.replace("__", "_")
+            return s.strip("_") or None
+
+        df.columns = [normalize_header(col) or f"_unnamed_{i}" for i, col in enumerate(df.columns)]
 
         successful_imports = []
         failed_imports = []
         leads_to_create = []
 
+        # Map CSV column names (any subset is OK; missing headers leave that field null)
         field_mappings = {
             "first_name": ["first_name", "firstname", "first"],
             "last_name": ["last_name", "lastname", "last"],
@@ -248,18 +258,21 @@ async def import_leads_from_csv(
             "mobile": ["mobile", "cell", "mobile_phone"],
             "sector": ["sector", "industry"],
             "time_in_current_role": ["time_in_current_role", "time_in_role", "role_duration"],
-            "lab_comments": ["lab_comments", "lab_comment", "labcomments"],
+            "unique_lead_id": ["unique_lead_id", "lead_id"],
+            "lab_comments": ["lab_comments", "lab_comment", "labcomments", "note"],
             "client_comments": ["client_comments", "client_comment", "clientcomments"],
-            "source": ["source", "lead_source"]
+            "source": ["source", "lead_source"],
         }
 
         for index, row in df.iterrows():
             try:
                 lead_data = {}
                 for db_field, possible_names in field_mappings.items():
-                    matching_col = next((col for col in possible_names if col in df.columns), None)
+                    matching_col = next((c for c in possible_names if c in df.columns), None)
                     if matching_col:
                         value = row[matching_col]
+                        if hasattr(value, "iloc"):
+                            value = value.iloc[0] if len(value) else None
                         if db_field in ["mobile", "telephone"]:
                             if isinstance(value, (int, float)) and not pd.isna(value):
                                 value = str(int(value))
@@ -267,6 +280,7 @@ async def import_leads_from_csv(
                         else:
                             value = clean_value(value)
                         lead_data[db_field] = value
+                    # else: column missing -> field not set; LeadCreate will use default (None)
 
                 if "email" not in lead_data:
                     lead_data["email"] = None
@@ -374,25 +388,26 @@ async def download_csv_template(
         output = io.StringIO()
         writer = csv.writer(output)
 
+        # Headers match Excel template; any subset of columns is accepted on import
         headers = [
-            "FIRSTNAME", "LASTNAME", "COMPANY", "JOB_TITLE", "LOCATION", "COUNTRY",
-            "EMAILS", "TELEPHONE", "MOBILE", "LINKEDIN", "WEBSITE", "SECTOR",
-            "NOTE"
+            "First_Name", "Last_Name", "Company", "Job_Title", "Email", "Telephone", "Mobile",
+            "Location", "LINKEDIN", "Country", "Website", "SECTOR", "Unique_Lead_ID", "Time in Current Role",
+            "Note"
         ]
         writer.writerow(headers)
 
         sample_data = [
             [
-                "John", "Doe", "Tech Corp", "Senior Developer", "San Francisco", "USA",
-                "john.doe@techcorp.com", "+1-555-0123", "+1-555-4567",
-                "https://linkedin.com/in/johndoe", "https://techcorp.com",
-                "Technology", "Experienced developer with cloud expertise"
+                "John", "Doe", "Tech Corp", "Senior Developer", "john.doe@techcorp.com",
+                "+1-555-0123", "+1-555-4567", "San Francisco", "https://linkedin.com/in/johndoe",
+                "USA", "https://techcorp.com", "Technology", "EXT-001", "2 years",
+                "Experienced developer with cloud expertise"
             ],
             [
-                "Jane", "Smith", "Finance Inc", "Investment Manager", "London", "UK",
-                "jane.smith@financeinc.com", "+44-20-1234", "+44-77-5678",
-                "https://linkedin.com/in/janesmith", "https://financeinc.com",
-                "Finance", "Specializes in portfolio management"
+                "Jane", "Smith", "Finance Inc", "Investment Manager", "jane.smith@financeinc.com",
+                "+44-20-1234", "+44-77-5678", "London", "https://linkedin.com/in/janesmith",
+                "UK", "https://financeinc.com", "Finance", "EXT-002", "1 year",
+                "Specializes in portfolio management"
             ]
         ]
 
