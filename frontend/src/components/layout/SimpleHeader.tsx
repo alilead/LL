@@ -8,7 +8,7 @@ export function SimpleHeader() {
 
   const handleSignOut = () => {
     logout();
-    navigate('/login');
+    navigate('/signin');
   };
 
   return (

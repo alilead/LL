@@ -80,7 +80,7 @@ const AcceptInvitation: React.FC = () => {
     const loadInvitation = async () => {
       if (!token) {
         toast.error('Invalid invitation link');
-        navigate('/login');
+        navigate('/signin');
         return;
       }
 
@@ -97,7 +97,7 @@ const AcceptInvitation: React.FC = () => {
         }
       } catch (error: any) {
         toast.error(error.response?.data?.detail || 'Failed to load invitation');
-        navigate('/login');
+        navigate('/signin');
       } finally {
         setIsLoading(false);
       }
@@ -200,7 +200,7 @@ const AcceptInvitation: React.FC = () => {
             <p className="text-gray-600 mb-4">
               This invitation link is invalid or has already been used.
             </p>
-            <Button onClick={() => navigate('/login')} className="w-full">
+            <Button onClick={() => navigate('/signin')} className="w-full">
               Go to Login
             </Button>
           </CardContent>
@@ -219,7 +219,7 @@ const AcceptInvitation: React.FC = () => {
             <p className="text-gray-600 mb-4">
               This invitation has expired. Please contact your team administrator for a new invitation.
             </p>
-            <Button onClick={() => navigate('/login')} className="w-full">
+            <Button onClick={() => navigate('/signin')} className="w-full">
               Go to Login
             </Button>
           </CardContent>
@@ -415,7 +415,7 @@ const AcceptInvitation: React.FC = () => {
           <p className="text-xs text-gray-500">
             Already have an account?{' '}
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/signin')}
               className="text-blue-600 hover:text-blue-500"
             >
               Sign in here

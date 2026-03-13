@@ -40,6 +40,16 @@ The backend returns 500 and "Database connection error" when it cannot connect t
 3. In your **backend** service → **Environment**, set **DATABASE_URL** to this value.
 4. Ensure the database server allows connections from Render (firewall/security group; some providers allow “any” for public DBs).
 
+**If you want Render to use your local database:**
+
+Render runs in the cloud and **cannot** connect to `localhost` on your PC. You have two options:
+
+- **Option A – Expose your local DB to the internet (temporary/dev only):**  
+  Use a tunnel (e.g. [ngrok](https://ngrok.com)) to expose your local MySQL/Postgres port. Then set **DATABASE_URL** on Render to the tunnel URL (e.g. `mysql+pymysql://user:pass@abc123.ngrok.io:12345/leadlab`). Not recommended for production (your PC must stay on and the tunnel open).
+
+- **Option B – Use Render Postgres and copy data from local (recommended):**  
+  Keep **DATABASE_URL** on Render pointing at **Render PostgreSQL**. Create tables with `scripts/init_render_db.py`, then sync users/data from your local DB into Render (e.g. run a one-off export from local and import into Render, or use the app’s sign-up/reset-password flow on the live site). See [Users and access](USERS_AND_ACCESS.md) for step-by-step Option B (including `scripts/sync_local_to_render.py`).
+
 ---
 
 ## 4. Save and redeploy
@@ -97,6 +107,25 @@ The database **connects** but the schema was never created (no `users`, `organiz
 
 ---
 
+## 7. If you see "role \"...\" is not permitted to log in"
+
+PostgreSQL is rejecting the database user (e.g. the role was disabled or credentials were rotated). Use a **fresh** connection URL from Render.
+
+1. **Get a new connection URL from Render**
+   - Render dashboard → your **PostgreSQL** service.
+   - Open **Info** or **Connections**.
+   - If you see **Reset database password** or **Regenerate credentials**, use it so the role is allowed to log in again. Then copy the new **Internal Database URL** (and **External** if you run scripts from your PC).
+   - If there is no reset option, copy the **Internal Database URL** as shown now (Render may have updated it).
+
+2. **Update the backend**
+   - Backend service → **Environment** → set **DATABASE_URL** to the **exact** new Internal Database URL (no extra spaces, same user/password as in the dashboard).
+   - **Save** → **Manual Deploy** → **Deploy latest commit**.
+
+3. **Re-run init and reset if needed**
+   - If you regenerated the password, the database may be empty again. Run `scripts/init_render_db.py` with the new **External** URL, then `scripts/reset_password.py` if you need to set a user password.
+
+---
+
 ## Quick checklist
 
 - [ ] Backend service has **DATABASE_URL** set in Environment.
@@ -104,4 +133,5 @@ The database **connects** but the schema was never created (no `users`, `organiz
 - [ ] Database service is running (not suspended).
 - [ ] Saved env and **redeployed** the backend after changing **DATABASE_URL**.
 - [ ] If you see **"relation \"users\" does not exist"**: run `scripts/init_render_db.py` once with that **DATABASE_URL** (see section 6).
+- [ ] If you see **"role \"...\" is not permitted to log in"**: use a fresh **Internal Database URL** from the PostgreSQL service (or reset DB password); update backend **DATABASE_URL** and redeploy (see section 7).
 - [ ] Checked **Logs** for the real error if the issue persists.

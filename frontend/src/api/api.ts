@@ -30,10 +30,13 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    // If token expired, logout
+    // If token expired, logout (don't redirect on login endpoint - let form show error)
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+      const isLoginRequest = error.config?.url?.includes('/auth/login');
+      if (!isLoginRequest) {
+        localStorage.removeItem('token');
+        window.location.href = '/signin';
+      }
     }
     return Promise.reject(error);
   }

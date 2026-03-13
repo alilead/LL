@@ -25,7 +25,7 @@ export const APP_CONFIG = {
   defaultTheme: 'light',
   routes: {
     home: '/',
-    login: '/login',
+    login: '/signin',
     register: '/register',
     dashboard: '/dashboard',
     leads: '/leads',

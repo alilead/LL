@@ -171,8 +171,12 @@ api.interceptors.response.use(
 
     // 401 Unauthorized hatası - Token sorunlarını ele alma
     if (error.response.status === 401 && !originalRequest._retry) {
-      // Kritik olmayan endpointler için sessizce geçelim, kullanıcıyı logout yapmayalım
       const currentUrl = originalRequest?.url || '';
+      // Don't redirect on login endpoint - let the form show "invalid credentials"
+      if (currentUrl.includes('/auth/login')) {
+        return Promise.reject(error);
+      }
+      // Kritik olmayan endpointler için sessizce geçelim, kullanıcıyı logout yapmayalım
       const isNonCritical = nonCriticalEndpoints.some(endpoint => currentUrl.includes(endpoint));
       
       if (isNonCritical) {
