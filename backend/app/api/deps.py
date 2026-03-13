@@ -59,8 +59,8 @@ def get_db() -> Generator:
             # HTTP hataları olduğu gibi iletilsin
             raise e
         else:
-            # Diğer hatalar veritabanı hatası olarak işlensin
-            logger.error(f"Database connection error: {str(e)}")
+            # Diğer hatalar veritabanı hatası olarak işlensin (log full trace for debugging)
+            logger.error("Database connection error: %s", str(e), exc_info=True)
             raise HTTPException(
                 status_code=500,
                 detail="Database connection error. Please try again later."
