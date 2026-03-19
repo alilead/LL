@@ -1,11 +1,12 @@
 import React from 'react';
-import { Users, Building2, Info, FileSpreadsheet, Tag, Receipt } from 'lucide-react';
+import { Users, Building2, Info, FileSpreadsheet, Tag, Receipt, ClipboardList } from 'lucide-react';
 import { LeadManagement } from './LeadManagement';
 import { UserManagement } from './UserManagement';
 import { OrganizationManagement } from './OrganizationManagement';
 import { InformationRequests } from './InformationRequests';
 import TagManagement from './TagManagement';
 import { InvoiceMaker } from './InvoiceMaker';
+import { MarketingFormSubmissions } from './MarketingFormSubmissions';
 
 type Tab = {
   id: string;
@@ -57,6 +58,13 @@ const tabs: Tab[] = [
     description: 'View and manage information requests.',
     icon: Info,
     component: InformationRequests,
+  },
+  {
+    id: 'marketing-forms',
+    title: 'Marketing forms',
+    description: 'Business diagnostic, data request, and pitch-your-idea submissions.',
+    icon: ClipboardList,
+    component: MarketingFormSubmissions,
   },
 ];
 

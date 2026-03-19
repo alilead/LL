@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { toast } from 'react-hot-toast'
-import { PublicHeader } from '../components/layout/PublicHeader'
+import { MarketingNav } from '../components/marketing/MarketingNav'
 import { Mail, Phone, MapPin } from 'lucide-react'
 
 interface ContactForm {
@@ -58,9 +58,9 @@ export function Contact() {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <PublicHeader />
-      <main className="flex-1 bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="flex flex-col min-h-screen">
+      <MarketingNav />
+      <main className="flex-1 bg-gradient-to-br from-blue-50 to-indigo-100 pt-24">
         <div className="max-w-7xl mx-auto px-4 py-12">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             {/* Contact Information */}

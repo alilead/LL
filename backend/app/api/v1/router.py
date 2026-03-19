@@ -4,7 +4,8 @@ from app.api.v1.endpoints import (
     leads_import, dashboard, tasks, events, reports, advanced_reports,
     information_requests, organizations, tags, linkedin,
     tokens, notifications, contact, lead_stages, health, settings, psychometrics, files, ai_insights, messages, credits, invoices, team_invitations, email, ml,
-    territories, cpq, email_sequences, workflows, conversations, data_import, forecasting, dashboards
+    territories, cpq, email_sequences, workflows, conversations, data_import, forecasting, dashboards,
+    marketing_forms,
 )
 import logging
 
@@ -84,6 +85,9 @@ api_router.include_router(notifications.router, prefix="/notifications", tags=["
 
 # Contact routes (available in api.py)
 api_router.include_router(contact.router, prefix="/contact", tags=["contact"])
+
+# Public marketing forms (landing page — no auth)
+api_router.include_router(marketing_forms.router, prefix="/lead-forms", tags=["lead-forms"])
 
 # Health routes (FRONTEND USES /api/v1/health)
 api_router.include_router(health.router, prefix="/health", tags=["health"])

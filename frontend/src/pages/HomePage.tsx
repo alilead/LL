@@ -35,6 +35,7 @@ import {
   Activity
 } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
+import { MarketingNav } from '../components/marketing/MarketingNav'
 import { motion } from 'framer-motion'
 import CountUp from 'react-countup'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -108,84 +109,7 @@ export function HomePage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <header className="fixed w-full px-6 lg:px-8 h-20 flex items-center border-b bg-white/80 backdrop-blur-sm z-50 shadow-sm">
-        <div className="container mx-auto flex items-center justify-between">
-          <Link to="/" className="flex items-center justify-center">
-            <img 
-              src="/images/leadlab-logo.png" 
-              alt="The Lead Lab Logo" 
-              className="h-16 w-auto"
-            />
-          </Link>
-          <nav className="flex items-center space-x-8">
-            <div className="flex items-center space-x-8">
-              <a href="#about" onClick={scrollToSection('about')} className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">
-                About
-              </a>
-              <a href="#features" onClick={scrollToSection('features')} className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">
-                Features
-              </a>
-              <a href="#testimonials" onClick={scrollToSection('testimonials')} className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">
-                Testimonials
-              </a>
-              <a href="#pricing" onClick={scrollToSection('pricing')} className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">
-                Products
-              </a>
-              <a href="#packages" onClick={scrollToSection('packages')} className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">
-                Packages
-              </a>
-              <Link to="/contact" className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">
-                Contact
-              </Link>
-              <a
-                href="https://6ku5qzv6zwp.typeform.com/to/ONTHimJl"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
-              >
-                Data Request Form
-              </a>
-            </div>
-            {isAuthenticated ? (
-              <div className="flex items-center space-x-3">
-                <a
-                  href="https://calendly.com/the-leadlab"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm font-medium bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2.5 rounded-lg hover:from-green-600 hover:to-emerald-700 hover:text-white transition-all duration-300 shadow-md hover:shadow-lg flex items-center"
-                >
-                  <Calendar className="w-4 h-4 mr-2" />
-                  BOOK NOW
-                </a>
-                <Link
-                  to="/dashboard"
-                  className="text-sm font-medium bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-2.5 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-md hover:shadow-lg"
-                >
-                  Dashboard
-                </Link>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-3">
-                <a
-                  href="https://calendly.com/the-leadlab"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm font-medium bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2.5 rounded-lg hover:from-green-600 hover:to-emerald-700 hover:text-white transition-all duration-300 shadow-md hover:shadow-lg flex items-center"
-                >
-                  <Calendar className="w-4 h-4 mr-2" />
-                  BOOK NOW
-                </a>
-                <Link
-                  to="/signin"
-                  className="text-sm font-medium bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-2.5 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-md hover:shadow-lg"
-                >
-                  Sign In
-                </Link>
-              </div>
-            )}
-          </nav>
-        </div>
-      </header>
+      <MarketingNav />
 
       <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-16 pt-32">
         <main className="flex-1 space-y-24">
@@ -210,10 +134,11 @@ export function HomePage() {
                   className="space-y-6 max-w-4xl"
                 >
                   <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 animate-gradient">
-                    Transform Your Lead Generation with AI-Powered Intelligence
+                    Connecting Businesses with Qualified Leads
                   </h1>
                   <p className="mx-auto max-w-[800px] text-gray-600 md:text-xl lg:text-2xl leading-relaxed">
-                    Join industry leaders who've achieved remarkable growth with our advanced lead generation platform
+                    The Lead Lab combines verified data, psychographic insight, and a practical CRM so your team spends time
+                    with prospects who can actually buy — not chasing dead ends.
                   </p>
                 </motion.div>
 
@@ -304,6 +229,92 @@ export function HomePage() {
                   </a>
                 </motion.div>
               </div>
+            </div>
+          </section>
+
+          <section id="problems-we-solve" className="w-full py-16 md:py-20 bg-white border-y border-gray-100">
+            <div className="max-w-6xl mx-auto px-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-4">The problems we solve</h2>
+              <p className="text-center text-gray-600 max-w-2xl mx-auto mb-12">
+                Revenue teams come to us when pipeline is noisy, slow, or expensive. Here is what we fix first.
+              </p>
+              <div className="grid md:grid-cols-3 gap-8">
+                <div className="bg-gradient-to-br from-slate-50 to-blue-50/80 rounded-2xl p-8 border border-gray-100">
+                  <Clock className="w-10 h-10 text-blue-600 mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Time-consuming lead generation</h3>
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    Manual research and spreadsheet chaos steal hours from selling. We structure targeting, lists, and
+                    follow-up so reps get back to conversations.
+                  </p>
+                </div>
+                <div className="bg-gradient-to-br from-slate-50 to-indigo-50/80 rounded-2xl p-8 border border-gray-100">
+                  <Filter className="w-10 h-10 text-indigo-600 mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Inefficient lead qualification</h3>
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    Bad fits clog the funnel. We help you define ICP, disqualifiers, and handoff rules so only real
+                    opportunities reach your calendar.
+                  </p>
+                </div>
+                <div className="bg-gradient-to-br from-slate-50 to-purple-50/80 rounded-2xl p-8 border border-gray-100">
+                  <Crosshair className="w-10 h-10 text-purple-600 mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Limited targeting options</h3>
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    One-size lists do not match how you sell. We combine firmographic, behavioral, and psychographic signals
+                    where it matters for your motion.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap justify-center gap-4 mt-10">
+                <Link
+                  to="/forms/business-diagnostic"
+                  className="inline-flex items-center px-6 py-3 rounded-xl font-medium text-white bg-blue-600 hover:bg-blue-700"
+                >
+                  Business diagnostic
+                </Link>
+                <Link
+                  to="/services"
+                  className="inline-flex items-center px-6 py-3 rounded-xl font-medium border-2 border-gray-300 text-gray-800 hover:border-blue-400"
+                >
+                  Explore services
+                </Link>
+              </div>
+            </div>
+          </section>
+
+          <section id="unique-approach" className="w-full py-16 md:py-20 bg-gradient-to-br from-blue-50/50 via-white to-indigo-50/50">
+            <div className="max-w-6xl mx-auto px-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-4">Our unique approach</h2>
+              <p className="text-center text-gray-600 max-w-2xl mx-auto mb-12">
+                Three pillars that separate The Lead Lab from generic list vendors and empty &quot;AI&quot; promises.
+              </p>
+              <div className="grid md:grid-cols-3 gap-8">
+                <div className="text-center p-6">
+                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-100 text-blue-700 mb-4">
+                    <Target className="w-7 h-7" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Advanced targeting</h3>
+                  <p className="text-gray-600 text-sm">Segments, tiers, and triggers aligned to your GTM — not static CSV dumps.</p>
+                </div>
+                <div className="text-center p-6">
+                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-indigo-100 text-indigo-700 mb-4">
+                    <BarChart3 className="w-7 h-7" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Data-driven insights</h3>
+                  <p className="text-gray-600 text-sm">Psychometrics and engagement signals to sharpen messaging and timing.</p>
+                </div>
+                <div className="text-center p-6">
+                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-violet-100 text-violet-700 mb-4">
+                    <Zap className="w-7 h-7" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Automated lead nurturing</h3>
+                  <p className="text-gray-600 text-sm">Tasks, sequences, and CRM hygiene so nothing good falls through the cracks.</p>
+                </div>
+              </div>
+              <p className="text-center mt-10">
+                <Link to="/forms/pitch-your-idea" className="text-blue-600 font-semibold hover:underline">
+                  Pitch a custom idea — we build it →
+                </Link>
+              </p>
             </div>
           </section>
 
@@ -1049,9 +1060,15 @@ export function HomePage() {
               <div>
                 <h4 className="font-semibold mb-4">Company</h4>
                 <ul className="space-y-2">
-                  <li><a href="#about" onClick={scrollToSection('about')} className="text-gray-600 hover:text-blue-600">About Us</a></li>
+                  <li><Link to="/about" className="text-gray-600 hover:text-blue-600">About</Link></li>
+                  <li><a href="#about" onClick={scrollToSection('about')} className="text-gray-600 hover:text-blue-600">Home — story</a></li>
+                  <li><Link to="/services" className="text-gray-600 hover:text-blue-600">Services</Link></li>
+                  <li><Link to="/pricing" className="text-gray-600 hover:text-blue-600">Pricing</Link></li>
+                  <li><Link to="/faq" className="text-gray-600 hover:text-blue-600">FAQ</Link></li>
                   <li><Link to="/contact" className="text-gray-600 hover:text-blue-600">Contact</Link></li>
-                  <li><a href="https://6ku5qzv6zwp.typeform.com/to/ONTHimJl" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-blue-600">Data Request</a></li>
+                  <li><Link to="/forms/data-request" className="text-gray-600 hover:text-blue-600">Data request</Link></li>
+                  <li><Link to="/forms/business-diagnostic" className="text-gray-600 hover:text-blue-600">Business diagnostic</Link></li>
+                  <li><Link to="/forms/pitch-your-idea" className="text-gray-600 hover:text-blue-600">Pitch your idea</Link></li>
                 </ul>
               </div>
               <div>

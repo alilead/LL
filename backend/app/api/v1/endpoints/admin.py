@@ -1,5 +1,5 @@
-from typing import Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
+from typing import Dict, Any, List, Optional
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from app.models.user import User
 from app.api.deps import get_db, get_current_user
@@ -11,6 +11,7 @@ import csv
 from io import StringIO
 from datetime import datetime
 from app.crud import lead
+from app.models.marketing_form_submission import MarketingFormSubmission
 import io
 
 router = APIRouter()
@@ -28,13 +29,15 @@ def _decode_csv_bytes(content: bytes) -> str:
     )
 
 def check_admin_access(current_user: User = Depends(get_current_user)):
-    """Check admin access"""
-    if not current_user.is_superuser:
-        raise HTTPException(
-            status_code=403,
-            detail="Admin access required"
-        )
-    return current_user
+    """Superuser or role=admin (matches frontend AdminRoute / is_admin)."""
+    if current_user.is_superuser:
+        return current_user
+    if getattr(current_user, "role", None) == "admin":
+        return current_user
+    raise HTTPException(
+        status_code=403,
+        detail="Admin access required"
+    )
 
 @router.get("/monitoring/stats")
 async def get_monitoring_stats(
@@ -364,3 +367,35 @@ async def download_admin_csv_template(
             'Content-Disposition': 'attachment; filename=admin_leads_template.csv'
         }
     )
+
+
+@router.get("/marketing-form-submissions")
+def list_marketing_form_submissions(
+    db: Session = Depends(get_db),
+    _: User = Depends(check_admin_access),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    form_type: Optional[str] = Query(None, description="Filter: business_diagnostic | data_request | pitch_your_idea"),
+) -> Dict[str, Any]:
+    """List public marketing form submissions (superuser only)."""
+    q = db.query(MarketingFormSubmission).order_by(MarketingFormSubmission.created_at.desc())
+    if form_type:
+        q = q.filter(MarketingFormSubmission.form_type == form_type)
+    total = q.count()
+    rows = q.offset(skip).limit(limit).all()
+    items: List[Dict[str, Any]] = []
+    for r in rows:
+        items.append(
+            {
+                "id": r.id,
+                "form_type": r.form_type,
+                "full_name": r.full_name,
+                "email": r.email,
+                "company": r.company,
+                "phone": r.phone,
+                "subject": r.subject,
+                "payload": r.payload_dict(),
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+        )
+    return {"items": items, "total": total, "skip": skip, "limit": limit}

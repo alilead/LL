@@ -1,0 +1,126 @@
+import { useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import { Calendar, Menu, X } from 'lucide-react'
+import { useAuthStore } from '../../store/auth'
+
+const navLink =
+  'text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors whitespace-nowrap'
+
+export function MarketingNav() {
+  const { isAuthenticated } = useAuthStore()
+  const location = useLocation()
+  const [open, setOpen] = useState(false)
+
+  const isActive = (path: string) =>
+    location.pathname === path ? 'text-blue-600 font-semibold' : ''
+
+  const links = (
+    <>
+      <Link to="/" className={`${navLink} ${isActive('/')}`} onClick={() => setOpen(false)}>
+        Home
+      </Link>
+      <Link to="/about" className={`${navLink} ${isActive('/about')}`} onClick={() => setOpen(false)}>
+        About
+      </Link>
+      <Link to="/services" className={`${navLink} ${isActive('/services')}`} onClick={() => setOpen(false)}>
+        Services
+      </Link>
+      <Link to="/pricing" className={`${navLink} ${isActive('/pricing')}`} onClick={() => setOpen(false)}>
+        Pricing
+      </Link>
+      <Link to="/resources" className={`${navLink} ${isActive('/resources')}`} onClick={() => setOpen(false)}>
+        Resources
+      </Link>
+      <Link to="/faq" className={`${navLink} ${isActive('/faq')}`} onClick={() => setOpen(false)}>
+        FAQ
+      </Link>
+      <Link to="/roadmap" className={`${navLink} ${isActive('/roadmap')}`} onClick={() => setOpen(false)}>
+        Roadmap
+      </Link>
+      <Link to="/forms/business-diagnostic" className={`${navLink} ${isActive('/forms/business-diagnostic')}`} onClick={() => setOpen(false)}>
+        Business Diagnostic
+      </Link>
+      <Link to="/forms/data-request" className={`${navLink} ${isActive('/forms/data-request')}`} onClick={() => setOpen(false)}>
+        Data Request
+      </Link>
+      <Link to="/forms/pitch-your-idea" className={`${navLink} ${isActive('/forms/pitch-your-idea')}`} onClick={() => setOpen(false)}>
+        Pitch Your Idea
+      </Link>
+      <Link to="/contact" className={`${navLink} ${isActive('/contact')}`} onClick={() => setOpen(false)}>
+        Contact
+      </Link>
+    </>
+  )
+
+  return (
+    <header className="fixed w-full px-4 sm:px-6 lg:px-8 min-h-16 flex items-center border-b bg-white/90 backdrop-blur-sm z-50 shadow-sm">
+      <div className="container mx-auto flex items-center justify-between gap-4 py-3">
+        <Link to="/" className="flex items-center shrink-0">
+          <img src="/images/leadlab-logo.png" alt="The Lead Lab" className="h-12 sm:h-14 w-auto" />
+        </Link>
+
+        <nav className="hidden xl:flex items-center flex-wrap gap-x-5 gap-y-2 justify-end flex-1">{links}</nav>
+
+        <div className="hidden xl:flex items-center gap-2 shrink-0">
+          <a
+            href="https://calendly.com/the-leadlab"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-medium bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg hover:from-green-600 hover:to-emerald-700 flex items-center gap-1"
+          >
+            <Calendar className="w-4 h-4" />
+            Book demo
+          </a>
+          {isAuthenticated ? (
+            <Link
+              to="/dashboard"
+              className="text-sm font-medium bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-lg"
+            >
+              Dashboard
+            </Link>
+          ) : (
+            <Link
+              to="/signin"
+              className="text-sm font-medium bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-lg"
+            >
+              Sign in
+            </Link>
+          )}
+        </div>
+
+        <button
+          type="button"
+          className="xl:hidden p-2 rounded-lg border border-gray-200"
+          aria-label="Menu"
+          onClick={() => setOpen((o) => !o)}
+        >
+          {open ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
+      </div>
+
+      {open && (
+        <div className="xl:hidden border-t bg-white px-4 py-4 flex flex-col gap-3 shadow-lg max-h-[70vh] overflow-y-auto">
+          {links}
+          <a
+            href="https://calendly.com/the-leadlab"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-medium bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg text-center"
+            onClick={() => setOpen(false)}
+          >
+            Book demo
+          </a>
+          {isAuthenticated ? (
+            <Link to="/dashboard" className="text-center text-sm font-medium text-blue-600" onClick={() => setOpen(false)}>
+              Dashboard
+            </Link>
+          ) : (
+            <Link to="/signin" className="text-center text-sm font-medium text-blue-600" onClick={() => setOpen(false)}>
+              Sign in
+            </Link>
+          )}
+        </div>
+      )}
+    </header>
+  )
+}

@@ -48,6 +48,7 @@ from .workflow import Workflow, WorkflowExecution, WorkflowActionExecution, Appr
 from .conversation import CallRecording, ConversationInsight
 from .forecast import ForecastPeriod, Forecast, ForecastItem, ForecastHistory, ForecastRollup, ForecastComment, ForecastCategory, ForecastPeriodType, ForecastStatus
 from .data_import import ImportJob, FieldMapping, ImportRecord, ExportJob, CRMConnection, ImportStatus, ImportSource
+from .marketing_form_submission import MarketingFormSubmission
 
 # Export all models
 __all__ = [
@@ -140,6 +141,7 @@ __all__ = [
     "CRMConnection",
     "ImportStatus",
     "ImportSource",
+    "MarketingFormSubmission",
 
     # Association tables
     "user_roles",
