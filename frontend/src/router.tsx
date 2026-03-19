@@ -1,14 +1,5 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { HomePage } from './pages/HomePage'
-import { AboutPage } from './pages/marketing/AboutPage'
-import { ServicesPage } from './pages/marketing/ServicesPage'
-import { PricingPage } from './pages/marketing/PricingPage'
-import { FaqPage } from './pages/marketing/FaqPage'
-import { RoadmapPage } from './pages/marketing/RoadmapPage'
-import { ResourcesPage } from './pages/marketing/ResourcesPage'
-import { BusinessDiagnosticPage } from './pages/marketing/BusinessDiagnosticPage'
-import { DataRequestPage } from './pages/marketing/DataRequestPage'
-import { PitchYourIdeaPage } from './pages/marketing/PitchYourIdeaPage'
 import { SignIn } from './pages/SignIn'
 import { SignUp } from './pages/SignUp'
 import { ForgotPassword } from './pages/ForgotPassword'
@@ -79,42 +70,6 @@ export const router = createBrowserRouter([
   {
     path: '/contact',
     element: <Contact />,
-  },
-  {
-    path: '/about',
-    element: <AboutPage />,
-  },
-  {
-    path: '/services',
-    element: <ServicesPage />,
-  },
-  {
-    path: '/pricing',
-    element: <PricingPage />,
-  },
-  {
-    path: '/faq',
-    element: <FaqPage />,
-  },
-  {
-    path: '/roadmap',
-    element: <RoadmapPage />,
-  },
-  {
-    path: '/resources',
-    element: <ResourcesPage />,
-  },
-  {
-    path: '/forms/business-diagnostic',
-    element: <BusinessDiagnosticPage />,
-  },
-  {
-    path: '/forms/data-request',
-    element: <DataRequestPage />,
-  },
-  {
-    path: '/forms/pitch-your-idea',
-    element: <PitchYourIdeaPage />,
   },
   {
     element: <PrivateRoute />,

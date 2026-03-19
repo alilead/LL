@@ -19,32 +19,18 @@ export function MarketingNav() {
       <Link to="/" className={`${navLink} ${isActive('/')}`} onClick={() => setOpen(false)}>
         Home
       </Link>
-      <Link to="/about" className={`${navLink} ${isActive('/about')}`} onClick={() => setOpen(false)}>
-        About
+      <Link
+        to="/#business-diagnostic-form"
+        className={navLink}
+        onClick={() => setOpen(false)}
+      >
+        Business diagnostic
       </Link>
-      <Link to="/services" className={`${navLink} ${isActive('/services')}`} onClick={() => setOpen(false)}>
-        Services
+      <Link to="/#data-request-form" className={navLink} onClick={() => setOpen(false)}>
+        Data request
       </Link>
-      <Link to="/pricing" className={`${navLink} ${isActive('/pricing')}`} onClick={() => setOpen(false)}>
-        Pricing
-      </Link>
-      <Link to="/resources" className={`${navLink} ${isActive('/resources')}`} onClick={() => setOpen(false)}>
-        Resources
-      </Link>
-      <Link to="/faq" className={`${navLink} ${isActive('/faq')}`} onClick={() => setOpen(false)}>
-        FAQ
-      </Link>
-      <Link to="/roadmap" className={`${navLink} ${isActive('/roadmap')}`} onClick={() => setOpen(false)}>
-        Roadmap
-      </Link>
-      <Link to="/forms/business-diagnostic" className={`${navLink} ${isActive('/forms/business-diagnostic')}`} onClick={() => setOpen(false)}>
-        Business Diagnostic
-      </Link>
-      <Link to="/forms/data-request" className={`${navLink} ${isActive('/forms/data-request')}`} onClick={() => setOpen(false)}>
-        Data Request
-      </Link>
-      <Link to="/forms/pitch-your-idea" className={`${navLink} ${isActive('/forms/pitch-your-idea')}`} onClick={() => setOpen(false)}>
-        Pitch Your Idea
+      <Link to="/#pitch-your-idea-form" className={navLink} onClick={() => setOpen(false)}>
+        Pitch your idea
       </Link>
       <Link to="/contact" className={`${navLink} ${isActive('/contact')}`} onClick={() => setOpen(false)}>
         Contact

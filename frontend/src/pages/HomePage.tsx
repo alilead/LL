@@ -36,10 +36,12 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { MarketingNav } from '../components/marketing/MarketingNav'
+import { submitMarketingForm } from '../services/marketingFormsApi'
 import { motion } from 'framer-motion'
 import CountUp from 'react-countup'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faLinkedin, faTwitter, faFacebook } from '@fortawesome/free-brands-svg-icons'
+import { toast } from 'react-hot-toast'
 
 export function HomePage() {
   const { user, isAuthenticated } = useAuthStore()
@@ -97,6 +99,176 @@ export function HomePage() {
     e.preventDefault()
     if (email) {
       navigate('/signup', { state: { email } })
+    }
+  }
+
+  // Embedded marketing forms (no separate pages)
+  const [bdLoading, setBdLoading] = useState(false)
+  const [bdFullName, setBdFullName] = useState('')
+  const [bdEmail, setBdEmail] = useState('')
+  const [bdCompany, setBdCompany] = useState('')
+  const [bdPhone, setBdPhone] = useState('')
+  const [bdIndustry, setBdIndustry] = useState('')
+  const [bdTeamSize, setBdTeamSize] = useState('')
+  const [bdLeadVolume, setBdLeadVolume] = useState('')
+  const [bdBiggestPain, setBdBiggestPain] = useState('')
+  const [bdTools, setBdTools] = useState('')
+  const [bdGoals, setBdGoals] = useState('')
+
+  const [drLoading, setDrLoading] = useState(false)
+  const [drFullName, setDrFullName] = useState('')
+  const [drEmail, setDrEmail] = useState('')
+  const [drCompany, setDrCompany] = useState('')
+  const [drPhone, setDrPhone] = useState('')
+  const [drDataType, setDrDataType] = useState('')
+  const [drGeography, setDrGeography] = useState('')
+  const [drVolume, setDrVolume] = useState('')
+  const [drCriteria, setDrCriteria] = useState('')
+  const [drUseCase, setDrUseCase] = useState('')
+  const [drTimeline, setDrTimeline] = useState('')
+  const [drCompliance, setDrCompliance] = useState('')
+
+  const [piLoading, setPiLoading] = useState(false)
+  const [piFullName, setPiFullName] = useState('')
+  const [piEmail, setPiEmail] = useState('')
+  const [piCompany, setPiCompany] = useState('')
+  const [piPhone, setPiPhone] = useState('')
+  const [piProjectTitle, setPiProjectTitle] = useState('')
+  const [piElevatorPitch, setPiElevatorPitch] = useState('')
+  const [piProblemSolved, setPiProblemSolved] = useState('')
+  const [piTargetUser, setPiTargetUser] = useState('')
+  const [piMustHaves, setPiMustHaves] = useState('')
+  const [piNiceToHaves, setPiNiceToHaves] = useState('')
+  const [piBudgetRange, setPiBudgetRange] = useState('')
+  const [piTimeline, setPiTimeline] = useState('')
+  const [piLinks, setPiLinks] = useState('')
+  const [piWhyLeadLab, setPiWhyLeadLab] = useState('')
+
+  const inputClass =
+    'w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow'
+  const labelClass = 'block text-sm font-medium text-gray-700 mb-1.5'
+
+  const onSubmitBusinessDiagnostic = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setBdLoading(true)
+    try {
+      await submitMarketingForm({
+        form_type: 'business_diagnostic',
+        full_name: bdFullName,
+        email: bdEmail,
+        company: bdCompany || undefined,
+        phone: bdPhone || undefined,
+        subject: `Diagnostic — ${bdCompany || bdEmail}`,
+        payload: {
+          industry: bdIndustry,
+          team_size: bdTeamSize,
+          monthly_lead_volume: bdLeadVolume,
+          biggest_pain_point: bdBiggestPain,
+          current_tools: bdTools,
+          twelve_month_goals: bdGoals,
+        },
+      })
+      toast.success('Thanks! We received your diagnostic. We will follow up soon.')
+      setBdFullName('')
+      setBdEmail('')
+      setBdCompany('')
+      setBdPhone('')
+      setBdIndustry('')
+      setBdTeamSize('')
+      setBdLeadVolume('')
+      setBdBiggestPain('')
+      setBdTools('')
+      setBdGoals('')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to submit. Please try again.')
+    } finally {
+      setBdLoading(false)
+    }
+  }
+
+  const onSubmitDataRequest = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setDrLoading(true)
+    try {
+      await submitMarketingForm({
+        form_type: 'data_request',
+        full_name: drFullName,
+        email: drEmail,
+        company: drCompany || undefined,
+        phone: drPhone || undefined,
+        subject: `Data request — ${drDataType || drCompany || drEmail}`,
+        payload: {
+          data_type: drDataType,
+          geography: drGeography,
+          expected_volume: drVolume,
+          targeting_criteria: drCriteria,
+          use_case: drUseCase,
+          timeline: drTimeline,
+          compliance_notes: drCompliance,
+        },
+      })
+      toast.success('Request received. Our team will confirm scope and next steps.')
+      setDrFullName('')
+      setDrEmail('')
+      setDrCompany('')
+      setDrPhone('')
+      setDrDataType('')
+      setDrGeography('')
+      setDrVolume('')
+      setDrCriteria('')
+      setDrUseCase('')
+      setDrTimeline('')
+      setDrCompliance('')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to submit. Please try again.')
+    } finally {
+      setDrLoading(false)
+    }
+  }
+
+  const onSubmitPitchYourIdea = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPiLoading(true)
+    try {
+      await submitMarketingForm({
+        form_type: 'pitch_your_idea',
+        full_name: piFullName,
+        email: piEmail,
+        company: piCompany || undefined,
+        phone: piPhone || undefined,
+        subject: piProjectTitle || `Pitch — ${piCompany || piEmail}`,
+        payload: {
+          project_title: piProjectTitle,
+          elevator_pitch: piElevatorPitch,
+          problem_solved: piProblemSolved,
+          target_user: piTargetUser,
+          must_have_features: piMustHaves,
+          nice_to_have: piNiceToHaves,
+          budget_range: piBudgetRange,
+          timeline: piTimeline,
+          reference_links: piLinks,
+          why_the_lead_lab: piWhyLeadLab,
+        },
+      })
+      toast.success('Pitch received! We will follow up soon.')
+      setPiFullName('')
+      setPiEmail('')
+      setPiCompany('')
+      setPiPhone('')
+      setPiProjectTitle('')
+      setPiElevatorPitch('')
+      setPiProblemSolved('')
+      setPiTargetUser('')
+      setPiMustHaves('')
+      setPiNiceToHaves('')
+      setPiBudgetRange('')
+      setPiTimeline('')
+      setPiLinks('')
+      setPiWhyLeadLab('')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to submit. Please try again.')
+    } finally {
+      setPiLoading(false)
     }
   }
 
@@ -232,6 +404,267 @@ export function HomePage() {
             </div>
           </section>
 
+          <section id="business-diagnostic-form" className="w-full py-16 md:py-20 bg-gradient-to-br from-blue-50/30 to-white border-y border-gray-100">
+            <div className="max-w-4xl mx-auto px-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-3">Business Diagnostic Form</h2>
+              <p className="text-center text-gray-600 mb-10 max-w-2xl mx-auto">
+                Help us understand your lead-generation context. We will review and follow up with recommendations.
+              </p>
+
+              <form onSubmit={onSubmitBusinessDiagnostic} className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sm:p-8 space-y-6">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Full name *</label>
+                    <input className={inputClass} required value={bdFullName} onChange={(e) => setBdFullName(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Work email *</label>
+                    <input className={inputClass} type="email" required value={bdEmail} onChange={(e) => setBdEmail(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Company</label>
+                    <input className={inputClass} value={bdCompany} onChange={(e) => setBdCompany(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Phone</label>
+                    <input className={inputClass} type="tel" value={bdPhone} onChange={(e) => setBdPhone(e.target.value)} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Industry / sector</label>
+                  <input className={inputClass} value={bdIndustry} onChange={(e) => setBdIndustry(e.target.value)} placeholder="e.g. B2B SaaS, professional services" />
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Team size</label>
+                    <select className={inputClass} value={bdTeamSize} onChange={(e) => setBdTeamSize(e.target.value)}>
+                      <option value="">Select…</option>
+                      <option value="1">Just me (solopreneur)</option>
+                      <option value="2-5">2–5</option>
+                      <option value="6-20">6–20</option>
+                      <option value="21+">21+</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelClass}>Monthly lead volume (approx.)</label>
+                    <input className={inputClass} value={bdLeadVolume} onChange={(e) => setBdLeadVolume(e.target.value)} placeholder="e.g. 50 qualified conversations / month" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Biggest pain point today</label>
+                  <textarea className={inputClass} rows={3} value={bdBiggestPain} onChange={(e) => setBdBiggestPain(e.target.value)} placeholder="Time on manual research, poor qualification, CRM hygiene, etc." />
+                </div>
+
+                <div>
+                  <label className={labelClass}>Tools you use today</label>
+                  <textarea className={inputClass} rows={2} value={bdTools} onChange={(e) => setBdTools(e.target.value)} placeholder="CRM, LinkedIn, spreadsheets, other…" />
+                </div>
+
+                <div>
+                  <label className={labelClass}>Goals for the next 12 months</label>
+                  <textarea className={inputClass} rows={3} value={bdGoals} onChange={(e) => setBdGoals(e.target.value)} />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={bdLoading}
+                  className="w-full py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 transition-all"
+                >
+                  {bdLoading ? 'Sending…' : 'Submit diagnostic'}
+                </button>
+              </form>
+            </div>
+          </section>
+
+          <section id="data-request-form" className="w-full py-16 md:py-20 bg-white border-b border-gray-100">
+            <div className="max-w-4xl mx-auto px-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-3">Data Request Form</h2>
+              <p className="text-center text-gray-600 mb-10 max-w-2xl mx-auto">
+                Tell us what verified data or lead lists you need. We respond with feasibility and next steps.
+              </p>
+
+              <form onSubmit={onSubmitDataRequest} className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sm:p-8 space-y-6">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Full name *</label>
+                    <input className={inputClass} required value={drFullName} onChange={(e) => setDrFullName(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Work email *</label>
+                    <input className={inputClass} type="email" required value={drEmail} onChange={(e) => setDrEmail(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Company</label>
+                    <input className={inputClass} value={drCompany} onChange={(e) => setDrCompany(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Phone</label>
+                    <input className={inputClass} type="tel" value={drPhone} onChange={(e) => setDrPhone(e.target.value)} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Type of data / list *</label>
+                  <input className={inputClass} required value={drDataType} onChange={(e) => setDrDataType(e.target.value)} placeholder="e.g. decision-makers in fintech, EU, with verified emails" />
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Geography</label>
+                    <input className={inputClass} value={drGeography} onChange={(e) => setDrGeography(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Expected volume</label>
+                    <input className={inputClass} value={drVolume} onChange={(e) => setDrVolume(e.target.value)} placeholder="e.g. 500 contacts, 10k companies" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Targeting criteria</label>
+                  <textarea className={inputClass} rows={4} value={drCriteria} onChange={(e) => setDrCriteria(e.target.value)} />
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Use case</label>
+                    <textarea className={inputClass} rows={2} value={drUseCase} onChange={(e) => setDrUseCase(e.target.value)} placeholder="Outbound, ABM, research…" />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Timeline</label>
+                    <input className={inputClass} value={drTimeline} onChange={(e) => setDrTimeline(e.target.value)} placeholder="e.g. needed by end of quarter" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Compliance / privacy requirements</label>
+                  <textarea className={inputClass} rows={2} value={drCompliance} onChange={(e) => setDrCompliance(e.target.value)} placeholder="GDPR, industry-specific rules, DPA needs…" />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={drLoading}
+                  className="w-full py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 transition-all"
+                >
+                  {drLoading ? 'Sending…' : 'Submit data request'}
+                </button>
+              </form>
+            </div>
+          </section>
+
+          <section id="pitch-your-idea-form" className="w-full py-16 md:py-20 bg-gradient-to-br from-indigo-50/40 to-white border-b border-gray-100">
+            <div className="max-w-4xl mx-auto px-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-3">Pitch Your Idea — We make it</h2>
+              <p className="text-center text-gray-600 mb-10 max-w-2xl mx-auto">
+                Share your product, workflow, or integration idea. We’ll review feasibility and follow up.
+              </p>
+
+              <form onSubmit={onSubmitPitchYourIdea} className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sm:p-8 space-y-6">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Full name *</label>
+                    <input className={inputClass} required value={piFullName} onChange={(e) => setPiFullName(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Work email *</label>
+                    <input className={inputClass} type="email" required value={piEmail} onChange={(e) => setPiEmail(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Company / org</label>
+                    <input className={inputClass} value={piCompany} onChange={(e) => setPiCompany(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Phone</label>
+                    <input className={inputClass} type="tel" value={piPhone} onChange={(e) => setPiPhone(e.target.value)} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Working title *</label>
+                  <input
+                    className={inputClass}
+                    required
+                    value={piProjectTitle}
+                    onChange={(e) => setPiProjectTitle(e.target.value)}
+                    placeholder="e.g. Partner referral tracker for our sales team"
+                  />
+                </div>
+
+                <div>
+                  <label className={labelClass}>Elevator pitch (2–4 sentences) *</label>
+                  <textarea className={inputClass} rows={4} required value={piElevatorPitch} onChange={(e) => setPiElevatorPitch(e.target.value)} />
+                </div>
+
+                <div>
+                  <label className={labelClass}>What problem does this solve? *</label>
+                  <textarea className={inputClass} rows={3} required value={piProblemSolved} onChange={(e) => setPiProblemSolved(e.target.value)} />
+                </div>
+
+                <div>
+                  <label className={labelClass}>Who is the primary user?</label>
+                  <textarea className={inputClass} rows={2} value={piTargetUser} onChange={(e) => setPiTargetUser(e.target.value)} />
+                </div>
+
+                <div>
+                  <label className={labelClass}>Must-have features / outcomes</label>
+                  <textarea className={inputClass} rows={3} value={piMustHaves} onChange={(e) => setPiMustHaves(e.target.value)} />
+                </div>
+
+                <div>
+                  <label className={labelClass}>Nice-to-have</label>
+                  <textarea className={inputClass} rows={2} value={piNiceToHaves} onChange={(e) => setPiNiceToHaves(e.target.value)} />
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Budget range (optional)</label>
+                    <select className={inputClass} value={piBudgetRange} onChange={(e) => setPiBudgetRange(e.target.value)}>
+                      <option value="">Prefer not to say</option>
+                      <option value="under-5k">Under $5k</option>
+                      <option value="5k-25k">$5k – $25k</option>
+                      <option value="25k-100k">$25k – $100k</option>
+                      <option value="100k+">$100k+</option>
+                      <option value="enterprise">Enterprise / TBD</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelClass}>Ideal timeline</label>
+                    <input className={inputClass} value={piTimeline} onChange={(e) => setPiTimeline(e.target.value)} placeholder="e.g. MVP in 8 weeks" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Links (Figma, Notion, Loom, repo…)</label>
+                  <textarea className={inputClass} rows={2} value={piLinks} onChange={(e) => setPiLinks(e.target.value)} />
+                </div>
+
+                <div>
+                  <label className={labelClass}>Why The Lead Lab?</label>
+                  <textarea className={inputClass} rows={2} value={piWhyLeadLab} onChange={(e) => setPiWhyLeadLab(e.target.value)} />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={piLoading}
+                  className="w-full py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 disabled:opacity-60 transition-all"
+                >
+                  {piLoading ? 'Sending…' : 'Send pitch'}
+                </button>
+              </form>
+            </div>
+          </section>
+
           <section id="problems-we-solve" className="w-full py-16 md:py-20 bg-white border-y border-gray-100">
             <div className="max-w-6xl mx-auto px-4">
               <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-4">The problems we solve</h2>
@@ -266,17 +699,18 @@ export function HomePage() {
               </div>
               <div className="flex flex-wrap justify-center gap-4 mt-10">
                 <Link
-                  to="/forms/business-diagnostic"
+                  to="/#business-diagnostic-form"
                   className="inline-flex items-center px-6 py-3 rounded-xl font-medium text-white bg-blue-600 hover:bg-blue-700"
                 >
                   Business diagnostic
                 </Link>
-                <Link
-                  to="/services"
+                <a
+                  href="#pricing"
+                  onClick={scrollToSection('pricing')}
                   className="inline-flex items-center px-6 py-3 rounded-xl font-medium border-2 border-gray-300 text-gray-800 hover:border-blue-400"
                 >
                   Explore services
-                </Link>
+                </a>
               </div>
             </div>
           </section>
@@ -311,9 +745,13 @@ export function HomePage() {
                 </div>
               </div>
               <p className="text-center mt-10">
-                <Link to="/forms/pitch-your-idea" className="text-blue-600 font-semibold hover:underline">
+                <a
+                  href="#pitch-your-idea-form"
+                  onClick={scrollToSection('pitch-your-idea-form')}
+                  className="text-blue-600 font-semibold hover:underline"
+                >
                   Pitch a custom idea — we build it →
-                </Link>
+                </a>
               </p>
             </div>
           </section>
@@ -1060,15 +1498,65 @@ export function HomePage() {
               <div>
                 <h4 className="font-semibold mb-4">Company</h4>
                 <ul className="space-y-2">
-                  <li><Link to="/about" className="text-gray-600 hover:text-blue-600">About</Link></li>
-                  <li><a href="#about" onClick={scrollToSection('about')} className="text-gray-600 hover:text-blue-600">Home — story</a></li>
-                  <li><Link to="/services" className="text-gray-600 hover:text-blue-600">Services</Link></li>
-                  <li><Link to="/pricing" className="text-gray-600 hover:text-blue-600">Pricing</Link></li>
-                  <li><Link to="/faq" className="text-gray-600 hover:text-blue-600">FAQ</Link></li>
-                  <li><Link to="/contact" className="text-gray-600 hover:text-blue-600">Contact</Link></li>
-                  <li><Link to="/forms/data-request" className="text-gray-600 hover:text-blue-600">Data request</Link></li>
-                  <li><Link to="/forms/business-diagnostic" className="text-gray-600 hover:text-blue-600">Business diagnostic</Link></li>
-                  <li><Link to="/forms/pitch-your-idea" className="text-gray-600 hover:text-blue-600">Pitch your idea</Link></li>
+                  <li>
+                    <a
+                      href="#about"
+                      onClick={scrollToSection('about')}
+                      className="text-gray-600 hover:text-blue-600"
+                    >
+                      About
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="#pricing"
+                      onClick={scrollToSection('pricing')}
+                      className="text-gray-600 hover:text-blue-600"
+                    >
+                      Pricing
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="#packages"
+                      onClick={scrollToSection('packages')}
+                      className="text-gray-600 hover:text-blue-600"
+                    >
+                      Packages
+                    </a>
+                  </li>
+                  <li>
+                    <Link to="/contact" className="text-gray-600 hover:text-blue-600">
+                      Contact
+                    </Link>
+                  </li>
+                  <li>
+                    <a
+                      href="#data-request-form"
+                      onClick={scrollToSection('data-request-form')}
+                      className="text-gray-600 hover:text-blue-600"
+                    >
+                      Data request
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="#business-diagnostic-form"
+                      onClick={scrollToSection('business-diagnostic-form')}
+                      className="text-gray-600 hover:text-blue-600"
+                    >
+                      Business diagnostic
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="#pitch-your-idea-form"
+                      onClick={scrollToSection('pitch-your-idea-form')}
+                      className="text-gray-600 hover:text-blue-600"
+                    >
+                      Pitch your idea
+                    </a>
+                  </li>
                 </ul>
               </div>
               <div>
