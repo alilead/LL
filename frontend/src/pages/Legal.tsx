@@ -288,6 +288,15 @@ If you have questions about this Cookie Policy, please contact us.
     }
   };
 
+  // Support direct links like `/legal?policy=privacy`
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const policy = params.get('policy')
+    if (policy && (policies as any)[policy]) {
+      setActivePolicy(policy)
+    }
+  }, [])
+
   const NavLink = ({ id, title, isActive, onClick }) => (
     <button
       onClick={() => {

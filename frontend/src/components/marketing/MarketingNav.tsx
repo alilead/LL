@@ -19,6 +19,27 @@ export function MarketingNav() {
       <Link to="/" className={`${navLink} ${isActive('/')}`} onClick={() => setOpen(false)}>
         Home
       </Link>
+      <a
+        href="/#about"
+        className={`${navLink}`}
+        onClick={() => setOpen(false)}
+      >
+        About
+      </a>
+      <a
+        href="/#services"
+        className={`${navLink}`}
+        onClick={() => setOpen(false)}
+      >
+        Services
+      </a>
+      <a
+        href="/#pricing"
+        className={`${navLink}`}
+        onClick={() => setOpen(false)}
+      >
+        Pricing
+      </a>
       <Link
         to="/#business-diagnostic-form"
         className={navLink}

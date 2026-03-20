@@ -149,11 +149,31 @@ export function HomePage() {
   const [leadIntakeType, setLeadIntakeType] = useState<LeadIntakeType>('business_diagnostic')
 
   useEffect(() => {
-    const hash = (location.hash || '').replace('#', '')
-    if (hash === 'business-diagnostic-form') setLeadIntakeType('business_diagnostic')
-    if (hash === 'data-request-form') setLeadIntakeType('data_request')
-    if (hash === 'pitch-your-idea-form') setLeadIntakeType('pitch_your_idea')
-  }, [location.hash])
+    // Hash deep-links drive both:
+    // 1) which intake form is shown
+    // 2) where the browser scrolls on the single-page home
+    const syncFromHash = () => {
+      const hash = (window.location.hash || '').replace('#', '')
+
+      if (hash === 'business-diagnostic-form') setLeadIntakeType('business_diagnostic')
+      if (hash === 'data-request-form') setLeadIntakeType('data_request')
+      if (hash === 'pitch-your-idea-form') setLeadIntakeType('pitch_your_idea')
+
+      if (hash) {
+        const el = document.getElementById(hash)
+        // Let React render first (the element usually exists, but this is safest)
+        if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0)
+      }
+    }
+
+    syncFromHash()
+    window.addEventListener('hashchange', syncFromHash)
+    return () => window.removeEventListener('hashchange', syncFromHash)
+  }, [])
+
+  // NDA capture (typed signature) stored in the form payload.
+  const [ndaAccepted, setNdaAccepted] = useState(false)
+  const [ndaSignature, setNdaSignature] = useState('')
 
   const inputClass =
     'w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow'
@@ -161,6 +181,10 @@ export function HomePage() {
 
   const onSubmitBusinessDiagnostic = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!ndaAccepted || !ndaSignature.trim()) {
+      toast.error('Please accept the NDA and type your signature.')
+      return
+    }
     setBdLoading(true)
     try {
       await submitMarketingForm({
@@ -177,6 +201,9 @@ export function HomePage() {
           biggest_pain_point: bdBiggestPain,
           current_tools: bdTools,
           twelve_month_goals: bdGoals,
+          nda_accepted: ndaAccepted,
+          nda_signature: ndaSignature,
+          nda_signed_at: new Date().toISOString(),
         },
       })
       toast.success('Thanks! We received your diagnostic. We will follow up soon.')
@@ -190,6 +217,8 @@ export function HomePage() {
       setBdBiggestPain('')
       setBdTools('')
       setBdGoals('')
+      setNdaAccepted(false)
+      setNdaSignature('')
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to submit. Please try again.')
     } finally {
@@ -199,6 +228,10 @@ export function HomePage() {
 
   const onSubmitDataRequest = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!ndaAccepted || !ndaSignature.trim()) {
+      toast.error('Please accept the NDA and type your signature.')
+      return
+    }
     setDrLoading(true)
     try {
       await submitMarketingForm({
@@ -216,6 +249,9 @@ export function HomePage() {
           use_case: drUseCase,
           timeline: drTimeline,
           compliance_notes: drCompliance,
+          nda_accepted: ndaAccepted,
+          nda_signature: ndaSignature,
+          nda_signed_at: new Date().toISOString(),
         },
       })
       toast.success('Request received. Our team will confirm scope and next steps.')
@@ -230,6 +266,8 @@ export function HomePage() {
       setDrUseCase('')
       setDrTimeline('')
       setDrCompliance('')
+      setNdaAccepted(false)
+      setNdaSignature('')
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to submit. Please try again.')
     } finally {
@@ -239,6 +277,10 @@ export function HomePage() {
 
   const onSubmitPitchYourIdea = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!ndaAccepted || !ndaSignature.trim()) {
+      toast.error('Please accept the NDA and type your signature.')
+      return
+    }
     setPiLoading(true)
     try {
       await submitMarketingForm({
@@ -259,6 +301,9 @@ export function HomePage() {
           timeline: piTimeline,
           reference_links: piLinks,
           why_the_lead_lab: piWhyLeadLab,
+          nda_accepted: ndaAccepted,
+          nda_signature: ndaSignature,
+          nda_signed_at: new Date().toISOString(),
         },
       })
       toast.success('Pitch received! We will follow up soon.')
@@ -276,6 +321,8 @@ export function HomePage() {
       setPiTimeline('')
       setPiLinks('')
       setPiWhyLeadLab('')
+      setNdaAccepted(false)
+      setNdaSignature('')
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to submit. Please try again.')
     } finally {
@@ -294,8 +341,8 @@ export function HomePage() {
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <MarketingNav />
 
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-16 pt-32">
-        <main className="flex-1 space-y-24">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-0 pt-32">
+        <main className="flex-1 space-y-0">
           <section className="w-full py-16 md:py-24 lg:py-32">
             <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
               <div className="flex flex-col items-center space-y-12 text-center">
@@ -316,7 +363,7 @@ export function HomePage() {
                   transition={{ duration: 0.8, delay: 0.2 }}
                   className="space-y-6 max-w-4xl"
                 >
-                  <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 animate-gradient">
+                  <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl leading-[1.05] bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 animate-gradient">
                     Connecting Businesses with Qualified Leads
                   </h1>
                   <p className="mx-auto max-w-[800px] text-gray-600 md:text-xl lg:text-2xl leading-relaxed">
@@ -678,6 +725,33 @@ export function HomePage() {
                       <textarea className={inputClass} rows={3} value={bdGoals} onChange={(e) => setBdGoals(e.target.value)} />
                     </div>
 
+                    <div className="border-t pt-6">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-2">NDA signing</h4>
+                      <p className="text-sm text-gray-600 mb-4">
+                        We will review your intake and provide the NDA in the next step. Please confirm agreement and type your signature below.
+                      </p>
+                      <label className="flex items-start gap-3 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={ndaAccepted}
+                          onChange={(e) => setNdaAccepted(e.target.checked)}
+                          className="mt-1"
+                        />
+                        <span>
+                          I agree to the NDA and authorize The Lead Lab to contact me about next steps.
+                        </span>
+                      </label>
+                      <div className="mt-4">
+                        <label className={labelClass}>Signature (type your full name) *</label>
+                        <input
+                          className={inputClass}
+                          value={ndaSignature}
+                          onChange={(e) => setNdaSignature(e.target.value)}
+                          placeholder="e.g. Ali Attia"
+                        />
+                      </div>
+                    </div>
+
                     <button
                       type="submit"
                       disabled={bdLoading}
@@ -793,6 +867,33 @@ export function HomePage() {
                         onChange={(e) => setDrCompliance(e.target.value)}
                         placeholder="GDPR, industry-specific rules, DPA needs…"
                       />
+                    </div>
+
+                    <div className="border-t pt-6">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-2">NDA signing</h4>
+                      <p className="text-sm text-gray-600 mb-4">
+                        We will review your intake and provide the NDA in the next step. Please confirm agreement and type your signature below.
+                      </p>
+                      <label className="flex items-start gap-3 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={ndaAccepted}
+                          onChange={(e) => setNdaAccepted(e.target.checked)}
+                          className="mt-1"
+                        />
+                        <span>
+                          I agree to the NDA and authorize The Lead Lab to contact me about next steps.
+                        </span>
+                      </label>
+                      <div className="mt-4">
+                        <label className={labelClass}>Signature (type your full name) *</label>
+                        <input
+                          className={inputClass}
+                          value={ndaSignature}
+                          onChange={(e) => setNdaSignature(e.target.value)}
+                          placeholder="e.g. Ali Attia"
+                        />
+                      </div>
                     </div>
 
                     <button
@@ -917,6 +1018,33 @@ export function HomePage() {
                       <textarea className={inputClass} rows={2} value={piWhyLeadLab} onChange={(e) => setPiWhyLeadLab(e.target.value)} />
                     </div>
 
+                    <div className="border-t pt-6">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-2">NDA signing</h4>
+                      <p className="text-sm text-gray-600 mb-4">
+                        We will review your intake and provide the NDA in the next step. Please confirm agreement and type your signature below.
+                      </p>
+                      <label className="flex items-start gap-3 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={ndaAccepted}
+                          onChange={(e) => setNdaAccepted(e.target.checked)}
+                          className="mt-1"
+                        />
+                        <span>
+                          I agree to the NDA and authorize The Lead Lab to contact me about next steps.
+                        </span>
+                      </label>
+                      <div className="mt-4">
+                        <label className={labelClass}>Signature (type your full name) *</label>
+                        <input
+                          className={inputClass}
+                          value={ndaSignature}
+                          onChange={(e) => setNdaSignature(e.target.value)}
+                          placeholder="e.g. Ali Attia"
+                        />
+                      </div>
+                    </div>
+
                     <button
                       type="submit"
                       disabled={piLoading}
@@ -933,7 +1061,7 @@ export function HomePage() {
           <section id="about" className="w-full py-16 bg-gradient-to-br from-white via-blue-50/50 to-white">
             <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
               <div className="text-center mb-16">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
                   About The-LeadLab.com
                 </h2>
                 <p className="text-xl text-gray-600 max-w-4xl mx-auto">
@@ -989,7 +1117,7 @@ export function HomePage() {
               </div>
 
               <div className="text-center mb-16">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
                   The Problems We Solve
                 </h2>
               </div>
@@ -1046,7 +1174,7 @@ export function HomePage() {
           <section className="w-full py-16 bg-white">
             <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
               <div className="text-center mb-16">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
                   Why Industry Leaders Choose LeadLab
                 </h2>
                 <p className="text-xl text-gray-600 max-w-3xl mx-auto">
@@ -1090,10 +1218,10 @@ export function HomePage() {
             </div>
           </section>
 
-          <section className="w-full py-16 bg-gradient-to-br from-white via-blue-50/50 to-white">
+          <section className="w-full py-16 bg-gradient-to-br from-white via-blue-50/50 to-white" id="services">
             <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
               <div className="text-center mb-16">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
                   How LeadLab Works
                 </h2>
                 <p className="text-xl text-gray-600 max-w-3xl mx-auto">
@@ -1151,7 +1279,7 @@ export function HomePage() {
           <section className="w-full py-16 bg-white">
             <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
               <div className="text-center mb-16">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
                   Real Results, Real Time
                 </h2>
                 <p className="text-xl text-gray-600 max-w-3xl mx-auto">
@@ -1377,7 +1505,7 @@ export function HomePage() {
 
           <section id="features" className="w-full py-16 md:py-24 bg-gradient-to-br from-white via-blue-50/50 to-white">
             <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
-              <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+              <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
                 Our Unique Approach
               </h2>
               <p className="text-xl text-gray-600 text-center mb-16 max-w-3xl mx-auto">
@@ -1431,7 +1559,7 @@ export function HomePage() {
 
           <section id="testimonials" className="w-full py-16 md:py-24 bg-gradient-to-br from-white via-blue-50/50 to-white">
             <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
-              <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+              <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
                 What Our Clients Say
               </h2>
               <p className="text-xl text-gray-600 text-center mb-16 max-w-3xl mx-auto">
@@ -1456,13 +1584,22 @@ export function HomePage() {
                     <p className="text-sm text-gray-600">Head of Business Development, Anchor Logistics Management</p>
                   </div>
                 </div>
+
+                <div className="bg-white p-8 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 border border-gray-100">
+                  <p className="text-gray-600 italic text-lg mb-6">"We finally stopped wasting time on low-fit leads. Their qualification rules and outreach timing improved our meetings-to-opportunities ratio dramatically."</p>
+                  <div className="w-12 h-1 bg-blue-600 rounded-full mb-4"></div>
+                  <div>
+                    <h4 className="font-semibold">Samira Holt</h4>
+                    <p className="text-sm text-gray-600">Director of Sales, NorthBridge Technologies</p>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
 
           <section id="pricing" className="w-full py-16 md:py-24 bg-gradient-to-br from-white via-indigo-50/50 to-white">
             <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
-              <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+              <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
                 Our Products
               </h2>
               <p className="text-xl text-gray-600 text-center mb-16 max-w-3xl mx-auto">
@@ -1544,7 +1681,7 @@ export function HomePage() {
 
           <section id="packages" className="w-full py-16 md:py-24 bg-gradient-to-br from-white via-blue-50/50 to-white">
             <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
-              <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+              <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
                 Our Packages
               </h2>
               <p className="text-xl text-gray-600 text-center mb-16 max-w-3xl mx-auto">
@@ -1692,11 +1829,11 @@ export function HomePage() {
                   </li>
                   <li>
                     <a
-                      href="#packages"
-                      onClick={scrollToSection('packages')}
+                      href="#services"
+                      onClick={scrollToSection('services')}
                       className="text-gray-600 hover:text-blue-600"
                     >
-                      Packages
+                      Services
                     </a>
                   </li>
                   <li>
