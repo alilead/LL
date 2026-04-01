@@ -81,6 +81,8 @@ export interface LeadStats {
   qualified: number;
   contacted: number;
   converted: number;
+  hot_prospects?: number;
+  qualification_rate?: number;
 }
 
 // Lead API endpoints

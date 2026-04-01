@@ -1,12 +1,33 @@
 #!/usr/bin/env python3
 """
 Reset password for a user by email. Run from backend dir: py scripts/reset_password.py
+
+Uses DATABASE_URL from .env by default (e.g. local MySQL). To target Render Postgres
+without changing DATABASE_URL, set RENDER_DATABASE_URL to the External Database URL
+(use postgresql+psycopg2://... if needed). Shell example:
+
+  $env:RENDER_DATABASE_URL="postgresql://..."
+  $env:RESET_EMAIL="ali@the-leadlab.com"
+  $env:RESET_PASSWORD="..."
+  py scripts/reset_password.py
 """
 import os
 import sys
 
 # Add backend to path so app is importable
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _BACKEND_DIR)
+
+
+def _resolve_db_url() -> str:
+    from dotenv import load_dotenv
+
+    load_dotenv(os.path.join(_BACKEND_DIR, ".env"))
+    from app.core.config import settings
+
+    # Prefer Render / one-off URL so DATABASE_URL can stay on local MySQL
+    return os.environ.get("RENDER_DATABASE_URL") or settings.DATABASE_URL
+
 
 def main():
     email = os.environ.get("RESET_EMAIL", "ali@the-leadlab.com")
@@ -14,9 +35,9 @@ def main():
 
     from app.core.security import get_password_hash
     from sqlalchemy import create_engine, text
-    from app.core.config import settings
 
-    engine = create_engine(settings.DATABASE_URL)
+    db_url = _resolve_db_url()
+    engine = create_engine(db_url)
     hashed = get_password_hash(new_password)
 
     with engine.connect() as conn:

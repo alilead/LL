@@ -31,6 +31,50 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b'];
 
+function formatPipelineUsd(value: number): string {
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
+  return `$${value.toFixed(0)}`;
+}
+
+function KpiWowBadge({
+  value,
+  suffix = '%',
+  sublabel,
+}: {
+  value: number | null | undefined;
+  suffix?: string;
+  sublabel?: string;
+}) {
+  if (value === null || value === undefined) {
+    return (
+      <span className="text-sm font-medium text-neutral-400 dark:text-neutral-500" title={sublabel}>
+        —
+      </span>
+    );
+  }
+  const up = value >= 0;
+  return (
+    <span
+      className={`flex items-center text-sm font-medium ${
+        up
+          ? 'text-green-600 dark:text-green-400'
+          : 'text-red-600 dark:text-red-400'
+      }`}
+      title={sublabel}
+    >
+      {up ? (
+        <ArrowUp className="w-4 h-4 mr-1" />
+      ) : (
+        <ArrowDown className="w-4 h-4 mr-1" />
+      )}
+      {up ? '+' : ''}
+      {value.toFixed(1)}
+      {suffix}
+    </span>
+  );
+}
+
 export function ModernDashboard() {
   const navigate = useNavigate();
 
@@ -46,7 +90,7 @@ export function ModernDashboard() {
     queryFn: () => api.get('/dashboard/stats'),
   });
 
-  const leadStats: LeadStats = leadStatsData?.data || {
+  const leadStats: LeadStats = leadStatsData ?? {
     total: 0,
     new: 0,
     qualified: 0,
@@ -62,12 +106,12 @@ export function ModernDashboard() {
   const conversionRate = dashboardStats.opportunities?.conversion_rate || 0;
   const activeDeals = dashboardStats.opportunities?.total || 0;
 
-  // Revenue trend data (last 7 days)
-  const revenueData = dashboardStats.leads?.trend?.slice(-7).map((item: any) => ({
-    name: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    revenue: item.new_leads * 1000, // Simulated revenue
-    leads: item.new_leads
-  })) || [];
+  // Lead activity chart (last 7 days — real counts from API)
+  const revenueData =
+    dashboardStats.leads?.trend?.slice(-7).map((item: { date: string; new_leads: number }) => ({
+      name: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      leads: item.new_leads,
+    })) || [];
 
   // Pipeline distribution data
   const pipelineData = [
@@ -109,15 +153,23 @@ export function ModernDashboard() {
             <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
               <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
-            <span className="flex items-center text-sm font-medium text-green-600 dark:text-green-400">
-              <ArrowUp className="w-4 h-4 mr-1" />
-              {leadStats.new || 0} new
-            </span>
+            <KpiWowBadge
+              value={dashboardStats.leads?.wow_new_leads_pct_change}
+              suffix="%"
+              sublabel="New leads vs prior 7 days (count)"
+            />
           </div>
           <h3 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-1">
             {totalLeads.toLocaleString()}
           </h3>
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">Total Leads</p>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+            Total Leads
+            {typeof dashboardStats.leads?.new_leads_last_7d === 'number' && (
+              <span className="block text-xs text-neutral-500 mt-0.5">
+                {dashboardStats.leads.new_leads_last_7d} new in last 7 days
+              </span>
+            )}
+          </p>
         </div>
 
         {/* Pipeline Value */}
@@ -126,13 +178,14 @@ export function ModernDashboard() {
             <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
               <DollarSign className="w-6 h-6 text-green-600 dark:text-green-400" />
             </div>
-            <span className="flex items-center text-sm font-medium text-green-600 dark:text-green-400">
-              <ArrowUp className="w-4 h-4 mr-1" />
-              15%
-            </span>
+            <KpiWowBadge
+              value={dashboardStats.opportunities?.pipeline_value_wow_pct_change}
+              suffix="%"
+              sublabel="New open pipeline $ created vs prior 7 days"
+            />
           </div>
           <h3 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-1">
-            ${(pipelineValue / 1000).toFixed(1)}K
+            {formatPipelineUsd(pipelineValue)}
           </h3>
           <p className="text-sm text-neutral-600 dark:text-neutral-400">Pipeline Value</p>
         </div>
@@ -143,10 +196,11 @@ export function ModernDashboard() {
             <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center">
               <TrendingUp className="w-6 h-6 text-purple-600 dark:text-purple-400" />
             </div>
-            <span className="flex items-center text-sm font-medium text-green-600 dark:text-green-400">
-              <ArrowUp className="w-4 h-4 mr-1" />
-              3.2%
-            </span>
+            <KpiWowBadge
+              value={dashboardStats.opportunities?.conversion_rate_wow_pp_change}
+              suffix=" pp"
+              sublabel="Win rate change (last 7d vs prior 7d closed deals), percentage points"
+            />
           </div>
           <h3 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-1">
             {conversionRate.toFixed(1)}%
@@ -278,10 +332,25 @@ export function ModernDashboard() {
             </button>
           </div>
           <div className="space-y-4">
-            <div className="text-center py-8 text-neutral-500 dark:text-neutral-400">
-              <p>No recent activities</p>
-              <p className="text-sm mt-2">Start adding leads to see activities here</p>
-            </div>
+            {Array.isArray(dashboardStats.activities) && dashboardStats.activities.length > 0 ? (
+              dashboardStats.activities.map((a: { id: string; title: string; created_at: string; type?: string }) => (
+                <div
+                  key={a.id}
+                  className="p-4 rounded-lg border border-neutral-200 dark:border-neutral-600 bg-neutral-50/50 dark:bg-neutral-800/50"
+                >
+                  <p className="text-sm font-medium text-neutral-900 dark:text-neutral-50">{a.title}</p>
+                  <p className="text-xs text-neutral-500 mt-1">
+                    {new Date(a.created_at).toLocaleString()}
+                    {a.type ? ` · ${a.type}` : ''}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-neutral-500 dark:text-neutral-400">
+                <p>No recent activities</p>
+                <p className="text-sm mt-2">Start adding leads to see activities here</p>
+              </div>
+            )}
           </div>
         </div>
 

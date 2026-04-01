@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel
 import logging
 from sqlalchemy import func, and_, or_
+from sqlalchemy.orm import joinedload
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +24,40 @@ class BulkLeadTagUpdate(BaseModel):
 
 class LeadStatsResponse(BaseModel):
     total: int
+    new: int
     qualified: int
+    contacted: int
+    converted: int
     hot_prospects: int
     qualification_rate: float
+
+
+def _lead_stage_bucket(stage_name: Optional[str]) -> str:
+    """
+    Map lead stage display name to dashboard buckets (New / Qualified / Contacted / Converted).
+    Unknown stages default to 'contacted' mid-funnel.
+    """
+    if not stage_name:
+        return "new"
+    n = stage_name.strip().lower()
+    if "renew" in n:
+        return "contacted"
+    if "lost" in n or "disqualified" in n:
+        return "contacted"
+    if any(k in n for k in ("closed won", "converted", "customer")):
+        return "converted"
+    if "won" in n and "new" not in n[:4]:
+        return "converted"
+    if "convert" in n:
+        return "converted"
+    if "contact" in n:
+        return "contacted"
+    if "qualif" in n:
+        return "qualified"
+    if "new" in n:
+        return "new"
+    return "contacted"
+
 
 @router.get("/stats", response_model=LeadStatsResponse)
 def get_lead_statistics(
@@ -33,71 +65,94 @@ def get_lead_statistics(
     current_user: models.User = Depends(deps.get_current_user)
 ) -> Any:
     """
-    Get lead statistics for the organization.
+    Lead statistics for the dashboard. Non-admin users are scoped to their organization;
+    admins see all leads (same as legacy behavior).
     """
     try:
         # Build organization filter
         filters = [
             models.Lead.is_deleted == False
         ]
-        
+
         # Add organization filter for non-admin users
         if not current_user.is_admin:
             filters.append(models.Lead.organization_id == current_user.organization_id)
-        
-        # Get total leads count
-        total_leads = db.query(func.count(models.Lead.id)).filter(*filters).scalar() or 0
-        
-        # Get all leads for qualification analysis
-        leads = db.query(models.Lead).filter(*filters).all()
-        
-        # Count qualified leads - more flexible criteria (at least email + (company or name))
-        qualified_count = 0
+
+        leads = (
+            db.query(models.Lead)
+            .options(joinedload(models.Lead.stage))
+            .filter(*filters)
+            .all()
+        )
+
+        total_leads = len(leads)
+        cnt_new = cnt_qualified = cnt_contacted = cnt_converted = 0
+
         for lead in leads:
-            has_email = bool(lead.email and lead.email.strip())
-            has_company = bool(lead.company and lead.company.strip())
-            has_name = bool((lead.first_name and lead.first_name.strip()) or (lead.last_name and lead.last_name.strip()))
-            
-            # Qualified if has email and either company or full name
-            if has_email and (has_company or has_name):
-                qualified_count += 1
-        
-        # Count hot prospects - more flexible criteria
-        hot_sectors = ['technology', 'finance', 'healthcare', 'consulting', 'software', 'it', 'medical', 'tech', 'fintech']
-        hot_sources = ['referral', 'linkedin', 'website', 'partner', 'recommendation']
+            name = lead.stage.name if lead.stage else ""
+            bucket = _lead_stage_bucket(name)
+            if bucket == "new":
+                cnt_new += 1
+            elif bucket == "qualified":
+                cnt_qualified += 1
+            elif bucket == "contacted":
+                cnt_contacted += 1
+            else:
+                cnt_converted += 1
+
+        # Hot prospects — heuristics (email + sector/source/title)
+        hot_sectors = [
+            "technology",
+            "finance",
+            "healthcare",
+            "consulting",
+            "software",
+            "it",
+            "medical",
+            "tech",
+            "fintech",
+        ]
+        hot_sources = ["referral", "linkedin", "website", "partner", "recommendation"]
         hot_prospects_count = 0
-        
+
         for lead in leads:
             has_email = bool(lead.email and lead.email.strip())
-            
-            # Check if sector matches hot sectors
             is_hot_sector = False
             if lead.sector and lead.sector.strip():
                 sector_lower = lead.sector.lower()
                 is_hot_sector = any(hot_sector in sector_lower for hot_sector in hot_sectors)
-            
-            # Check if source is valuable
             is_hot_source = False
             if lead.source and lead.source.strip():
                 source_lower = lead.source.lower()
                 is_hot_source = any(hot_source in source_lower for hot_source in hot_sources)
-            
-            # Hot prospect if has email and (hot sector OR hot source OR has job title)
             has_job_title = bool(lead.job_title and lead.job_title.strip())
-            
             if has_email and (is_hot_sector or is_hot_source or has_job_title):
                 hot_prospects_count += 1
-        
-        # Calculate qualification rate
-        qualification_rate = (qualified_count / total_leads * 100) if total_leads > 0 else 0.0
-        
-        logger.info(f"Lead Statistics for org {current_user.organization_id}: Total={total_leads}, Qualified={qualified_count}, Hot={hot_prospects_count}, Rate={qualification_rate}")
-        
+
+        # Qualification rate: % of leads in a "Qualified" stage (name contains qualif)
+        qualification_rate = (
+            (cnt_qualified / total_leads * 100) if total_leads > 0 else 0.0
+        )
+
+        logger.info(
+            "Lead Statistics for org %s: Total=%s new=%s qual=%s contact=%s conv=%s hot=%s",
+            current_user.organization_id,
+            total_leads,
+            cnt_new,
+            cnt_qualified,
+            cnt_contacted,
+            cnt_converted,
+            hot_prospects_count,
+        )
+
         return LeadStatsResponse(
             total=total_leads,
-            qualified=qualified_count,
+            new=cnt_new,
+            qualified=cnt_qualified,
+            contacted=cnt_contacted,
+            converted=cnt_converted,
             hot_prospects=hot_prospects_count,
-            qualification_rate=round(qualification_rate, 1)
+            qualification_rate=round(qualification_rate, 1),
         )
         
     except Exception as e:
