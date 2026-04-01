@@ -111,6 +111,8 @@ async def import_leads_from_csv(
                 status_code=400,
                 detail="Assigned user must be associated with an organization"
             )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting assigned user: {str(e)}")
         raise HTTPException(

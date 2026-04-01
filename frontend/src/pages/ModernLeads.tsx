@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { leadsAPI, type Lead } from '@/services/api/leads';
 import { stagesAPI } from '@/services/api/stages';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthStore } from '@/store/auth';
 import {
   LayoutGrid,
   List,
@@ -48,6 +49,7 @@ export function ModernLeads() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuthStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [view, setView] = useState<'kanban' | 'table'>('kanban');
@@ -84,9 +86,12 @@ export function ModernLeads() {
   // Upload mutation
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
+      if (!user?.id) {
+        throw new Error('You must be logged in to import leads.');
+      }
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('assigned_user_id', '1'); // Default user ID
+      formData.append('assigned_user_id', String(user.id));
       return leadsAPI.uploadCSV(formData);
     },
     onSuccess: () => {
@@ -99,9 +104,13 @@ export function ModernLeads() {
       });
     },
     onError: (error: any) => {
+      const detail =
+        error?.response?.data?.detail ||
+        error?.message ||
+        "Failed to import leads";
       toast({
         title: "Error",
-        description: error?.response?.data?.detail || "Failed to import leads",
+        description: typeof detail === "string" ? detail : JSON.stringify(detail),
         variant: "destructive",
       });
     },
@@ -139,7 +148,15 @@ export function ModernLeads() {
       });
       return;
     }
-    
+    if (!user?.id) {
+      toast({
+        title: "Not signed in",
+        description: "Please sign in again to import leads.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsUploading(true);
     try {
       await uploadMutation.mutateAsync(selectedFile);
