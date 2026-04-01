@@ -18,6 +18,16 @@ from app.schemas.lead import LeadCreate, LeadUpdate
 
 logger = logging.getLogger(__name__)
 
+# Lead ORM has read-only @property fields (no DB column); Pydantic LeadBase still includes them.
+_LEAD_ORM_EXCLUDE = frozenset({"email_guidelines", "visible", "full_name"})
+
+
+def _lead_dict_for_orm(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove schema-only keys so Lead(**data) does not hit read-only properties."""
+    out = {k: v for k, v in data.items() if k not in _LEAD_ORM_EXCLUDE}
+    return out
+
+
 class CRUDLead(CRUDBase[Lead, LeadCreate, LeadUpdate]):
     def get(self, db: Session, id: int) -> Optional[Lead]:
         """Get a lead by ID"""
@@ -291,6 +301,8 @@ class CRUDLead(CRUDBase[Lead, LeadCreate, LeadUpdate]):
         create_data["created_at"] = now
         create_data["updated_at"] = now
 
+        create_data = _lead_dict_for_orm(create_data)
+
         db_obj = self.model(**create_data)
         db.add(db_obj)
         db.commit()
@@ -314,6 +326,8 @@ class CRUDLead(CRUDBase[Lead, LeadCreate, LeadUpdate]):
             # Ensure tags is initialized as an empty list, not None
             if 'tags' not in obj_in_data or obj_in_data['tags'] is None:
                 obj_in_data['tags'] = []
+
+            obj_in_data = _lead_dict_for_orm(obj_in_data)
                 
             db_obj = Lead(**obj_in_data)
             db_objs.append(db_obj)
