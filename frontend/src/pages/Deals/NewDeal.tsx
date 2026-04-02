@@ -80,10 +80,22 @@ export const NewDealPage = () => {
     }
   });
 
-  const { data: currencies = [] as CurrencyRow[] } = useQuery({
+  const {
+    data: currencies = [] as CurrencyRow[],
+    isLoading: isLoadingCurrencies,
+    isError: isCurrenciesError,
+  } = useQuery({
     queryKey: ['currencies'],
     queryFn: getCurrencies,
   });
+
+  const currencyPlaceholder = isLoadingCurrencies
+    ? 'Loading…'
+    : isCurrenciesError
+      ? 'Could not load currencies'
+      : currencies.length
+        ? 'Select currency'
+        : 'No currencies — contact admin';
 
   useEffect(() => {
     if (!currencies.length) return;
@@ -474,11 +486,11 @@ export const NewDealPage = () => {
                     <Select
                       onValueChange={(v) => field.onChange(Number(v))}
                       value={field.value ? String(field.value) : undefined}
-                      disabled={!currencies.length}
+                      disabled={isLoadingCurrencies || !currencies.length}
                     >
                       <FormControl>
                         <SelectTrigger className="h-10">
-                          <SelectValue placeholder={currencies.length ? 'Select currency' : 'Loading…'} />
+                          <SelectValue placeholder={currencyPlaceholder} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>

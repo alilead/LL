@@ -5,7 +5,7 @@ from app.api.v1.endpoints import (
     information_requests, organizations, tags, linkedin,
     tokens, notifications, contact, lead_stages, health, settings, psychometrics, files, ai_insights, messages, credits, invoices, team_invitations, email, ml,
     territories, cpq, email_sequences, workflows, conversations, data_import, forecasting, dashboards,
-    marketing_forms,
+    marketing_forms, currencies,
 )
 import logging
 
@@ -38,6 +38,9 @@ api_router.include_router(organizations.router, prefix="/organizations", tags=["
 
 # Deal routes
 api_router.include_router(deals.router, prefix="/deals", tags=["deals"])
+
+# Currencies (deal amounts, org settings)
+api_router.include_router(currencies.router, prefix="/currencies", tags=["currencies"])
 
 # Activity routes
 api_router.include_router(activities.router, prefix="/activities", tags=["activities"])
