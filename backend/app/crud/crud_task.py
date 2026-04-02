@@ -71,6 +71,7 @@ class CRUDTask(CRUDBase[Task, TaskCreate, TaskUpdate]):
         return query.all()
 
     def create(self, db: Session, *, obj_in: TaskCreate) -> Task:
+        # Task model has no deal_id / created_by; TaskCreate has no those fields.
         db_obj = Task(
             title=obj_in.title,
             description=obj_in.description,
@@ -80,8 +81,6 @@ class CRUDTask(CRUDBase[Task, TaskCreate, TaskUpdate]):
             assigned_to_id=obj_in.assigned_to_id,
             organization_id=obj_in.organization_id,
             lead_id=obj_in.lead_id,
-            deal_id=obj_in.deal_id,
-            created_by=obj_in.created_by
         )
         db.add(db_obj)
         db.commit()
