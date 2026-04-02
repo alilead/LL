@@ -8,7 +8,7 @@ Work through this list **with your team** in order. Check items off as you finis
 
 - [x] **Phase 2A — Backend** — real aggregates, remove placeholders, document `curl` tests.
 - [x] **Phase 2B — API contract alignment** — `/leads/stats` + `/dashboard/stats` match what `ModernDashboard` (and reports) need.
-- [ ] **Phase 2C — HTTP client consistency** — one dev/prod story for all features (Messages vs main app).
+- [x] **Phase 2C — HTTP client consistency** — one dev/prod story for all features (Messages vs main app).
 - [ ] **Later phases** — frontend KPI/chart cleanup, other tabs, QA.
 
 ---
@@ -46,7 +46,7 @@ Work through this list **with your team** in order. Check items off as you finis
 
 | # | Task | Done |
 |---|------|------|
-| 1 | Unify **`frontend/src/api/api.ts`** with `services/axios` / `lib/axios` (dev proxy + prod `VITE_API_URL`) so **Messages** and main app hit the same backend in dev. | [ ] |
+| 1 | Unify **`frontend/src/api/api.ts`** with `services/axios` / `lib/axios` (dev proxy + prod `VITE_API_URL`) so **Messages** and main app hit the same backend in dev. | [x] |
 | 2 | Smoke-test **Messages** send/receive after change. | [ ] |
 
 ---
