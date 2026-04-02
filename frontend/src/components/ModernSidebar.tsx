@@ -148,9 +148,45 @@ const bottomNavigation: NavItem[] = [
 export function ModernSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [sidebarAvatarUrl, setSidebarAvatarUrl] = useState<string | null>(null);
+  const sidebarAvatarRef = useRef<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user, logout, avatarRevision } = useAuthStore();
+
+  useEffect(() => {
+    if (!user?.id) {
+      if (sidebarAvatarRef.current) {
+        URL.revokeObjectURL(sidebarAvatarRef.current);
+        sidebarAvatarRef.current = null;
+      }
+      setSidebarAvatarUrl(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get('/users/me/avatar', { responseType: 'blob' });
+        if (cancelled) return;
+        if (sidebarAvatarRef.current) {
+          URL.revokeObjectURL(sidebarAvatarRef.current);
+        }
+        const url = URL.createObjectURL(res.data);
+        sidebarAvatarRef.current = url;
+        setSidebarAvatarUrl(url);
+      } catch {
+        if (cancelled) return;
+        if (sidebarAvatarRef.current) {
+          URL.revokeObjectURL(sidebarAvatarRef.current);
+          sidebarAvatarRef.current = null;
+        }
+        setSidebarAvatarUrl(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, avatarRevision]);
 
   const handleLogout = async () => {
     await logout();
