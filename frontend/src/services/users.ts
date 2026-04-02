@@ -53,6 +53,13 @@ export const updateProfile = async (data: UserUpdateInput): Promise<UserProfile>
   return response.data;
 };
 
+/** Profile photo: POST multipart field `file` (JPG/PNG/GIF/WebP, max 2MB). GET /users/me/avatar returns the image. */
+export const uploadAvatar = async (file: File): Promise<void> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  await api.post('/users/me/avatar', formData);
+};
+
 export const changePassword = async (data: ChangePasswordInput): Promise<{ message: string }> => {
   const response = await api.post('/users/me/change-password', data);
   return response.data;
@@ -86,6 +93,7 @@ export const activateUser = async (id: string): Promise<{ message: string }> => 
 export default {
   getCurrentUser,
   updateProfile,
+  uploadAvatar,
   changePassword,
   getUsers,
   getUser,

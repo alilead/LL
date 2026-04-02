@@ -93,6 +93,15 @@ export function ModernAIInsights() {
         <p className="text-neutral-600 dark:text-neutral-400">
           Organization analytics from stored lead analyses (same data as lead-level insights).
         </p>
+        <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
+          <p className="font-medium">Why numbers can be zero</p>
+          <p className="mt-1 text-blue-800 dark:text-blue-200">
+            These metrics are computed from rows in the <strong>ai_insights</strong> table for your
+            organization. They appear after lead analyses run (open a lead, use AI insights / analyze, or
+            batch analysis). No stored analyses yet means zeros and empty charts — that is expected until
+            you analyze at least one lead.
+          </p>
+        </div>
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">

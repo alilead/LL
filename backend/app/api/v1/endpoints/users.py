@@ -1,16 +1,57 @@
 from typing import List, Optional, Any
-from fastapi import APIRouter, Depends, HTTPException, Query
+from pathlib import Path
+import mimetypes
+from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.api import deps
 from app.crud import crud_user
 from app.models.user import User as UserModel
 from app.schemas.user import User, UserCreate, UserUpdate, UserInDB, UserList, UserResponse
 from app.core.security import get_password_hash
+from app.core.config import settings
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
 logger = logging.getLogger(__name__)
+
+_AVATAR_ALLOWED_TYPES = frozenset({"image/jpeg", "image/png", "image/gif", "image/webp"})
+_AVATAR_MAX_BYTES = 2 * 1024 * 1024  # 2MB
+_AVATAR_SUFFIX = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+}
+
+
+def _avatar_storage_dir() -> Path:
+    p = Path(settings.UPLOAD_DIR) / "avatars"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def _avatar_paths_for_user(user_id: int) -> List[Path]:
+    """Possible on-disk avatar files for this user (single active file expected)."""
+    base = _avatar_storage_dir()
+    return [base / f"{user_id}{suf}" for suf in (".jpg", ".jpeg", ".png", ".gif", ".webp")]
+
+
+def _find_avatar_file(user_id: int) -> Optional[Path]:
+    for path in _avatar_paths_for_user(user_id):
+        if path.is_file():
+            return path
+    return None
+
+
+def _remove_existing_avatars(user_id: int) -> None:
+    for path in _avatar_paths_for_user(user_id):
+        if path.is_file():
+            try:
+                path.unlink()
+            except OSError:
+                pass
 
 router = APIRouter()
 
@@ -115,6 +156,46 @@ def update_current_user(
 
     user = crud_user.user.update(db, db_obj=current_user, obj_in=user_in)
     return user
+
+
+@router.post("/me/avatar")
+async def upload_my_avatar(
+    *,
+    file: UploadFile = File(...),
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
+    """Upload profile photo (JPG, PNG, GIF, WebP — max 2MB). Stored on disk; no DB column required."""
+    content_type = (file.content_type or "").split(";")[0].strip().lower()
+    if content_type not in _AVATAR_ALLOWED_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file type. Use JPG, PNG, GIF, or WebP.",
+        )
+    data = await file.read()
+    if len(data) > _AVATAR_MAX_BYTES:
+        raise HTTPException(status_code=400, detail="File too large (max 2MB).")
+    if len(data) < 32:
+        raise HTTPException(status_code=400, detail="Invalid image file.")
+
+    suffix = _AVATAR_SUFFIX.get(content_type, ".bin")
+    _remove_existing_avatars(int(current_user.id))
+    out = _avatar_storage_dir() / f"{current_user.id}{suffix}"
+    out.write_bytes(data)
+    logger.info("User %s uploaded avatar (%s bytes)", current_user.id, len(data))
+    return {"success": True, "message": "Avatar updated"}
+
+
+@router.get("/me/avatar")
+def get_my_avatar(
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
+    """Return the current user's avatar image (requires Authorization)."""
+    path = _find_avatar_file(int(current_user.id))
+    if not path:
+        raise HTTPException(status_code=404, detail="No avatar uploaded")
+    media = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
+    return FileResponse(path, media_type=media)
+
 
 @router.get("/organization-users", response_model=List[UserResponse])
 def get_organization_users(

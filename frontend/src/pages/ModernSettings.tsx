@@ -3,7 +3,7 @@
  * Tab-based, clean, professional
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   User,
   Building2,
@@ -17,11 +17,13 @@ import {
   Palette,
   Database,
   Save,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { updateProfile } from '@/services/users';
+import { updateProfile, uploadAvatar } from '@/services/users';
 import { useAuthStore } from '@/store/auth';
+import api from '@/lib/axios';
 
 type Tab = 'profile' | 'organization' | 'notifications' | 'security' | 'billing' | 'team' | 'integrations';
 
@@ -97,6 +99,11 @@ export function ModernSettings() {
 
 function ProfileSettings() {
   const { user, fetchUser } = useAuthStore();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarBlobRef = useRef<string | null>(null);
+  const [avatarObjectUrl, setAvatarObjectUrl] = useState<string | null>(null);
+  const [avatarVersion, setAvatarVersion] = useState(0);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [formState, setFormState] = useState({
     firstName: '',
@@ -124,6 +131,66 @@ function ProfileSettings() {
       }));
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get('/users/me/avatar', { responseType: 'blob' });
+        if (cancelled) return;
+        if (avatarBlobRef.current) {
+          URL.revokeObjectURL(avatarBlobRef.current);
+        }
+        const url = URL.createObjectURL(res.data);
+        avatarBlobRef.current = url;
+        setAvatarObjectUrl(url);
+      } catch {
+        if (cancelled) return;
+        if (avatarBlobRef.current) {
+          URL.revokeObjectURL(avatarBlobRef.current);
+          avatarBlobRef.current = null;
+        }
+        setAvatarObjectUrl(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (avatarBlobRef.current) {
+        URL.revokeObjectURL(avatarBlobRef.current);
+        avatarBlobRef.current = null;
+      }
+    };
+  }, [user?.id, avatarVersion]);
+
+  const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image must be 2MB or smaller');
+      return;
+    }
+    setIsUploadingAvatar(true);
+    try {
+      await uploadAvatar(file);
+      setAvatarVersion((v) => v + 1);
+      toast.success('Photo updated');
+    } catch (err: unknown) {
+      const detail =
+        err &&
+        typeof err === 'object' &&
+        'response' in err &&
+        (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+      toast.error(typeof detail === 'string' ? detail : 'Failed to upload photo');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
 
   const handleChange = (field: keyof typeof formState, value: string) => {
     setFormState((prev) => ({
@@ -182,15 +249,32 @@ function ProfileSettings() {
             Profile Photo
           </label>
           <div className="flex items-center space-x-4">
-            <div className="w-20 h-20 bg-gradient-to-br from-primary-500 to-primary-700 rounded-full flex items-center justify-center">
-              <User className="w-10 h-10 text-white" />
+            <div className="w-20 h-20 bg-gradient-to-br from-primary-500 to-primary-700 rounded-full flex items-center justify-center overflow-hidden shrink-0">
+              {avatarObjectUrl ? (
+                <img src={avatarObjectUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <User className="w-10 h-10 text-white" />
+              )}
             </div>
             <div>
-              <button className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                className="hidden"
+                onChange={handleAvatarFile}
+              />
+              <button
+                type="button"
+                disabled={isUploadingAvatar}
+                onClick={() => fileInputRef.current?.click()}
+                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"
+              >
+                {isUploadingAvatar && <Loader2 className="animate-spin w-4 h-4" />}
                 Upload new photo
               </button>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-2">
-                JPG, PNG or GIF. Max 2MB
+                JPG, PNG, GIF or WebP. Max 2MB
               </p>
             </div>
           </div>
