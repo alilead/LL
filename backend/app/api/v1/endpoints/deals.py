@@ -11,6 +11,7 @@ from app.models.currency import Currency
 from app.models.deal import Deal
 from app.schemas.deal import Deal as DealSchema
 from app.schemas.deal import DealCreate, DealUpdate, DealList, PipelineStats, DealResponse
+from app.crud.crud_currency import ensure_default_currencies
 
 import logging
 from datetime import datetime
@@ -25,6 +26,7 @@ def _resolve_currency_id(db, requested_id: int) -> int:
     Ensure currency_id exists in `currencies` (Render/prod DBs may not have id=1).
     Prefer the requested id if that row exists, else USD, else first active, else create USD.
     """
+    ensure_default_currencies(db)
     row = db.query(Currency).filter(Currency.id == requested_id).first()
     if row:
         return row.id

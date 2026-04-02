@@ -5,6 +5,7 @@ from app.api.deps import get_db, get_current_user
 from app.models.user import User
 from app.models.currency import Currency
 from app.schemas.currency import CurrencyCreate, CurrencyUpdate, Currency as CurrencySchema
+from app.crud.crud_currency import ensure_default_currencies
 
 router = APIRouter()
 
@@ -14,12 +15,18 @@ async def get_currencies(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all currencies"""
+    """Get all currencies. Seeds USD/EUR/GBP/JPY/CHF/TRY if the table is empty."""
     try:
         query = db.query(Currency)
         if active_only:
             query = query.filter(Currency.is_active == True)
         currencies = query.all()
+        if not currencies:
+            ensure_default_currencies(db)
+            query = db.query(Currency)
+            if active_only:
+                query = query.filter(Currency.is_active == True)
+            currencies = query.all()
         return currencies
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
