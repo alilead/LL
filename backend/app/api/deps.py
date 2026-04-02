@@ -1,5 +1,6 @@
 from typing import Generator, Optional, Union
 from fastapi import Depends, HTTPException, status, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from pydantic import ValidationError
@@ -57,6 +58,9 @@ def get_db() -> Generator:
     except Exception as e:
         if isinstance(e, HTTPException):
             # HTTP hataları olduğu gibi iletilsin
+            raise e
+        if isinstance(e, RequestValidationError):
+            # Body/query validation must return 422, not be masked as DB errors
             raise e
         else:
             # Diğer hatalar veritabanı hatası olarak işlensin (log full trace for debugging)

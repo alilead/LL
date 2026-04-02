@@ -58,8 +58,8 @@ export function TaskList() {
         });
         setError(null);
         return {
-          items: response.data.items || [],
-          total: response.data.total || 0
+          items: response.items || [],
+          total: response.total || 0
         };
       } catch (error: any) {
         console.error('Error fetching tasks:', error);

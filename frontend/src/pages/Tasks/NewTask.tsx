@@ -18,7 +18,7 @@ import { PageContainer } from '@/components/ui/PageContainer';
 import { useAuthStore } from '@/store/auth';
 
 // API imports
-import tasksAPI, { TaskPriority } from '@/services/tasks';
+import tasksAPI, { TaskPriority, TaskStatus } from '@/services/tasks';
 import leadsAPI, { Lead } from '@/services/api/leads';
 import usersAPI, { User } from '@/services/api/users';
 import api from '@/services/axios';
@@ -28,9 +28,9 @@ interface NewTaskForm {
   description: string;
   due_date: string;
   priority: TaskPriority;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  lead_id?: string;
-  assigned_to_id?: string;
+  status: TaskStatus;
+  lead_id?: number;
+  assigned_to_id?: number;
 }
 
 const TASK_PRIORITIES = [
@@ -41,10 +41,10 @@ const TASK_PRIORITIES = [
 ];
 
 const TASK_STATUSES = [
-  { value: 'pending', label: 'Pending' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
+  { value: TaskStatus.PENDING, label: 'Pending' },
+  { value: TaskStatus.IN_PROGRESS, label: 'In Progress' },
+  { value: TaskStatus.COMPLETED, label: 'Completed' },
+  { value: TaskStatus.CANCELLED, label: 'Cancelled' },
 ];
 
 export const NewTaskPage = () => {
@@ -58,7 +58,13 @@ export const NewTaskPage = () => {
   const [userPopoverOpen, setUserPopoverOpen] = useState(false);
   const [leadPopoverOpen, setLeadPopoverOpen] = useState(false);
   
-  const { register, handleSubmit, formState: { errors }, setValue } = useForm<NewTaskForm>();
+  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<NewTaskForm>({
+    defaultValues: {
+      description: '',
+      priority: TaskPriority.MEDIUM,
+      status: TaskStatus.PENDING,
+    },
+  });
 
   // Debug auth state
   useEffect(() => {
@@ -330,12 +336,16 @@ export const NewTaskPage = () => {
         throw new Error('Organization ID is required');
       }
       
-      const taskData = {
-        ...data,
-        organization_id: currentUser.organization_id
-      };
-      
-      const task = await tasksAPI.createTask(taskData);
+      const task = await tasksAPI.createTask({
+        title: data.title,
+        description: data.description?.trim() ? data.description : undefined,
+        due_date: data.due_date,
+        priority: data.priority,
+        status: data.status,
+        organization_id: currentUser.organization_id,
+        assigned_to_id: data.assigned_to_id,
+        lead_id: data.lead_id,
+      });
       
       toast.success("Task created successfully");
       navigate(`/tasks/${task.id}`);
@@ -400,8 +410,8 @@ export const NewTaskPage = () => {
           <div className="space-y-2">
             <label htmlFor="priority" className="text-sm font-medium">Priority</label>
             <Select
+              value={watch('priority') ?? TaskPriority.MEDIUM}
               onValueChange={(value) => setValue('priority', value as TaskPriority)}
-              defaultValue=""
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select priority" />
@@ -422,8 +432,8 @@ export const NewTaskPage = () => {
           <div className="space-y-2">
             <label htmlFor="status" className="text-sm font-medium">Status</label>
             <Select
-              onValueChange={(value) => setValue('status', value as 'pending' | 'in_progress' | 'completed' | 'cancelled')}
-              defaultValue=""
+              value={watch('status') ?? TaskStatus.PENDING}
+              onValueChange={(value) => setValue('status', value as TaskStatus)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select status" />
