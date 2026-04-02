@@ -1,11 +1,15 @@
-import axios from 'axios';
+import { getApiOrigin } from './lib/apiOrigin';
 
-// Export the API URL directly without modifying it
-export const API_URL = import.meta.env.VITE_API_URL || 'https://api.the-leadlab.com';
+const DEFAULT_PROD_ORIGIN = 'https://api.the-leadlab.com';
+
+/** API origin in production (normalized). In dev, empty — use relative /api/v1. */
+export const API_URL = import.meta.env.DEV ? '' : getApiOrigin() || DEFAULT_PROD_ORIGIN;
 export const API_BASE_URL = API_URL; // Alias for compatibility
 
+export { getApiOrigin } from './lib/apiOrigin';
+
 export const APP_CONFIG = {
-  apiBaseUrl: API_URL,
+  apiBaseUrl: API_URL || DEFAULT_PROD_ORIGIN,
   apiRequestConfig: {
     headers: {
       'Content-Type': 'application/json',

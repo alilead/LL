@@ -81,6 +81,8 @@ export function MarketingNav() {
           {isAuthenticated ? (
             <Link
               to="/dashboard"
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-sm font-medium bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-lg"
             >
               Dashboard
@@ -88,6 +90,8 @@ export function MarketingNav() {
           ) : (
             <Link
               to="/signin"
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-sm font-medium bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-lg"
             >
               Sign in
@@ -118,11 +122,23 @@ export function MarketingNav() {
             Book demo
           </a>
           {isAuthenticated ? (
-            <Link to="/dashboard" className="text-center text-sm font-medium text-blue-600" onClick={() => setOpen(false)}>
+            <Link
+              to="/dashboard"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-center text-sm font-medium text-blue-600"
+              onClick={() => setOpen(false)}
+            >
               Dashboard
             </Link>
           ) : (
-            <Link to="/signin" className="text-center text-sm font-medium text-blue-600" onClick={() => setOpen(false)}>
+            <Link
+              to="/signin"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-center text-sm font-medium text-blue-600"
+              onClick={() => setOpen(false)}
+            >
               Sign in
             </Link>
           )}

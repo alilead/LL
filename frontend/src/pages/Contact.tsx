@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { toast } from 'react-hot-toast'
+import { getApiOrigin } from '@/lib/apiOrigin'
 import { MarketingNav } from '../components/marketing/MarketingNav'
 import { Mail, Phone, MapPin } from 'lucide-react'
 
@@ -24,7 +25,7 @@ export function Contact() {
     setIsLoading(true)
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/contact/`, {
+      const response = await fetch(`${getApiOrigin()}/api/v1/contact/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

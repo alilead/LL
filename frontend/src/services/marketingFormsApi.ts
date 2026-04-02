@@ -1,4 +1,4 @@
-const apiBase = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+import { getApiOrigin } from '@/lib/apiOrigin'
 
 export type MarketingFormType =
   | 'business_diagnostic'
@@ -17,6 +17,7 @@ export interface MarketingFormPayload {
 }
 
 export async function submitMarketingForm(body: MarketingFormPayload): Promise<{ msg: string; id?: number }> {
+  const apiBase = getApiOrigin()
   const res = await fetch(`${apiBase}/api/v1/lead-forms/submit`, {
     method: 'POST',
     headers: {

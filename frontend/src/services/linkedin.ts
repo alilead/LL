@@ -1,5 +1,6 @@
 import axios from 'axios';
 import api from './axios';
+import { getApiOrigin } from '@/lib/apiOrigin';
 import { extractLinkedInProfileId } from '@/utils/linkedin';
 import { VITE_LINKEDIN_CLIENT_ID, VITE_LINKEDIN_REDIRECT_URI } from '@/config/env'
 
@@ -114,8 +115,9 @@ export const handleLinkedInCallback = async (code: string) => {
       throw new Error('No code verifier found');
     }
 
-    const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    const response = await axios.post(`${baseURL}/api/v1/linkedin/token`, { 
+    const origin = getApiOrigin();
+    const tokenUrl = origin ? `${origin}/api/v1/linkedin/token` : '/api/v1/linkedin/token';
+    const response = await axios.post(tokenUrl, {
       code,
       code_verifier: codeVerifier 
     });

@@ -1,16 +1,17 @@
 import axios from 'axios';
+import { getApiOrigin } from '@/lib/apiOrigin';
 import { informationRequestsAPI } from './information-requests';
 import leadsAPI from './leads';
 
 // Get API URL from environment variables or use proxy in development
 const isDevelopment = import.meta.env.DEV;
-// In development mode, use the proxy set up in vite.config.ts
-const API_URL = isDevelopment ? '' : import.meta.env.VITE_API_URL || 'https://api.the-leadlab.com';
+const API_URL = isDevelopment ? '' : getApiOrigin();
 // In development, use the proxy to route to localhost:8000
 const baseURL = isDevelopment ? '/api/v1' : `${API_URL}/api/v1`;
 
 const instance = axios.create({
   baseURL,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },

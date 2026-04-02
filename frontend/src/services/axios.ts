@@ -1,20 +1,20 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/auth';
+import { getApiOrigin } from '@/lib/apiOrigin';
 
 // Get API URL from environment variables or use proxy in development
 const isDevelopment = import.meta.env.DEV;
-// In development mode, use the proxy set up in vite.config.ts
-const API_URL = isDevelopment ? '' : import.meta.env.VITE_API_URL;
+const API_URL = isDevelopment ? '' : getApiOrigin();
 if (!isDevelopment && !API_URL) {
   console.error('VITE_API_URL is not defined in environment variables and not in development mode');
 }
 
 // In development, use the proxy to route to localhost:8000
 const baseURL = isDevelopment ? '/api/v1' : `${API_URL}/api/v1`;
-console.log('Using API base URL:', baseURL);
 
 const api = axios.create({
   baseURL,
+  timeout: 60000,
   headers: {
     'Accept': 'application/json',
     'Content-Type': 'application/json'

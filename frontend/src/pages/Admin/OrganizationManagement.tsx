@@ -1,5 +1,6 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getApiOrigin } from '@/lib/apiOrigin'
 import { organizationsAPI } from '@/services/api';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -481,7 +482,7 @@ export function OrganizationManagement() {
             <div className="flex items-center space-x-4">
               {org.logo_filename ? (
                 <img
-                  src={`${import.meta.env.VITE_API_URL}/api/v1/organizations/logo/${org.id}/${org.logo_filename}`}
+                  src={`${getApiOrigin()}/api/v1/organizations/logo/${org.id}/${org.logo_filename}`}
                   alt={org.name}
                   className="w-12 h-12 rounded object-cover"
                   onError={(e) => {

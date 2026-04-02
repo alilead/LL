@@ -40,6 +40,7 @@ import {
 import { toast } from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth';
+import { getApiOrigin } from '@/lib/apiOrigin'
 import { organizationsAPI } from '@/services/api';
 
 // Validation schema
@@ -125,7 +126,7 @@ export function OrganizationPage() {
       
       // Set logo preview if exists
       if (organization.logo_filename) {
-        setLogoPreview(`${import.meta.env.VITE_API_URL}/api/v1/organizations/logo/${organization.id}/${organization.logo_filename}`);
+        setLogoPreview(`${getApiOrigin()}/api/v1/organizations/logo/${organization.id}/${organization.logo_filename}`);
       }
     }
   }, [organization, form]);
@@ -203,7 +204,7 @@ export function OrganizationPage() {
       
       // Reset logo preview
       if (organization.logo_filename) {
-        setLogoPreview(`${import.meta.env.VITE_API_URL}/api/v1/organizations/logo/${organization.id}/${organization.logo_filename}`);
+        setLogoPreview(`${getApiOrigin()}/api/v1/organizations/logo/${organization.id}/${organization.logo_filename}`);
       } else {
         setLogoPreview(null);
       }
@@ -466,7 +467,7 @@ export function OrganizationPage() {
               </CardHeader>
               <CardContent>
                 <img 
-                  src={`${import.meta.env.VITE_API_URL}/api/v1/organizations/logo/${organization.id}/${organization.logo_filename}`}
+                  src={`${getApiOrigin()}/api/v1/organizations/logo/${organization.id}/${organization.logo_filename}`}
                   alt={organization.name}
                   className="w-full h-32 object-contain rounded-lg border bg-gray-50"
                   onError={(e) => {

@@ -563,10 +563,11 @@ export function HomePage() {
 
             <div className="max-w-4xl mx-auto px-4">
               <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-3">
-                Choose your intake
+                Tell us what you need
               </h2>
               <p className="text-center text-gray-600 mb-10 max-w-2xl mx-auto">
-                Pick one option and submit the right details. We route it to the team that can help.
+                Pick one option and submit the right details. We route it to the team that can help. Your information is
+                sent securely.
               </p>
 
               <div className="grid sm:grid-cols-3 gap-3">
