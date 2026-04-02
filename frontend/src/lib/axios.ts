@@ -138,7 +138,7 @@ api.interceptors.response.use(
           return Promise.resolve({ data: { settings: {} } });
         }
         if (currentUrl.includes('/currencies')) {
-          return Promise.resolve({ data: { items: [] } });
+          return Promise.resolve({ data: [] });
         }
         if (currentUrl.includes('/lead-stages')) {
           return Promise.resolve({ data: { items: [] } });
@@ -207,7 +207,7 @@ api.interceptors.response.use(
           return Promise.resolve({ data: { settings: {} } });
         }
         if (currentUrl.includes('/currencies')) {
-          return Promise.resolve({ data: { items: [] } });
+          return Promise.resolve({ data: [] });
         }
         if (currentUrl.includes('/lead-stages')) {
           return Promise.resolve({ data: { items: [] } });

@@ -7,9 +7,15 @@ export interface Currency {
   symbol: string;
 }
 
-export const getCurrencies = async () => {
+/** Backend returns a JSON array; axios 401/404 fallbacks may use `{ items: [] }`. */
+export const getCurrencies = async (): Promise<Currency[]> => {
   const response = await api.get('/currencies');
-  return response.data;
+  const data = response.data;
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray((data as { items?: unknown }).items)) {
+    return (data as { items: Currency[] }).items;
+  }
+  return [];
 };
 
 export const createCurrency = async (data: Omit<Currency, 'id'>) => {
