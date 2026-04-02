@@ -182,6 +182,7 @@ function ProfileSettings() {
     try {
       await uploadAvatar(file);
       setAvatarVersion((v) => v + 1);
+      useAuthStore.getState().bumpAvatarRevision();
       toast.success('Photo updated');
     } catch (err: unknown) {
       const detail =
@@ -815,47 +816,103 @@ function TeamSettings() {
   );
 }
 
+type IntegrationTile = {
+  id: string;
+  name: string;
+  icon: typeof Mail;
+  /** Shown status — informational; live status comes from your connected accounts / CRM import */
+  connected: boolean;
+  connectPath?: string;
+  disconnectHint?: string;
+};
+
 function IntegrationsSettings() {
+  const navigate = useNavigate();
+
+  const tiles: IntegrationTile[] = [
+    {
+      id: 'salesforce',
+      name: 'Salesforce',
+      icon: Database,
+      connected: false,
+      connectPath: '/data-import/wizard',
+    },
+    {
+      id: 'hubspot',
+      name: 'HubSpot',
+      icon: Mail,
+      connected: false,
+      connectPath: '/data-import/wizard',
+    },
+    {
+      id: 'slack',
+      name: 'Slack',
+      icon: MessageSquare,
+      connected: false,
+      disconnectHint: 'Slack workspace linking is not enabled for this environment yet.',
+    },
+    {
+      id: 'gmail',
+      name: 'Gmail',
+      icon: Mail,
+      connected: false,
+      connectPath: '/emails',
+    },
+  ];
+
+  const handlePrimary = (tile: IntegrationTile) => {
+    if (tile.connected) {
+      toast(tile.disconnectHint || 'Disconnect is not available for this integration yet.');
+      return;
+    }
+    if (tile.connectPath) {
+      navigate(tile.connectPath);
+      if (tile.id === 'gmail') {
+        toast.success('On the Email page, add an account and choose Gmail.');
+      }
+      return;
+    }
+    toast('This integration is not available yet.');
+  };
+
   return (
     <div className="p-8">
       <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-6">
         Integrations
       </h2>
       <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
-        Integration tiles are examples. Connect CRM and messaging from the Integrations or Admin sections when those connectors are enabled for your org.
+        Connect Gmail from Email. HubSpot and Salesforce use the Data Import wizard (CSV and CRM sources). Other
+        connectors are shown as placeholders until enabled for your org.
       </p>
 
       <div className="grid grid-cols-2 gap-4">
-        {[
-          { name: 'Salesforce', icon: Database, connected: true },
-          { name: 'HubSpot', icon: Mail, connected: false },
-          { name: 'Slack', icon: MessageSquare, connected: true },
-          { name: 'Gmail', icon: Mail, connected: false },
-        ].map((integration, index) => {
-          const Icon = integration.icon;
+        {tiles.map((tile) => {
+          const Icon = tile.icon;
           return (
-            <div key={index} className="p-6 border border-neutral-200 dark:border-neutral-700 rounded-lg">
+            <div key={tile.id} className="p-6 border border-neutral-200 dark:border-neutral-700 rounded-lg">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="w-12 h-12 bg-neutral-100 dark:bg-neutral-700 rounded-lg flex items-center justify-center">
                   <Icon className="w-6 h-6 text-neutral-600 dark:text-neutral-400" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-neutral-900 dark:text-neutral-50">
-                    {integration.name}
+                    {tile.name}
                   </h3>
                   <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                    {integration.connected ? 'Connected' : 'Not connected'}
+                    {tile.connected ? 'Connected' : 'Not connected'}
                   </p>
                 </div>
               </div>
               <button
+                type="button"
+                onClick={() => handlePrimary(tile)}
                 className={`w-full px-4 py-2 rounded-lg font-medium transition-colors ${
-                  integration.connected
+                  tile.connected
                     ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30'
                     : 'bg-primary-600 hover:bg-primary-700 text-white'
                 }`}
               >
-                {integration.connected ? 'Disconnect' : 'Connect'}
+                {tile.connected ? 'Disconnect' : 'Connect'}
               </button>
             </div>
           );

@@ -23,8 +23,11 @@ interface AuthState {
   isAuthenticated: boolean
   isLoading: boolean
   error: string | null
+  /** Bumped when profile photo changes so layout can refetch /users/me/avatar */
+  avatarRevision: number
   setUser: (user: User | null) => void
   setToken: (token: string | null) => void
+  bumpAvatarRevision: () => void
   login: (credentials: LoginCredentials) => Promise<void>
   register: (data: RegisterData) => Promise<void>
   logout: () => Promise<void>
@@ -41,10 +44,13 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: false,
       error: null,
-      
+      avatarRevision: 0,
+
       setUser: (user) => set({ user }),
-      
+
       setToken: (token) => set({ token }),
+
+      bumpAvatarRevision: () => set((s) => ({ avatarRevision: (s.avatarRevision ?? 0) + 1 })),
       
       login: async (credentials: LoginCredentials) => {
         set({ isLoading: true, error: null })

@@ -3,9 +3,10 @@
  * Clean, intuitive, professional
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth';
+import api from '@/lib/axios';
 import {
   LayoutDashboard,
   Users,
@@ -320,8 +321,12 @@ export function ModernSidebar() {
             onClick={handleLogout}
             className="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
           >
-            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-full flex items-center justify-center">
-              <User className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-full flex items-center justify-center overflow-hidden shrink-0">
+              {sidebarAvatarUrl ? (
+                <img src={sidebarAvatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <User className="w-5 h-5 text-white" />
+              )}
             </div>
             <div className="flex-1 min-w-0 text-left">
               <p className="text-sm font-medium text-neutral-900 dark:text-neutral-50 truncate">
