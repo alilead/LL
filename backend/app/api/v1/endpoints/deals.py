@@ -7,6 +7,7 @@ from decimal import Decimal
 from app.api import deps
 from app.crud import crud_deal
 from app.models.user import User
+from app.models.currency import Currency
 from app.models.deal import Deal
 from app.schemas.deal import Deal as DealSchema
 from app.schemas.deal import DealCreate, DealUpdate, DealList, PipelineStats, DealResponse
@@ -17,6 +18,45 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _resolve_currency_id(db, requested_id: int) -> int:
+    """
+    Ensure currency_id exists in `currencies` (Render/prod DBs may not have id=1).
+    Prefer the requested id if that row exists, else USD, else first active, else create USD.
+    """
+    row = db.query(Currency).filter(Currency.id == requested_id).first()
+    if row:
+        return row.id
+
+    usd = db.query(Currency).filter(Currency.code == "USD").first()
+    if usd:
+        logger.warning(
+            "currency_id=%s invalid or inactive; using USD id=%s",
+            requested_id,
+            usd.id,
+        )
+        return usd.id
+
+    first = (
+        db.query(Currency)
+        .filter(Currency.is_active == True)
+        .order_by(Currency.id.asc())
+        .first()
+    )
+    if first:
+        logger.warning(
+            "currency_id=%s invalid; using first active currency id=%s",
+            requested_id,
+            first.id,
+        )
+        return first.id
+
+    c = Currency(code="USD", name="US Dollar", symbol="$", is_active=True)
+    db.add(c)
+    db.flush()
+    logger.info("Created default USD currency row id=%s", c.id)
+    return c.id
 
 @router.get("", response_model=DealList)
 @router.get("/", response_model=DealList)
@@ -56,6 +96,10 @@ def create_deal(
     # Set the organization_id to the current user's organization
     if not current_user.is_admin:
         deal_in.organization_id = current_user.organization_id
+
+    resolved_currency = _resolve_currency_id(db, deal_in.currency_id)
+    if resolved_currency != deal_in.currency_id:
+        deal_in = deal_in.model_copy(update={"currency_id": resolved_currency})
 
     # Create the deal
     deal = crud_deal.deal.create(db=db, obj_in=deal_in)

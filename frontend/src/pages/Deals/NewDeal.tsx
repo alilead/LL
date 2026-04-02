@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/Form';
 import { useAuthStore } from '@/store/auth';
 import usersAPI from '@/services/api/users';
+import { getCurrencies, type Currency as CurrencyRow } from '@/services/currencies';
 
 interface NewDealForm {
   lead_id: number;
@@ -74,10 +75,24 @@ export const NewDealPage = () => {
       probability: 0,
       organization_id: 0,
       assigned_to_id: 0,
-      currency_id: 1,
+      currency_id: 0,
       lead_id: 0
     }
   });
+
+  const { data: currencies = [] as CurrencyRow[] } = useQuery({
+    queryKey: ['currencies'],
+    queryFn: getCurrencies,
+  });
+
+  useEffect(() => {
+    if (!currencies.length) return;
+    const current = form.getValues('currency_id');
+    if (current && currencies.some((c) => c.id === current)) return;
+    const usd = currencies.find((c) => c.code === 'USD');
+    form.setValue('currency_id', (usd ?? currencies[0]).id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run when currency list loads
+  }, [currencies]);
 
   // Fetch leads based on search term
   const { data: leadsResponse, isLoading: isLoadingLeads } = useQuery({
@@ -153,10 +168,19 @@ export const NewDealPage = () => {
     setIsSubmitting(true);
     try {
       // Backend'in beklediği formata göre veri hazırlayalım
+      if (!data.currency_id) {
+        toast({
+          title: 'Currency required',
+          description: 'Loading currencies… try again in a moment.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       const formattedData = {
         ...data,
         organization_id: currentUser?.organization_id || 0,
-        currency_id: 1,
+        currency_id: data.currency_id,
         // Status değeri için DealStatus enum formatında düzenleyelim
         status: data.status === 'Closed_Won' ? 'Closed Won' : 
                 data.status === 'Closed_Lost' ? 'Closed Lost' : 
@@ -402,7 +426,7 @@ export const NewDealPage = () => {
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-medium">Amount (USD)</FormLabel>
+                      <FormLabel className="text-sm font-medium">Amount</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <span className="absolute left-3 top-2.5 text-gray-500">$</span>
@@ -421,7 +445,7 @@ export const NewDealPage = () => {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-sm font-medium">Stage</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger className="h-10">
                             <SelectValue placeholder="Select stage" />
@@ -440,6 +464,38 @@ export const NewDealPage = () => {
                   )}
                 />
               </div>
+
+              <FormField
+                control={form.control}
+                name="currency_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">Currency</FormLabel>
+                    <Select
+                      onValueChange={(v) => field.onChange(Number(v))}
+                      value={field.value ? String(field.value) : undefined}
+                      disabled={!currencies.length}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder={currencies.length ? 'Select currency' : 'Loading…'} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {currencies.map((c) => (
+                          <SelectItem key={c.id} value={String(c.id)}>
+                            {c.code} — {c.name} ({c.symbol})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription className="text-xs text-gray-500">
+                      Amount is stored in the selected currency.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
             <div className="grid grid-cols-1 gap-4 lg:gap-6 bg-white rounded-xl shadow-sm border p-4 lg:p-6">
