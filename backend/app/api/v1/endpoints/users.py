@@ -64,6 +64,7 @@ def get_users(
         has_more=has_more
     )
 
+@router.post("", response_model=UserInDB)
 @router.post("/", response_model=UserInDB)
 def create_user(
     *,
