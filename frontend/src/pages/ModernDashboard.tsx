@@ -79,15 +79,27 @@ export function ModernDashboard() {
   const navigate = useNavigate();
 
   // Fetch lead statistics
-  const { data: leadStatsData, isLoading: isLoadingLeadStats } = useQuery({
+  const {
+    data: leadStatsData,
+    isLoading: isLoadingLeadStats,
+    isError: isLeadStatsError,
+    refetch: refetchLeadStats,
+  } = useQuery({
     queryKey: ['leadStats'],
     queryFn: leadsAPI.getLeadStats,
+    retry: 1,
   });
 
   // Fetch dashboard stats
-  const { data: dashboardStatsResponse, isLoading: isLoadingDashboard } = useQuery({
+  const {
+    data: dashboardStatsResponse,
+    isLoading: isLoadingDashboard,
+    isError: isDashboardError,
+    refetch: refetchDashboard,
+  } = useQuery({
     queryKey: ['dashboardStats'],
     queryFn: () => api.get('/dashboard/stats'),
+    retry: 1,
   });
 
   const leadStats: LeadStats = leadStatsData ?? {
@@ -128,6 +140,31 @@ export function ModernDashboard() {
         <div className="flex flex-col items-center space-y-4">
           <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
           <p className="text-neutral-600 dark:text-neutral-400">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLeadStatsError || isDashboardError) {
+    return (
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-8 flex items-center justify-center">
+        <div className="max-w-md rounded-xl border border-red-200 dark:border-red-900 bg-white dark:bg-neutral-800 p-8 text-center shadow-sm">
+          <p className="text-lg font-semibold text-neutral-900 dark:text-neutral-50 mb-2">
+            Could not load dashboard
+          </p>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-6">
+            One or more requests failed. Check your connection or sign in again.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              void refetchLeadStats();
+              void refetchDashboard();
+            }}
+            className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );

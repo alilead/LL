@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/Label';
 import { useToast } from '@/hooks/use-toast';
 import {
   TrendingUp, Target, DollarSign, Award, Calendar,
-  Loader2, CheckCircle, Send, Edit
+  Loader2, CheckCircle, Send, Edit, Plus
 } from 'lucide-react';
 import { PageContainer } from '@/components/ui/PageContainer';
 import { Badge } from '@/components/ui/Badge';
@@ -26,10 +26,17 @@ export const ForecastDashboard: React.FC = () => {
     closed_amount: ''
   });
 
-  // Fetch active period
-  const { data: activePeriod, isLoading: isPeriodLoading } = useQuery({
+  // Fetch active period (404 = no period configured — not an infinite retry case)
+  const {
+    data: activePeriod,
+    isLoading: isPeriodLoading,
+    isError: isActivePeriodError,
+    error: activePeriodError,
+    refetch: refetchActivePeriod,
+  } = useQuery({
     queryKey: ['forecast-periods', 'active'],
-    queryFn: forecastsAPI.getActivePeriod
+    queryFn: forecastsAPI.getActivePeriod,
+    retry: false,
   });
 
   // Fetch my forecast
@@ -40,8 +47,24 @@ export const ForecastDashboard: React.FC = () => {
   });
 
   // Save forecast mutation
+  const createPeriodMutation = useMutation({
+    mutationFn: forecastsAPI.createPeriod,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['forecast-periods'] });
+      toast({
+        title: 'Forecast period created',
+        description: 'You can now save your forecast for this period.',
+      });
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : 'Could not create period';
+      toast({ title: 'Error', description: msg, variant: 'destructive' });
+    },
+  });
+
   const saveMutation = useMutation({
-    mutationFn: (data: any) => forecastsAPI.createOrUpdateForecast(data),
+    mutationFn: (data: Parameters<typeof forecastsAPI.createOrUpdateForecast>[0]) =>
+      forecastsAPI.createOrUpdateForecast(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-forecast'] });
       setIsEditDialogOpen(false);
@@ -49,7 +72,22 @@ export const ForecastDashboard: React.FC = () => {
         title: 'Success',
         description: 'Forecast updated successfully'
       });
-    }
+    },
+    onError: (err: unknown) => {
+      const msg =
+        err &&
+        typeof err === 'object' &&
+        'response' in err &&
+        err.response &&
+        typeof err.response === 'object' &&
+        'data' in err.response &&
+        err.response.data &&
+        typeof err.response.data === 'object' &&
+        'detail' in err.response.data
+        ? String((err.response.data as { detail?: unknown }).detail)
+        : 'Could not save forecast';
+      toast({ title: 'Save failed', description: msg, variant: 'destructive' });
+    },
   });
 
   // Submit forecast mutation
@@ -84,7 +122,14 @@ export const ForecastDashboard: React.FC = () => {
   };
 
   const handleSave = () => {
-    if (!activePeriod) return;
+    if (!activePeriod) {
+      toast({
+        title: 'No active period',
+        description: 'Create a forecast period first, or ask an admin to open one.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     saveMutation.mutate({
       period_id: activePeriod.id,
@@ -101,7 +146,7 @@ export const ForecastDashboard: React.FC = () => {
 
   const finalCommit = myForecast?.manager_adjusted_commit || myForecast?.commit_amount || 0;
 
-  if (isPeriodLoading || isForecastLoading) {
+  if (isPeriodLoading) {
     return (
       <PageContainer>
         <div className="flex items-center justify-center h-64">
@@ -110,6 +155,42 @@ export const ForecastDashboard: React.FC = () => {
       </PageContainer>
     );
   }
+
+  // Non-404 errors loading active period
+  if (isActivePeriodError && (activePeriodError as { response?: { status?: number } })?.response?.status !== 404) {
+    return (
+      <PageContainer>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
+          <p className="font-medium text-red-800">Could not load forecast period</p>
+          <Button className="mt-4" variant="outline" onClick={() => refetchActivePeriod()}>
+            Retry
+          </Button>
+        </div>
+      </PageContainer>
+    );
+  }
+
+  if (activePeriod && isForecastLoading) {
+    return (
+      <PageContainer>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
+      </PageContainer>
+    );
+  }
+
+  const handleCreateCurrentMonthPeriod = () => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    createPeriodMutation.mutate({
+      period_type: 'monthly',
+      start_date: iso(start),
+      end_date: iso(end),
+    });
+  };
 
   return (
     <PageContainer>
@@ -132,7 +213,7 @@ export const ForecastDashboard: React.FC = () => {
           <div className="flex gap-2">
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" onClick={handleEdit}>
+                <Button variant="outline" onClick={handleEdit} disabled={!activePeriod}>
                   <Edit className="h-4 w-4 mr-2" />
                   Update Forecast
                 </Button>
@@ -195,7 +276,7 @@ export const ForecastDashboard: React.FC = () => {
                 </div>
               </DialogContent>
             </Dialog>
-            {myForecast && myForecast.status === 'draft' && (
+            {myForecast && myForecast.id > 0 && myForecast.status === 'draft' && (
               <Button onClick={() => submitMutation.mutate(myForecast.id)}>
                 <Send className="h-4 w-4 mr-2" />
                 Submit for Review
@@ -204,8 +285,29 @@ export const ForecastDashboard: React.FC = () => {
           </div>
         </div>
 
+        {!activePeriod && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="font-medium text-amber-900">No active forecast period</p>
+              <p className="text-sm text-amber-800 mt-1">
+                Create a period for the current month so you can save numbers. Your org can add other ranges from the API or admin tools if needed.
+              </p>
+            </div>
+            <Button
+              type="button"
+              onClick={handleCreateCurrentMonthPeriod}
+              disabled={createPeriodMutation.isPending}
+            >
+              {createPeriodMutation.isPending && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              Create this month&apos;s period
+            </Button>
+          </div>
+        )}
+
         {/* Status Badge */}
-        {myForecast && (
+        {myForecast && myForecast.id > 0 && (
           <div className="flex gap-2">
             {myForecast.status === 'draft' && (
               <Badge variant="secondary">
@@ -339,8 +441,8 @@ export const ForecastDashboard: React.FC = () => {
           </Card>
         )}
 
-        {/* Empty State */}
-        {!myForecast && activePeriod && (
+        {/* Empty State — API returns placeholder forecast with id 0 when none exists */}
+        {activePeriod && (!myForecast || myForecast.id === 0) && (
           <Card>
             <CardContent className="py-12 text-center">
               <TrendingUp className="h-16 w-16 mx-auto mb-4 text-gray-400" />

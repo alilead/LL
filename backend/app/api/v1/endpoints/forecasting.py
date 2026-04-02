@@ -11,19 +11,59 @@ Collaborative forecasting system with:
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, date
 
 from app.api import deps
 from app.models.user import User
 from app.models.forecast import (
     ForecastPeriod, Forecast, ForecastItem, ForecastHistory,
-    ForecastRollup, ForecastComment, ForecastCategory, ForecastStatus
+    ForecastRollup, ForecastComment, ForecastCategory, ForecastStatus,
+    ForecastPeriodType,
 )
 from app.db.session import get_db
 
 router = APIRouter()
+
+
+class ForecastPeriodCreate(BaseModel):
+    period_type: str
+    start_date: str
+    end_date: str
+
+
+class ForecastUpsert(BaseModel):
+    period_id: int
+    pipeline_amount: float = 0.0
+    best_case_amount: float = 0.0
+    commit_amount: float = 0.0
+    closed_amount: float = 0.0
+    territory_id: Optional[int] = None
+    quota_amount: Optional[float] = None
+
+
+class ForecastAdjustBody(BaseModel):
+    manager_adjusted_commit: float
+    adjustment_reason: str
+
+
+def _derive_period_calendar_fields(
+    period_type: ForecastPeriodType, start: date
+) -> tuple[int, Optional[int], Optional[int], Optional[int]]:
+    y = start.year
+    if period_type == ForecastPeriodType.MONTHLY:
+        return y, None, start.month, None
+    if period_type == ForecastPeriodType.QUARTERLY:
+        q = (start.month - 1) // 3 + 1
+        return y, q, None, None
+    if period_type == ForecastPeriodType.WEEKLY:
+        _, w, _ = start.isocalendar()
+        return y, None, None, int(w)
+    if period_type == ForecastPeriodType.ANNUAL:
+        return y, None, None, None
+    return y, None, None, None
 
 
 # ==================== FORECAST PERIODS ====================
@@ -85,23 +125,39 @@ def get_active_period(
 
 @router.post("/periods", response_model=dict)
 def create_forecast_period(
-    period_type: str,
-    start_date: str,
-    end_date: str,
+    body: ForecastPeriodCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(deps.get_current_user)
 ):
     """Create a new forecast period"""
-    from app.models.forecast import ForecastPeriodType
-    from datetime import date
+    from datetime import time as time_
+
+    try:
+        pt = ForecastPeriodType(body.period_type)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid period_type: {body.period_type}")
+
+    sd = date.fromisoformat(body.start_date)
+    ed = date.fromisoformat(body.end_date)
+    if ed < sd:
+        raise HTTPException(status_code=400, detail="end_date must be on or after start_date")
+
+    year, quarter, month, week = _derive_period_calendar_fields(pt, sd)
+    start_dt = datetime.combine(sd, time_.min)
+    end_dt = datetime.combine(ed, time_(23, 59, 59))
 
     period = ForecastPeriod(
         organization_id=current_user.organization_id,
-        period_type=ForecastPeriodType(period_type),
-        start_date=date.fromisoformat(start_date),
-        end_date=date.fromisoformat(end_date),
+        period_type=pt,
+        year=year,
+        quarter=quarter,
+        month=month,
+        week=week,
+        start_date=start_dt,
+        end_date=end_dt,
         is_closed=False,
-        created_at=datetime.now()
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
     )
 
     db.add(period)
@@ -198,125 +254,6 @@ def get_forecasts(
     return [_forecast_to_dict(f) for f in forecasts]
 
 
-@router.get("/{forecast_id}", response_model=dict)
-def get_forecast(
-    forecast_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(deps.get_current_user)
-):
-    """Get a specific forecast"""
-    forecast = db.query(Forecast).filter(Forecast.id == forecast_id).first()
-
-    if not forecast:
-        raise HTTPException(status_code=404, detail="Forecast not found")
-
-    return _forecast_to_dict(forecast)
-
-
-@router.post("", response_model=dict)
-def create_or_update_forecast(
-    period_id: int,
-    pipeline_amount: float,
-    best_case_amount: float,
-    commit_amount: float,
-    closed_amount: float,
-    territory_id: Optional[int] = None,
-    quota_amount: Optional[float] = None,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(deps.get_current_user)
-):
-    """Create or update a forecast"""
-    # Check if forecast exists
-    forecast = db.query(Forecast).filter(
-        Forecast.period_id == period_id,
-        Forecast.user_id == current_user.id
-    ).first()
-
-    if forecast:
-        # Update existing
-        forecast.pipeline_amount = pipeline_amount
-        forecast.best_case_amount = best_case_amount
-        forecast.commit_amount = commit_amount
-        forecast.closed_amount = closed_amount
-        if territory_id:
-            forecast.territory_id = territory_id
-        if quota_amount:
-            forecast.quota_amount = quota_amount
-        forecast.updated_at = datetime.now()
-    else:
-        # Create new
-        forecast = Forecast(
-            period_id=period_id,
-            user_id=current_user.id,
-            territory_id=territory_id,
-            pipeline_amount=pipeline_amount,
-            best_case_amount=best_case_amount,
-            commit_amount=commit_amount,
-            closed_amount=closed_amount,
-            quota_amount=quota_amount,
-            status=ForecastStatus.draft,
-            created_at=datetime.now(),
-            updated_at=datetime.now()
-        )
-        db.add(forecast)
-
-    db.commit()
-    db.refresh(forecast)
-
-    return _forecast_to_dict(forecast)
-
-
-@router.post("/{forecast_id}/submit", response_model=dict)
-def submit_forecast(
-    forecast_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(deps.get_current_user)
-):
-    """Submit a forecast for approval"""
-    forecast = db.query(Forecast).filter(
-        Forecast.id == forecast_id,
-        Forecast.user_id == current_user.id
-    ).first()
-
-    if not forecast:
-        raise HTTPException(status_code=404, detail="Forecast not found")
-
-    forecast.status = ForecastStatus.submitted
-    forecast.submitted_at = datetime.now()
-    forecast.updated_at = datetime.now()
-
-    db.commit()
-    db.refresh(forecast)
-
-    return _forecast_to_dict(forecast)
-
-
-@router.post("/{forecast_id}/adjust", response_model=dict)
-def adjust_forecast(
-    forecast_id: int,
-    manager_adjusted_commit: float,
-    adjustment_reason: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(deps.get_current_user)
-):
-    """Manager adjusts a forecast"""
-    forecast = db.query(Forecast).filter(Forecast.id == forecast_id).first()
-
-    if not forecast:
-        raise HTTPException(status_code=404, detail="Forecast not found")
-
-    forecast.manager_adjusted_commit = manager_adjusted_commit
-    forecast.adjustment_reason = adjustment_reason
-    forecast.adjusted_by_id = current_user.id
-    forecast.adjusted_at = datetime.now()
-    forecast.updated_at = datetime.now()
-
-    db.commit()
-    db.refresh(forecast)
-
-    return _forecast_to_dict(forecast)
-
-
 @router.get("/rollup", response_model=dict)
 def get_forecast_rollup(
     period_id: int = Query(...),
@@ -353,6 +290,125 @@ def get_forecast_rollup(
         "quota_attainment": (total_closed / total_quota * 100) if total_quota > 0 else 0,
         "forecast_count": len(forecasts)
     }
+
+
+@router.get("/{forecast_id}", response_model=dict)
+def get_forecast(
+    forecast_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(deps.get_current_user)
+):
+    """Get a specific forecast"""
+    forecast = db.query(Forecast).filter(Forecast.id == forecast_id).first()
+
+    if not forecast:
+        raise HTTPException(status_code=404, detail="Forecast not found")
+
+    return _forecast_to_dict(forecast)
+
+
+@router.post("", response_model=dict)
+def create_or_update_forecast(
+    body: ForecastUpsert,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(deps.get_current_user)
+):
+    """Create or update a forecast"""
+    period = db.query(ForecastPeriod).filter(
+        ForecastPeriod.id == body.period_id,
+        ForecastPeriod.organization_id == current_user.organization_id,
+    ).first()
+    if not period:
+        raise HTTPException(status_code=404, detail="Forecast period not found")
+
+    forecast = db.query(Forecast).filter(
+        Forecast.period_id == body.period_id,
+        Forecast.user_id == current_user.id
+    ).first()
+
+    if forecast:
+        # Update existing
+        forecast.pipeline_amount = body.pipeline_amount
+        forecast.best_case_amount = body.best_case_amount
+        forecast.commit_amount = body.commit_amount
+        forecast.closed_amount = body.closed_amount
+        if body.territory_id is not None:
+            forecast.territory_id = body.territory_id
+        if body.quota_amount is not None:
+            forecast.quota_amount = body.quota_amount
+        forecast.updated_at = datetime.utcnow()
+    else:
+        # Create new
+        forecast = Forecast(
+            period_id=body.period_id,
+            user_id=current_user.id,
+            organization_id=current_user.organization_id,
+            territory_id=body.territory_id,
+            pipeline_amount=body.pipeline_amount,
+            best_case_amount=body.best_case_amount,
+            commit_amount=body.commit_amount,
+            closed_amount=body.closed_amount,
+            quota_amount=body.quota_amount,
+            status=ForecastStatus.DRAFT,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.add(forecast)
+
+    db.commit()
+    db.refresh(forecast)
+
+    return _forecast_to_dict(forecast)
+
+
+@router.post("/{forecast_id}/submit", response_model=dict)
+def submit_forecast(
+    forecast_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(deps.get_current_user)
+):
+    """Submit a forecast for approval"""
+    forecast = db.query(Forecast).filter(
+        Forecast.id == forecast_id,
+        Forecast.user_id == current_user.id
+    ).first()
+
+    if not forecast:
+        raise HTTPException(status_code=404, detail="Forecast not found")
+
+    forecast.status = ForecastStatus.SUBMITTED
+    forecast.submitted_at = datetime.now()
+    forecast.updated_at = datetime.now()
+
+    db.commit()
+    db.refresh(forecast)
+
+    return _forecast_to_dict(forecast)
+
+
+@router.post("/{forecast_id}/adjust", response_model=dict)
+def adjust_forecast(
+    forecast_id: int,
+    body: ForecastAdjustBody,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(deps.get_current_user)
+):
+    """Manager adjusts a forecast"""
+    forecast = db.query(Forecast).filter(Forecast.id == forecast_id).first()
+
+    if not forecast:
+        raise HTTPException(status_code=404, detail="Forecast not found")
+
+    forecast.manager_adjusted_commit = body.manager_adjusted_commit
+    forecast.adjustment_reason = body.adjustment_reason
+    forecast.adjusted_by_id = current_user.id
+    forecast.adjusted_at = datetime.now()
+    forecast.updated_at = datetime.now()
+
+    db.commit()
+    db.refresh(forecast)
+
+    return _forecast_to_dict(forecast)
 
 
 # Helper function
