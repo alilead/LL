@@ -61,7 +61,10 @@ export const uploadAvatar = async (file: File): Promise<void> => {
 };
 
 export const changePassword = async (data: ChangePasswordInput): Promise<{ message: string }> => {
-  const response = await api.post('/users/me/change-password', data);
+  const response = await api.post('/auth/change-password', {
+    current_password: data.current_password,
+    new_password: data.new_password,
+  });
   return response.data;
 };
 

@@ -4,6 +4,8 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import {
   User,
   Building2,
@@ -18,10 +20,11 @@ import {
   Database,
   Save,
   X,
-  Loader2
+  Loader2,
+  MessageSquare,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { updateProfile, uploadAvatar } from '@/services/users';
+import { updateProfile, uploadAvatar, changePassword } from '@/services/users';
 import { useAuthStore } from '@/store/auth';
 import api from '@/lib/axios';
 
@@ -372,11 +375,87 @@ function ProfileSettings() {
 }
 
 function OrganizationSettings() {
+  const { user } = useAuthStore();
+  const queryClient = useQueryClient();
+  const orgId = user?.organization_id != null ? Number(user.organization_id) : null;
+  const canEditOrg = Boolean(user?.is_admin);
+
+  const { data: org, isLoading } = useQuery({
+    queryKey: ['settings-organization', orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const r = await api.get(`/organizations/${orgId}`);
+      return r.data as {
+        id: number;
+        name: string;
+        description?: string | null;
+        website?: string | null;
+      };
+    },
+  });
+
+  const [name, setName] = useState('');
+  const [website, setWebsite] = useState('');
+  const [description, setDescription] = useState('');
+
+  useEffect(() => {
+    if (org) {
+      setName(org.name || '');
+      setWebsite(org.website || '');
+      setDescription(org.description || '');
+    }
+  }, [org]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const fd = new FormData();
+      fd.append('name', name);
+      fd.append('description', description);
+      fd.append('website', website);
+      await api.patch(`/organizations/${orgId}`, fd);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settings-organization', orgId] });
+      toast.success('Organization updated');
+    },
+    onError: (err: unknown) => {
+      const d =
+        err &&
+        typeof err === 'object' &&
+        'response' in err &&
+        (err as { response?: { data?: { detail?: unknown } } }).response?.data?.detail;
+      toast.error(typeof d === 'string' ? d : 'Could not save organization');
+    },
+  });
+
+  if (!orgId) {
+    return (
+      <div className="p-8">
+        <p className="text-neutral-600 dark:text-neutral-400">Sign in to manage your organization.</p>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="p-8 flex items-center gap-2 text-neutral-600">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        Loading organization…
+      </div>
+    );
+  }
+
   return (
     <div className="p-8">
       <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-6">
         Organization Settings
       </h2>
+
+      {!canEditOrg && (
+        <p className="text-sm text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-lg p-3 mb-4">
+          Only organization administrators can change these fields. You can still view them.
+        </p>
+      )}
 
       <div className="space-y-6">
         <div>
@@ -385,8 +464,10 @@ function OrganizationSettings() {
           </label>
           <input
             type="text"
-            defaultValue="LeadLab"
-            className="w-full px-4 py-2.5 bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            value={name}
+            disabled={!canEditOrg}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full px-4 py-2.5 bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-70"
           />
         </div>
 
@@ -397,31 +478,52 @@ function OrganizationSettings() {
           <input
             type="url"
             placeholder="https://your-company.com"
-            className="w-full px-4 py-2.5 bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            value={website}
+            disabled={!canEditOrg}
+            onChange={(e) => setWebsite(e.target.value)}
+            className="w-full px-4 py-2.5 bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-70"
           />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-            Industry
+            Description
           </label>
-          <select className="w-full px-4 py-2.5 bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
-            <option>Technology</option>
-            <option>Finance</option>
-            <option>Healthcare</option>
-            <option>Education</option>
-          </select>
+          <textarea
+            rows={3}
+            value={description}
+            disabled={!canEditOrg}
+            onChange={(e) => setDescription(e.target.value)}
+            className="w-full px-4 py-2.5 bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-70"
+          />
         </div>
 
-        <div className="flex items-center justify-end space-x-3 pt-6 border-t border-neutral-200 dark:border-neutral-700">
-          <button className="px-4 py-2 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg font-medium transition-colors">
-            Cancel
-          </button>
-          <button className="flex items-center space-x-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors">
-            <Save className="w-4 h-4" />
-            <span>Save Changes</span>
-          </button>
-        </div>
+        {canEditOrg && (
+          <div className="flex items-center justify-end space-x-3 pt-6 border-t border-neutral-200 dark:border-neutral-700">
+            <button
+              type="button"
+              onClick={() => {
+                if (org) {
+                  setName(org.name || '');
+                  setWebsite(org.website || '');
+                  setDescription(org.description || '');
+                }
+              }}
+              className="px-4 py-2 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg font-medium transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={saveMutation.isPending}
+              onClick={() => saveMutation.mutate()}
+              className="flex items-center space-x-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors disabled:opacity-60"
+            >
+              {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <span>Save Changes</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -433,6 +535,9 @@ function NotificationSettings() {
       <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-6">
         Notification Preferences
       </h2>
+      <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+        Preferences below are UI placeholders. Server-side notification settings will be wired in a future release.
+      </p>
 
       <div className="space-y-6">
         {[
@@ -462,6 +567,44 @@ function NotificationSettings() {
 }
 
 function SecuritySettings() {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast.error('New password and confirmation do not match');
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast.error('New password must be at least 8 characters');
+      return;
+    }
+    setSaving(true);
+    try {
+      await changePassword({
+        current_password: currentPassword,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+      });
+      toast.success('Password updated');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: unknown) {
+      const detail =
+        err &&
+        typeof err === 'object' &&
+        'response' in err &&
+        (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+      toast.error(typeof detail === 'string' ? detail : 'Could not update password');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="p-8">
       <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-6">
@@ -469,42 +612,53 @@ function SecuritySettings() {
       </h2>
 
       <div className="space-y-6">
-        <div>
+        <form onSubmit={handleChangePassword}>
           <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50 mb-4">
             Change Password
           </h3>
-          <div className="space-y-4">
+          <div className="space-y-4 max-w-md">
             <input
               type="password"
               placeholder="Current password"
               className="w-full px-4 py-2.5 bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              autoComplete="current-password"
             />
             <input
               type="password"
               placeholder="New password"
               className="w-full px-4 py-2.5 bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              autoComplete="new-password"
             />
             <input
               type="password"
               placeholder="Confirm new password"
               className="w-full px-4 py-2.5 bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              autoComplete="new-password"
             />
-            <button className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors">
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors disabled:opacity-60 inline-flex items-center gap-2"
+            >
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
               Update Password
             </button>
           </div>
-        </div>
+        </form>
 
         <div className="pt-6 border-t border-neutral-200 dark:border-neutral-700">
           <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50 mb-4">
             Two-Factor Authentication
           </h3>
           <p className="text-neutral-600 dark:text-neutral-400 mb-4">
-            Add an extra layer of security to your account
+            Two-factor authentication is not available in this release. Use a strong password above.
           </p>
-          <button className="px-4 py-2 bg-neutral-200 dark:bg-neutral-700 hover:bg-neutral-300 dark:hover:bg-neutral-600 text-neutral-900 dark:text-neutral-50 rounded-lg font-medium transition-colors">
-            Enable 2FA
-          </button>
         </div>
       </div>
     </div>
@@ -517,6 +671,9 @@ function BillingSettings() {
       <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-6">
         Billing & Subscription
       </h2>
+      <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+        Live billing is handled outside this screen (e.g. Stripe). Use the Credits or subscription flows from the product menu when available.
+      </p>
 
       <div className="space-y-6">
         <div className="p-6 bg-gradient-to-r from-primary-50 to-purple-50 dark:from-primary-900/20 dark:to-purple-900/20 border border-primary-200 dark:border-primary-800 rounded-xl">
@@ -567,51 +724,93 @@ function BillingSettings() {
   );
 }
 
+type OrgMemberRow = {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  is_admin?: boolean;
+  organization_role?: string;
+};
+
 function TeamSettings() {
+  const navigate = useNavigate();
+  const { data: members = [], isLoading, error } = useQuery({
+    queryKey: ['organization-users-settings'],
+    queryFn: async () => {
+      const r = await api.get<OrgMemberRow[]>('/users/organization-users');
+      return r.data;
+    },
+  });
+
+  const roleLabel = (m: OrgMemberRow) => {
+    if (m.is_admin) return 'Admin';
+    const r = (m.organization_role || 'member').toLowerCase();
+    if (r === 'manager') return 'Manager';
+    if (r === 'viewer') return 'Viewer';
+    return 'Member';
+  };
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
           Team Members
         </h2>
-        <button className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors">
-          Invite Member
+        <button
+          type="button"
+          onClick={() => navigate('/admin')}
+          className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
+        >
+          Invite / manage users
         </button>
       </div>
 
-      <div className="space-y-3">
-        {[
-          { name: 'Firat Celik', email: 'firat@the-leadlab.com', role: 'Owner' },
-          { name: 'Mike Chen', email: 'mike@the-leadlab.com', role: 'Admin' },
-          { name: 'Sarah Johnson', email: 'sarah@the-leadlab.com', role: 'Member' },
-        ].map((member, index) => (
-          <div key={index} className="flex items-center justify-between p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-full flex items-center justify-center">
-                <User className="w-5 h-5 text-white" />
+      <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+        People in your organization. Admins can add users from the Admin panel.
+      </p>
+
+      {isLoading && (
+        <div className="flex items-center gap-2 text-neutral-600">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          Loading team…
+        </div>
+      )}
+      {error && (
+        <p className="text-red-600 dark:text-red-400 text-sm">Could not load team list. Try again later.</p>
+      )}
+
+      {!isLoading && !error && (
+        <div className="space-y-3">
+          {members.length === 0 ? (
+            <p className="text-neutral-600 dark:text-neutral-400">No team members found.</p>
+          ) : (
+            members.map((member) => (
+              <div
+                key={member.id}
+                className="flex items-center justify-between p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-full flex items-center justify-center">
+                    <User className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-neutral-900 dark:text-neutral-50">
+                      {`${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email}
+                    </p>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400">{member.email}</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <span className="px-3 py-1 bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-full text-sm">
+                    {roleLabel(member)}
+                  </span>
+                </div>
               </div>
-              <div>
-                <p className="font-medium text-neutral-900 dark:text-neutral-50">
-                  {member.name}
-                </p>
-                <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                  {member.email}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              <span className="px-3 py-1 bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-full text-sm">
-                {member.role}
-              </span>
-              {member.role !== 'Owner' && (
-                <button className="text-red-600 hover:text-red-700">
-                  <X className="w-5 h-5" />
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -622,6 +821,9 @@ function IntegrationsSettings() {
       <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-6">
         Integrations
       </h2>
+      <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+        Integration tiles are examples. Connect CRM and messaging from the Integrations or Admin sections when those connectors are enabled for your org.
+      </p>
 
       <div className="grid grid-cols-2 gap-4">
         {[

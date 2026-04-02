@@ -25,6 +25,19 @@ _AVATAR_SUFFIX = {
     "image/webp": ".webp",
 }
 
+_EXT_TO_MIME = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+}
+
+
+def _mime_from_filename(filename: str) -> Optional[str]:
+    suf = Path(filename or "").suffix.lower()
+    return _EXT_TO_MIME.get(suf)
+
 
 def _avatar_storage_dir() -> Path:
     p = Path(settings.UPLOAD_DIR) / "avatars"
@@ -167,6 +180,8 @@ async def upload_my_avatar(
     """Upload profile photo (JPG, PNG, GIF, WebP — max 2MB). Stored on disk; no DB column required."""
     content_type = (file.content_type or "").split(";")[0].strip().lower()
     if content_type not in _AVATAR_ALLOWED_TYPES:
+        content_type = _mime_from_filename(file.filename or "") or ""
+    if content_type not in _AVATAR_ALLOWED_TYPES:
         raise HTTPException(
             status_code=400,
             detail="Invalid file type. Use JPG, PNG, GIF, or WebP.",
@@ -177,7 +192,9 @@ async def upload_my_avatar(
     if len(data) < 32:
         raise HTTPException(status_code=400, detail="Invalid image file.")
 
-    suffix = _AVATAR_SUFFIX.get(content_type, ".bin")
+    suffix = _AVATAR_SUFFIX.get(content_type)
+    if not suffix:
+        raise HTTPException(status_code=400, detail="Could not determine image type.")
     _remove_existing_avatars(int(current_user.id))
     out = _avatar_storage_dir() / f"{current_user.id}{suffix}"
     out.write_bytes(data)

@@ -66,7 +66,16 @@ const taskDefaultResponses = {
 // Son başarılı token yenileme zamanı
 let lastSuccessfulTokenRefresh = 0;
 // Token yenileme minimum aralığı (15 saniye)
-const TOKEN_REFRESH_MIN_INTERVAL = 15000; 
+const TOKEN_REFRESH_MIN_INTERVAL = 15000;
+
+/** Do not fake 404/401 responses for these /users/* paths — real errors must surface (profile, avatar, org roster, user by id). */
+function isUsersSubResourceUrl(url: string): boolean {
+  return (
+    url.includes('/users/me') ||
+    url.includes('/users/organization-users') ||
+    /\/users\/\d+(\/|$|\?)/.test(url)
+  );
+}
 
 // Request interceptor - URL'lerin sonuna / ekleyerek yönlendirmeleri önleyelim
 api.interceptors.request.use(
@@ -75,7 +84,13 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
+    // Multipart uploads: default Content-Type is application/json — strip so the browser sets boundary
+    if (config.data instanceof FormData) {
+      const h = config.headers as Record<string, unknown>;
+      delete h['Content-Type'];
+      delete h['content-type'];
+    }
+
     return config;
   },
   (error) => {
@@ -125,7 +140,7 @@ api.interceptors.response.use(
         if (currentUrl.includes('/leads')) {
           return Promise.resolve({ data: { items: [], total: 0 } });
         }
-        if (currentUrl.includes('/users')) {
+        if (currentUrl.includes('/users') && !isUsersSubResourceUrl(currentUrl)) {
           return Promise.resolve({ data: { items: [], total: 0 } });
         }
         if (currentUrl.includes('/tags')) {
@@ -186,7 +201,7 @@ api.interceptors.response.use(
         if (currentUrl.includes('/leads')) {
           return Promise.resolve({ data: { items: [], total: 0 } });
         }
-        if (currentUrl.includes('/users')) {
+        if (currentUrl.includes('/users') && !isUsersSubResourceUrl(currentUrl)) {
           return Promise.resolve({ data: { items: [], total: 0 } });
         }
         if (currentUrl.includes('/tags')) {

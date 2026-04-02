@@ -70,7 +70,7 @@ _Defer until Phase 2 is done._
 | 1 | **AI Insights:** fix path to `GET /api/v1/ai-insights/analytics` (or correct routes from `ai_insights.py`). | [x] |
 | 2 | Audit **Reports** (`advancedReports`) empty states vs backend errors. | [ ] |
 | 3 | Remove or route **`ModernEmailCampaigns`** mock data if still linked. | [ ] |
-| 4 | **Settings** tabs: replace placeholder copy with real API or hide until ready. | [ ] |
+| 4 | **Settings** tabs: replace placeholder copy with real API or hide until ready. | [x] |
 | 5 | **Tasks:** `ModernTasks` must read `GET /tasks` body `{ items, total }` (not a raw array); add **`/tasks/:id`** for post-create redirect. | [x] |
 | 6 | **Calendar:** avoid `100vh` inside `ModernLayout` scroll (use `max-h` + `min-h-0` + `overflow-y-auto`); normalize **`events.list`** if API returns array or `{ items }`. | [x] |
 
