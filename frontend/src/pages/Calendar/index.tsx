@@ -860,12 +860,12 @@ export const CalendarPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="h-screen flex flex-col">
-        <Card className="flex-1 border-0 shadow-sm rounded-none bg-white flex flex-col">
+    <div className="bg-gray-50">
+      <div className="flex max-h-[calc(100dvh-5rem)] min-h-0 flex-col">
+        <Card className="flex min-h-0 flex-1 flex-col overflow-hidden border-0 shadow-sm rounded-none bg-white">
           {renderCalendarHeader()}
           
-          <div className="flex-1 overflow-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
             {renderCurrentView()}
           </div>
         </Card>

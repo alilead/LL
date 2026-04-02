@@ -15,6 +15,7 @@ import { ModernLeadForm } from './pages/ModernLeadForm'
 import { ModernDashboard } from './pages/ModernDashboard'
 import { ModernTasks } from './pages/ModernTasks'
 import { ModernNewTask } from './pages/ModernNewTask'
+import { ModernTaskDetail } from './pages/ModernTaskDetail'
 import { ModernDeals } from './pages/ModernDeals'
 import { ModernNewDeal } from './pages/ModernNewDeal'
 import { ModernAIInsights } from './pages/ModernAIInsights'
@@ -105,7 +106,8 @@ export const router = createBrowserRouter([
             path: '/tasks',
             children: [
               { index: true, element: <ModernTasks /> },
-              { path: 'new', element: <ModernNewTask /> }
+              { path: 'new', element: <ModernNewTask /> },
+              { path: ':id', element: <ModernTaskDetail /> },
             ]
           },
           {

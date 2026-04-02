@@ -34,10 +34,10 @@ interface Task {
   title: string;
   description?: string;
   status: string;
-  priority: 'high' | 'medium' | 'low';
+  priority: string;
   due_date?: string;
-  assigned_to?: any;
-  lead?: any;
+  assigned_to?: { first_name?: string; last_name?: string };
+  lead?: unknown;
   created_at: string;
 }
 
@@ -55,14 +55,19 @@ export function ModernTasks() {
     },
   });
 
-  const tasks: Task[] = Array.isArray(tasksResponse?.data)
-    ? tasksResponse.data
-    : (tasksResponse?.data?.data || tasksResponse?.data?.results || []);
+  // Backend returns { items: Task[], total: number } — not a bare array
+  const body = tasksResponse?.data;
+  const tasks: Task[] = Array.isArray(body?.items)
+    ? body.items
+    : Array.isArray(body)
+      ? body
+      : [];
 
   const statuses = [
-    { id: 'pending', name: 'To Do', color: 'blue' },
-    { id: 'in_progress', name: 'In Progress', color: 'yellow' },
-    { id: 'completed', name: 'Completed', color: 'green' },
+    { id: 'PENDING', name: 'To Do', color: 'blue' },
+    { id: 'IN_PROGRESS', name: 'In Progress', color: 'yellow' },
+    { id: 'COMPLETED', name: 'Completed', color: 'green' },
+    { id: 'CANCELLED', name: 'Cancelled', color: 'gray' },
   ];
 
   const tasksByStatus = statuses.map((status) => ({
@@ -71,11 +76,17 @@ export function ModernTasks() {
   }));
 
   const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'text-red-600 bg-red-100 dark:bg-red-900/20 dark:text-red-400';
-      case 'medium': return 'text-orange-600 bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400';
-      case 'low': return 'text-blue-600 bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400';
-      default: return 'text-neutral-600 bg-neutral-100 dark:bg-neutral-700 dark:text-neutral-400';
+    const p = (priority || '').toUpperCase();
+    switch (p) {
+      case 'URGENT':
+      case 'HIGH':
+        return 'text-red-600 bg-red-100 dark:bg-red-900/20 dark:text-red-400';
+      case 'MEDIUM':
+        return 'text-orange-600 bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400';
+      case 'LOW':
+        return 'text-blue-600 bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400';
+      default:
+        return 'text-neutral-600 bg-neutral-100 dark:bg-neutral-700 dark:text-neutral-400';
     }
   };
 
@@ -161,7 +172,7 @@ export function ModernTasks() {
 
       {/* Kanban View */}
       {view === 'kanban' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           {tasksByStatus.map((status) => (
             <div key={status.id} className="flex flex-col">
               <div className="flex items-center justify-between mb-4 pb-3 border-b-2 border-neutral-200 dark:border-neutral-700">

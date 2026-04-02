@@ -192,7 +192,10 @@ const eventsAPI = {
     try {
       console.log('Fetching events with params:', params);
       const response = await api.get('/events', { params });
-      return response.data.items; // Extract the items array from EventListResponse
+      const data = response.data;
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.items)) return data.items;
+      return [];
     } catch (error) {
       console.error('Error fetching events:', error);
       throw error;
