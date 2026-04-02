@@ -214,10 +214,20 @@ export function ModernDashboard() {
             <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center">
               <Target className="w-6 h-6 text-orange-600 dark:text-orange-400" />
             </div>
-            <span className="flex items-center text-sm font-medium text-orange-600 dark:text-orange-400">
-              <ArrowUp className="w-4 h-4 mr-1" />
-              {dashboardStats.opportunities?.won || 0} won
-            </span>
+            {typeof dashboardStats.opportunities?.won === 'number' &&
+            dashboardStats.opportunities.won > 0 ? (
+              <span className="flex items-center text-sm font-medium text-orange-600 dark:text-orange-400">
+                <ArrowUp className="w-4 h-4 mr-1" />
+                {dashboardStats.opportunities.won} won
+              </span>
+            ) : (
+              <span
+                className="text-sm font-medium text-neutral-400 dark:text-neutral-500"
+                title="Closed-won deals (last snapshot)"
+              >
+                —
+              </span>
+            )}
           </div>
           <h3 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-1">
             {activeDeals}

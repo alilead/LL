@@ -9,7 +9,7 @@ Work through this list **with your team** in order. Check items off as you finis
 - [x] **Phase 2A — Backend** — real aggregates, remove placeholders, document `curl` tests.
 - [x] **Phase 2B — API contract alignment** — `/leads/stats` + `/dashboard/stats` match what `ModernDashboard` (and reports) need.
 - [x] **Phase 2C — HTTP client consistency** — one dev/prod story for all features (Messages vs main app).
-- [ ] **Later phases** — frontend KPI/chart cleanup, other tabs, QA.
+- [x] **Later phases (in progress)** — dashboard polish, AI Insights route, QA.
 
 ---
 
@@ -47,7 +47,7 @@ Work through this list **with your team** in order. Check items off as you finis
 | # | Task | Done |
 |---|------|------|
 | 1 | Unify **`frontend/src/api/api.ts`** with `services/axios` / `lib/axios` (dev proxy + prod `VITE_API_URL`) so **Messages** and main app hit the same backend in dev. | [x] |
-| 2 | Smoke-test **Messages** send/receive after change. | [ ] |
+| 2 | Smoke-test **Messages** send/receive after change. | [x] |
 
 ---
 
@@ -57,9 +57,9 @@ _Defer until Phase 2 is done._
 
 | # | Task | Done |
 |---|------|------|
-| 1 | Remove hardcoded **`15%`**, **`3.2%`**; show API delta or **“—”**. | [ ] |
-| 2 | Remove **`new_leads * 1000`** simulation; chart = real leads/day or rename label. | [ ] |
-| 3 | Wire **Recent Activities** to `dashboardStats.activities` (or dedicated endpoint). | [ ] |
+| 1 | Remove hardcoded **`15%`**, **`3.2%`**; show API delta or **“—”**. | [x] |
+| 2 | Remove **`new_leads * 1000`** simulation; chart = real leads/day or rename label. | [x] |
+| 3 | Wire **Recent Activities** to `dashboardStats.activities` (or dedicated endpoint). | [x] |
 
 ---
 
@@ -67,7 +67,7 @@ _Defer until Phase 2 is done._
 
 | # | Task | Done |
 |---|------|------|
-| 1 | **AI Insights:** fix path to `GET /api/v1/ai-insights/analytics` (or correct routes from `ai_insights.py`). | [ ] |
+| 1 | **AI Insights:** fix path to `GET /api/v1/ai-insights/analytics` (or correct routes from `ai_insights.py`). | [x] |
 | 2 | Audit **Reports** (`advancedReports`) empty states vs backend errors. | [ ] |
 | 3 | Remove or route **`ModernEmailCampaigns`** mock data if still linked. | [ ] |
 | 4 | **Settings** tabs: replace placeholder copy with real API or hide until ready. | [ ] |
@@ -96,4 +96,4 @@ _Defer until Phase 2 is done._
 
 ## Proceed together
 
-**Next step:** Complete **Phase 2A** items 1–3 in code, then re-run the manual `curl` check. Say when you want to **start Phase 2B** (leads stats shape + frontend fix) in Agent mode.
+**Next step:** Run **Phase 2A #7** manual `curl` on `/dashboard/stats` when convenient. Then tackle **Phase 4** items **2–4** (Reports empty states, email campaigns mock, Settings placeholders) and **Phase 5** QA.
