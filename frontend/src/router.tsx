@@ -1,5 +1,7 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { HomePage } from './pages/HomePage'
+import { IntakeSelectPage } from './pages/IntakeSelectPage'
+import { IntakeFormPage } from './pages/IntakeFormPage'
 import { SignIn } from './pages/SignIn'
 import { SignUp } from './pages/SignUp'
 import { ForgotPassword } from './pages/ForgotPassword'
@@ -71,6 +73,14 @@ export const router = createBrowserRouter([
   {
     path: '/contact',
     element: <Contact />,
+  },
+  {
+    path: '/intake',
+    element: <IntakeSelectPage />,
+  },
+  {
+    path: '/intake/:formSlug',
+    element: <IntakeFormPage />,
   },
   {
     element: <PrivateRoute />,

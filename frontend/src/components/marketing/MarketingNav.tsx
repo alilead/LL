@@ -40,17 +40,13 @@ export function MarketingNav() {
       >
         Pricing
       </a>
-      <Link
-        to="/#business-diagnostic-form"
-        className={navLink}
-        onClick={() => setOpen(false)}
-      >
+      <Link to="/intake/business-diagnostic" className={navLink} onClick={() => setOpen(false)}>
         Business diagnostic
       </Link>
-      <Link to="/#data-request-form" className={navLink} onClick={() => setOpen(false)}>
+      <Link to="/intake/data-request" className={navLink} onClick={() => setOpen(false)}>
         Data request
       </Link>
-      <Link to="/#pitch-your-idea-form" className={navLink} onClick={() => setOpen(false)}>
+      <Link to="/intake/pitch-your-idea" className={navLink} onClick={() => setOpen(false)}>
         Pitch your idea
       </Link>
       <Link to="/contact" className={`${navLink} ${isActive('/contact')}`} onClick={() => setOpen(false)}>
