@@ -136,10 +136,21 @@ interface LeadResponse {
 export const getLeads = async (params: LeadQueryParams = {}): Promise<any> => {
   console.log('Getting leads with params:', params);
   try {
-    // URL sonuna / ekleyerek yönlendirmeyi önleyelim
     const response = await api.get('/leads/', { params });
-    console.log('Leads API response:', response.data);
-    return response.data;
+    const d = response.data;
+    if (d && Array.isArray(d.results)) {
+      return d;
+    }
+    if (Array.isArray(d)) {
+      return {
+        results: d,
+        total: d.length,
+        page: 0,
+        size: d.length,
+        has_more: false,
+      };
+    }
+    return d;
   } catch (error) {
     console.log('Error in getLeads:', error);
     throw error;
@@ -198,17 +209,7 @@ const updateTags = async (id: number, data: { tags: number[] }) => {
 
 // leadsAPI export'u ekleniyor
 export const leadsAPI = {
-  getAll: async (params?: { 
-    search?: string;
-    sort_by?: string;
-    sort_desc?: boolean;
-    stage_id?: number;
-    assigned_to_id?: number;
-  }): Promise<any> => {
-    return api.get('/leads/', { params });
-  },
-
-  getLeads: async (params?: { 
+  getAll: async (params?: {
     search?: string;
     sort_by?: string;
     sort_desc?: boolean;
@@ -216,15 +217,39 @@ export const leadsAPI = {
     assigned_to_id?: number;
     skip?: number;
     limit?: number;
+    tag?: string;
+  }): Promise<any> => {
+    return api.get('/leads/', { params });
+  },
+
+  getLeads: async (params?: {
+    search?: string;
+    sort_by?: string;
+    sort_desc?: boolean;
+    stage_id?: number;
+    assigned_to_id?: number;
+    skip?: number;
+    limit?: number;
+    tag?: string;
   }): Promise<any> => {
     const response = await api.get('/leads/', { params });
     const data = response.data;
-    // Backend returns array, wrap it in expected format
+    if (data?.results != null) {
+      return {
+        results: data.results,
+        total: data.total ?? data.results.length,
+        page: data.page ?? 0,
+        size: data.size ?? data.results.length,
+        has_more: data.has_more ?? false,
+      };
+    }
+    const list = Array.isArray(data) ? data : [];
     return {
-      results: Array.isArray(data) ? data : data.results || [],
-      total: Array.isArray(data) ? data.length : data.total || 0,
-      page: params?.skip ? Math.floor(params.skip / (params.limit || 20)) : 0,
-      limit: params?.limit || 20
+      results: list,
+      total: list.length,
+      page: 0,
+      size: list.length,
+      has_more: false,
     };
   },
 

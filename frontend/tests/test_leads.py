@@ -113,8 +113,10 @@ def test_list_leads(client: TestClient, db: Session, test_user: dict):
         headers=headers
     )
     assert response.status_code == 200
-    leads = response.json()
+    body = response.json()
+    leads = body["results"]
     assert len(leads) > 0
+    assert body["total"] >= len(leads)
     
     # Filtrelerle listele
     response = client.get(
@@ -122,7 +124,8 @@ def test_list_leads(client: TestClient, db: Session, test_user: dict):
         headers=headers
     )
     assert response.status_code == 200
-    leads = response.json()
+    body = response.json()
+    leads = body["results"]
     assert len(leads) > 0
     assert all(lead["sector"] == "Technology" for lead in leads)
     

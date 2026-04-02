@@ -46,8 +46,8 @@ class CRUDLead(CRUDBase[Lead, LeadCreate, LeadUpdate]):
         sort_desc: bool = False,
         filters: Optional[Dict[str, Any]] = None,
         is_admin: bool = False
-    ) -> List[Lead]:
-        """Get multiple leads with filters and pagination"""
+    ) -> tuple[List[Lead], int]:
+        """Get multiple leads with filters and pagination. Returns (items, total_count)."""
         # Start with a subquery to get lead IDs with the specified tag
         if tag_id and tag_id > 0:
             logger.info(f"Filtering leads for tag_id: {tag_id}")
@@ -108,8 +108,9 @@ class CRUDLead(CRUDBase[Lead, LeadCreate, LeadUpdate]):
         total = query.count()
         logger.info(f"Total leads before pagination: {total}")
         logger.info(f"Returning {limit} leads after pagination")
-        
-        return query.offset(skip).limit(limit).all()
+
+        items = query.offset(skip).limit(limit).all()
+        return items, total
 
     def count(
         self,

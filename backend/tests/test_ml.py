@@ -66,7 +66,7 @@ def test_batch_predict(client: TestClient, db: Session, test_user: dict):
         headers=headers
     )
     assert response.status_code == 200
-    leads = response.json()
+    leads = response.json()["results"]
     lead_ids = [lead["id"] for lead in leads]
     
     # Toplu tahmin yap

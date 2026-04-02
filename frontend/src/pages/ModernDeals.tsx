@@ -1,10 +1,20 @@
 /**
- * Modern Deals Page — pipeline aligned with backend Deal model / DealStatus enum.
+ * Modern Deals Page — pipeline with drag-and-drop between stages (aligned with DealStatus).
  */
 
 import React, { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCorners,
+} from '@dnd-kit/core';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 import api from '@/services/axios';
 import {
   DollarSign,
@@ -14,7 +24,9 @@ import {
   Calendar,
   MoreVertical,
   Loader2,
+  GripVertical,
 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 /** Backend DealStatus string values */
 type DealStatusStr =
@@ -76,6 +88,21 @@ function mapStatusToUiStage(status: string): UiStageId {
   }
 }
 
+function uiStageToApiStatus(stage: UiStageId): DealStatusStr {
+  switch (stage) {
+    case 'qualification':
+      return 'Qualified';
+    case 'proposal':
+      return 'Proposal';
+    case 'negotiation':
+      return 'Negotiation';
+    case 'closed_won':
+      return 'Closed Won';
+    case 'closed_lost':
+      return 'Closed Lost';
+  }
+}
+
 const STATUS_WEIGHT: Record<string, number> = {
   Lead: 20,
   Qualified: 35,
@@ -95,9 +122,116 @@ function formatMoney(n: number): string {
   return n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
+function DroppableStageBody({
+  stageId,
+  children,
+}: {
+  stageId: UiStageId;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `stage-${stageId}`,
+    data: { stageId },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`bg-neutral-50 dark:bg-neutral-900/50 rounded-b-xl border-x border-b border-neutral-200 dark:border-neutral-700 p-3 space-y-3 min-h-[320px] transition-colors ${
+        isOver ? 'ring-2 ring-inset ring-primary-500 bg-primary-50/40 dark:bg-primary-950/20' : ''
+      }`}
+    >
+      {children}
+    </div>
+  );
+}
+
+function DraggableDealCard({
+  deal,
+  disabled,
+  onOpen,
+}: {
+  deal: ApiDeal;
+  disabled?: boolean;
+  onOpen: (id: number) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `deal-${deal.id}`,
+    data: { deal },
+    disabled,
+  });
+
+  const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined;
+  const value = toAmountNumber(deal.amount);
+  const weight = STATUS_WEIGHT[deal.status] ?? 0;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:shadow-md transition-shadow ${
+        isDragging ? 'opacity-50 shadow-lg z-10' : ''
+      }`}
+    >
+      <div className="flex items-start justify-between p-4 gap-2">
+        <button
+          type="button"
+          className="mt-0.5 shrink-0 p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700 cursor-grab active:cursor-grabbing touch-none text-neutral-400"
+          aria-label="Drag to change stage"
+          {...listeners}
+          {...attributes}
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          className="flex-1 min-w-0 text-left"
+          onClick={() => onOpen(deal.id)}
+        >
+          <h4 className="font-medium text-neutral-900 dark:text-neutral-50 text-sm mb-1 truncate">
+            {deal.name}
+          </h4>
+          <div className="flex items-center space-x-2 text-xs text-neutral-600 dark:text-neutral-400">
+            <DollarSign className="w-3 h-3 shrink-0" />
+            <span className="font-semibold">${formatMoney(value)}</span>
+          </div>
+        </button>
+        <button
+          type="button"
+          className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded shrink-0"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreVertical className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
+        </button>
+      </div>
+
+      <div className="px-4 pb-4 space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-neutral-600 dark:text-neutral-400">Stage weight</span>
+          <span className="font-medium text-neutral-900 dark:text-neutral-50">{weight}%</span>
+        </div>
+        {deal.valid_until && (
+          <div className="flex items-center text-xs text-neutral-600 dark:text-neutral-400">
+            <Calendar className="w-3 h-3 mr-1 shrink-0" />
+            Close by {new Date(deal.valid_until).toLocaleDateString()}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function ModernDeals() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+  );
 
   const { data: axiosResponse, isLoading } = useQuery({
     queryKey: ['deals'],
@@ -105,6 +239,38 @@ export function ModernDeals() {
   });
 
   const rawDeals: ApiDeal[] = axiosResponse?.data?.items ?? [];
+
+  const updateStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: DealStatusStr }) => {
+      await api.put(`/deals/${id}/`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deals'] });
+      toast({
+        title: 'Stage updated',
+        description: 'Deal moved in your pipeline.',
+      });
+    },
+    onError: (err: unknown) => {
+      const msg =
+        err &&
+        typeof err === 'object' &&
+        'response' in err &&
+        err.response &&
+        typeof err.response === 'object' &&
+        'data' in err.response &&
+        err.response.data &&
+        typeof err.response.data === 'object' &&
+        'detail' in err.response.data
+          ? String((err.response.data as { detail: unknown }).detail)
+          : null;
+      toast({
+        title: 'Could not move deal',
+        description: msg || 'Try again or refresh the page.',
+        variant: 'destructive',
+      });
+    },
+  });
 
   const filteredDeals = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -122,8 +288,28 @@ export function ModernDeals() {
 
   const totalValue = useMemo(
     () => filteredDeals.reduce((sum, d) => sum + toAmountNumber(d.amount), 0),
-    [filteredDeals]
+    [filteredDeals],
   );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+
+    const dealId = Number(String(active.id).replace(/^deal-/, ''));
+    const overId = String(over.id);
+    if (!overId.startsWith('stage-')) return;
+
+    const stageKey = overId.replace(/^stage-/, '') as UiStageId;
+    if (!STAGES.some((s) => s.id === stageKey)) return;
+
+    const deal = rawDeals.find((d) => d.id === dealId);
+    if (!deal) return;
+
+    const newStatus = uiStageToApiStatus(stageKey);
+    if (deal.status === newStatus) return;
+
+    updateStatus.mutate({ id: dealId, status: newStatus });
+  };
 
   if (isLoading) {
     return (
@@ -146,6 +332,9 @@ export function ModernDeals() {
               Manage your sales pipeline • ${formatMoney(totalValue)} total value • {filteredDeals.length}{' '}
               shown
               {searchQuery.trim() ? ` (${rawDeals.length} total)` : ''}
+            </p>
+            <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-500">
+              Drag the grip handle on a card to move it to another stage.
             </p>
           </div>
           <button
@@ -179,76 +368,44 @@ export function ModernDeals() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        {dealsByStage.map((stage) => (
-          <div key={stage.id} className="flex flex-col">
-            <div className="bg-white dark:bg-neutral-800 rounded-t-xl p-4 border-x border-t border-neutral-200 dark:border-neutral-700">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center space-x-2">
-                  <div className={`w-3 h-3 rounded-full ${stage.dotClass}`} />
-                  <h3 className="font-semibold text-neutral-900 dark:text-neutral-50 text-sm">
-                    {stage.name}
-                  </h3>
-                </div>
-                <span className="text-xs text-neutral-500 dark:text-neutral-400">{stage.deals.length}</span>
-              </div>
-              <div className="text-lg font-bold text-neutral-900 dark:text-neutral-50">
-                ${formatMoney(stage.totalValue)}
-              </div>
-            </div>
-
-            <div className="bg-neutral-50 dark:bg-neutral-900/50 rounded-b-xl border-x border-b border-neutral-200 dark:border-neutral-700 p-3 space-y-3 min-h-[320px]">
-              {stage.deals.map((deal) => {
-                const value = toAmountNumber(deal.amount);
-                const weight = STATUS_WEIGHT[deal.status] ?? 0;
-                return (
-                  <div
-                    key={deal.id}
-                    className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700 hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-neutral-900 dark:text-neutral-50 text-sm mb-1 truncate">
-                          {deal.name}
-                        </h4>
-                        <div className="flex items-center space-x-2 text-xs text-neutral-600 dark:text-neutral-400">
-                          <DollarSign className="w-3 h-3 shrink-0" />
-                          <span className="font-semibold">${formatMoney(value)}</span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <MoreVertical className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
-                      </button>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-neutral-600 dark:text-neutral-400">Stage weight</span>
-                        <span className="font-medium text-neutral-900 dark:text-neutral-50">{weight}%</span>
-                      </div>
-                      {deal.valid_until && (
-                        <div className="flex items-center text-xs text-neutral-600 dark:text-neutral-400">
-                          <Calendar className="w-3 h-3 mr-1 shrink-0" />
-                          Close by {new Date(deal.valid_until).toLocaleDateString()}
-                        </div>
-                      )}
-                    </div>
+      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          {dealsByStage.map((stage) => (
+            <div key={stage.id} className="flex flex-col">
+              <div className="bg-white dark:bg-neutral-800 rounded-t-xl p-4 border-x border-t border-neutral-200 dark:border-neutral-700">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${stage.dotClass}`} />
+                    <h3 className="font-semibold text-neutral-900 dark:text-neutral-50 text-sm">
+                      {stage.name}
+                    </h3>
                   </div>
-                );
-              })}
-              {stage.deals.length === 0 && (
-                <div className="text-center py-8 text-neutral-500 dark:text-neutral-400 text-sm">
-                  No deals
+                  <span className="text-xs text-neutral-500 dark:text-neutral-400">{stage.deals.length}</span>
                 </div>
-              )}
+                <div className="text-lg font-bold text-neutral-900 dark:text-neutral-50">
+                  ${formatMoney(stage.totalValue)}
+                </div>
+              </div>
+
+              <DroppableStageBody stageId={stage.id}>
+                {stage.deals.map((deal) => (
+                  <DraggableDealCard
+                    key={deal.id}
+                    deal={deal}
+                    disabled={updateStatus.isPending}
+                    onOpen={(id) => navigate(`/deals/${id}`)}
+                  />
+                ))}
+                {stage.deals.length === 0 && (
+                  <div className="text-center py-8 text-neutral-500 dark:text-neutral-400 text-sm">
+                    Drop deals here
+                  </div>
+                )}
+              </DroppableStageBody>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </DndContext>
     </div>
   );
 }

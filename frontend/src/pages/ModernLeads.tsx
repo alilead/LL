@@ -10,10 +10,11 @@
  * - Full backend integration
  */
 
-import React, { useState, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useRef, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { leadsAPI, type Lead } from '@/services/api/leads';
+import type { LeadListResponse } from '@/services/api';
 import { stagesAPI } from '@/services/api/stages';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthStore } from '@/store/auth';
@@ -33,7 +34,9 @@ import {
   Upload,
   FileDown,
   Loader2,
-  X
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import {
   Dialog,
@@ -54,18 +57,38 @@ export function ModernLeads() {
   
   const [view, setView] = useState<'kanban' | 'table'>('kanban');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Fetch leads from backend
-  const { data: leadsResponse, isLoading: isLoadingLeads } = useQuery({
-    queryKey: ['leads', searchQuery],
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => window.clearTimeout(t);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch]);
+
+  // Fetch leads from backend (paginated; debounced search avoids remounting the page each keystroke)
+  const { data: leadsPage, isLoading: isLoadingLeads, isFetching: isFetchingLeads } = useQuery({
+    queryKey: ['leads', debouncedSearch, page, pageSize],
     queryFn: async () => {
-      const params = searchQuery ? { search: searchQuery } : {};
-      return leadsAPI.getAll(params);
+      const res = await leadsAPI.getAll({
+        search: debouncedSearch || undefined,
+        skip: page * pageSize,
+        limit: pageSize,
+        sort_by: 'created_at',
+        sort_desc: true,
+      });
+      return res.data as LeadListResponse;
     },
+    placeholderData: keepPreviousData,
   });
 
   // Fetch stages from backend
@@ -74,10 +97,10 @@ export function ModernLeads() {
     queryFn: stagesAPI.getAll,
   });
 
-  // Handle different response formats from backend
-  const leads: Lead[] = Array.isArray(leadsResponse?.data)
-    ? leadsResponse.data
-    : (leadsResponse?.data?.data || leadsResponse?.data?.results || []);
+  const leads: Lead[] = leadsPage?.results ?? [];
+  const totalLeads = leadsPage?.total ?? 0;
+  const pageStart = totalLeads === 0 ? 0 : page * pageSize + 1;
+  const pageEnd = page * pageSize + leads.length;
 
   const stages = Array.isArray(stagesResponse?.data)
     ? stagesResponse.data
@@ -191,8 +214,35 @@ export function ModernLeads() {
     }
   };
 
-  // Loading state
-  if (isLoadingLeads || isLoadingStages) {
+  const handleExport = async () => {
+    try {
+      const blob = await leadsAPI.exportCSV({
+        search: debouncedSearch || undefined,
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `leads-export-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast({ title: 'Exported', description: 'CSV download started.' });
+    } catch {
+      toast({
+        title: 'Export failed',
+        description: 'Could not download CSV.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const totalPages = Math.max(1, Math.ceil(totalLeads / pageSize));
+  const canPrev = page > 0;
+  const canNext = totalLeads > 0 && page < totalPages - 1;
+
+  // Initial load only — avoid replacing the whole page (and search input) on every refetch
+  if ((isLoadingLeads && leadsPage === undefined) || (isLoadingStages && !stagesResponse)) {
     return (
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-8 flex items-center justify-center">
         <div className="flex flex-col items-center space-y-4">
@@ -221,7 +271,18 @@ export function ModernLeads() {
               Leads
             </h1>
             <p className="text-neutral-600 dark:text-neutral-400">
-              Manage and track your sales pipeline • {leads.length} total leads
+              Manage and track your sales pipeline • {totalLeads} total leads
+              {totalLeads > 0 && (
+                <>
+                  {' '}
+                  · Rows {pageStart}–{pageEnd}
+                  {isFetchingLeads && (
+                    <span className="ml-2 inline-flex items-center gap-1 text-primary-600">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    </span>
+                  )}
+                </>
+              )}
             </p>
           </div>
           <button
@@ -247,7 +308,11 @@ export function ModernLeads() {
                 className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
-            <button className="flex items-center space-x-2 px-4 py-2.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
+            <button
+              type="button"
+              onClick={() => setIsFiltersOpen(true)}
+              className="flex items-center space-x-2 px-4 py-2.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+            >
               <Filter className="w-5 h-5 text-neutral-600 dark:text-neutral-400" />
               <span className="text-neutral-700 dark:text-neutral-300">Filters</span>
             </button>
@@ -288,11 +353,58 @@ export function ModernLeads() {
               <span className="text-neutral-700 dark:text-neutral-300">Import</span>
             </button>
             
-            <button className="flex items-center space-x-2 px-4 py-2.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
+            <button
+              type="button"
+              onClick={() => void handleExport()}
+              className="flex items-center space-x-2 px-4 py-2.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+            >
               <Download className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
               <span className="text-neutral-700 dark:text-neutral-300">Export</span>
             </button>
           </div>
+        </div>
+      </div>
+
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
+          <span>Rows per page</span>
+          <select
+            value={pageSize}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setPage(0);
+            }}
+            className="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm text-neutral-900 dark:text-neutral-100"
+          >
+            {[20, 50, 100, 200].map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={!canPrev}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-200 disabled:opacity-40 disabled:pointer-events-none hover:bg-neutral-50 dark:hover:bg-neutral-700"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Previous
+          </button>
+          <span className="text-sm text-neutral-600 dark:text-neutral-400 tabular-nums px-2">
+            Page {Math.min(page + 1, totalPages)} / {totalPages}
+          </span>
+          <button
+            type="button"
+            disabled={!canNext}
+            onClick={() => setPage((p) => p + 1)}
+            className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-200 disabled:opacity-40 disabled:pointer-events-none hover:bg-neutral-50 dark:hover:bg-neutral-700"
+          >
+            Next
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -517,6 +629,22 @@ export function ModernLeads() {
           )}
         </div>
       )}
+
+      <Dialog open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Filters</DialogTitle>
+            <DialogDescription>
+              Use search and rows-per-page to narrow results. Stage, tag, and assignee filters are planned next; export respects the current search.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsFiltersOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Upload Dialog */}
       <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>

@@ -162,13 +162,13 @@ def get_lead_statistics(
             detail=f"An error occurred while retrieving lead statistics: {str(e)}"
         )
 
-@router.get("", response_model=List[schemas.Lead])
-@router.get("/", response_model=List[schemas.Lead])
+@router.get("", response_model=schemas.LeadListResponse)
+@router.get("/", response_model=schemas.LeadListResponse)
 def read_leads(
     db: Session = Depends(deps.get_db),
     current_user: models.User = Depends(deps.get_current_user),
     skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(20, ge=1, le=200),
     search: Optional[str] = None,
     sort_by: Optional[str] = "created_at",
     sort_desc: bool = True,
@@ -191,7 +191,7 @@ def read_leads(
                 )
 
         # Get leads with organization filter
-        leads = crud.lead.get_multi(
+        leads, total = crud.lead.get_multi(
             db=db,
             skip=skip,
             limit=limit,
@@ -205,10 +205,14 @@ def read_leads(
 
         # Psychometrics is now automatically corrected via hybrid_property
 
-        logger.info(f"Total leads before pagination: {len(leads)}")
-        logger.info(f"Returning {limit} leads after pagination")
-        
-        return leads
+        page_idx = skip // limit if limit else 0
+        return schemas.LeadListResponse(
+            results=leads,
+            total=total,
+            page=page_idx,
+            size=len(leads),
+            has_more=(skip + len(leads)) < total,
+        )
         
     except Exception as e:
         logger.error(f"Error retrieving leads: {str(e)}")

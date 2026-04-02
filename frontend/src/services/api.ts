@@ -311,12 +311,15 @@ export const informationRequestsAPI = {
 
 // API Functions
 export const leadsAPI = {
-  getAll: async (params?: { 
+  getAll: async (params?: {
     search?: string;
     sort_by?: string;
     sort_desc?: boolean;
     stage_id?: number;
     assigned_to_id?: number;
+    skip?: number;
+    limit?: number;
+    tag?: string;
   }): Promise<APIResponse<LeadListResponse>> => {
     return api.get('/leads/', { params });
   },

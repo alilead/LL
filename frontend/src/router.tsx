@@ -19,6 +19,7 @@ import { ModernTasks } from './pages/ModernTasks'
 import { ModernNewTask } from './pages/ModernNewTask'
 import { ModernTaskDetail } from './pages/ModernTaskDetail'
 import { ModernDeals } from './pages/ModernDeals'
+import { ModernDealDetail } from './pages/ModernDealDetail'
 import { ModernNewDeal } from './pages/ModernNewDeal'
 import { ModernAIInsights } from './pages/ModernAIInsights'
 import { NotFound } from './pages/NotFound'
@@ -121,12 +122,16 @@ export const router = createBrowserRouter([
             ]
           },
           {
-            path: '/deals',
-            element: <ModernDeals />
-          },
-          {
             path: '/deals/new',
             element: <ModernNewDeal />
+          },
+          {
+            path: '/deals/:id',
+            element: <ModernDealDetail />
+          },
+          {
+            path: '/deals',
+            element: <ModernDeals />
           },
           {
             path: '/profile',

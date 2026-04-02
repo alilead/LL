@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { leadsAPI } from '../services/api';
+import { leadsAPI, type LeadListResponse } from '../services/api';
 import { useAuth } from './useAuth';
 import { toast } from 'react-hot-toast';
 
@@ -58,13 +58,14 @@ export function useLeads(params?: UseLeadsParams) {
         sort_desc: params?.filters?.sort_desc,
         stage_id: params?.filters?.stage_id,
       });
-      
+
+      const d = response.data as LeadListResponse;
       return {
-        items: response.data.data,
-        total: response.data.total,
-        page: response.data.page,
-        size: response.data.size,
-        has_more: response.data.has_more,
+        items: d.results,
+        total: d.total,
+        page: d.page,
+        size: d.size,
+        has_more: d.has_more,
       };
     },
     enabled: !!user,
