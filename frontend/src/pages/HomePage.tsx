@@ -230,25 +230,6 @@ export function HomePage() {
             </div>
           </section>
 
-          <section
-            id="lead-intake-section"
-            className="w-full py-16 md:py-20 bg-gradient-to-br from-blue-50/30 to-white border-y border-gray-100"
-          >
-            <div className="max-w-2xl mx-auto px-4 text-center">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">Ready to talk?</h2>
-              <p className="text-gray-600 mb-8">
-                Tell us what you need — we route your request securely and follow up by email with next steps, including an
-                NDA when relevant.
-              </p>
-              <Link
-                to="/intake"
-                className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:from-blue-700 hover:to-indigo-700 shadow-lg transition-all"
-              >
-                Tell us what you need
-              </Link>
-            </div>
-          </section>
-
           <section id="about" className="w-full py-16 bg-gradient-to-br from-white via-blue-50/50 to-white">
             <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
               <div className="text-center mb-16">
@@ -463,6 +444,29 @@ export function HomePage() {
                     </motion.div>
                   ))}
                 </div>
+              </div>
+            </div>
+          </section>
+
+          <section
+            id="lead-intake-section"
+            className="w-full py-16 md:py-24 bg-gradient-to-br from-white via-blue-50/50 to-white border-y border-gray-100"
+          >
+            <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
+              <div className="text-center">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+                  Ready to talk?
+                </h2>
+                <p className="text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed mb-10">
+                  Tell us what you need — we route your request securely and follow up by email with next steps, including
+                  an NDA when relevant.
+                </p>
+                <Link
+                  to="/intake"
+                  className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:from-blue-700 hover:to-indigo-700 shadow-lg transition-all"
+                >
+                  Tell us what you need
+                </Link>
               </div>
             </div>
           </section>
