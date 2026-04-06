@@ -145,7 +145,7 @@ const bottomNavigation: NavItem[] = [
   },
 ];
 
-export function ModernSidebar() {
+export function ModernSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const [collapsed, setCollapsed] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [sidebarAvatarUrl, setSidebarAvatarUrl] = useState<string | null>(null);
@@ -288,6 +288,7 @@ export function ModernSidebar() {
                           <Link
                             key={child.path}
                             to={child.path}
+                            onClick={() => onNavigate?.()}
                             className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition-colors ${
                               childActive
                                 ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
@@ -305,6 +306,7 @@ export function ModernSidebar() {
               ) : (
                 <Link
                   to={item.path}
+                  onClick={() => onNavigate?.()}
                   className={`flex items-center justify-between px-3 py-2.5 rounded-lg transition-colors ${
                     active
                       ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
@@ -337,6 +339,7 @@ export function ModernSidebar() {
             <Link
               key={item.name}
               to={item.path}
+              onClick={() => onNavigate?.()}
               className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-colors ${
                 active
                   ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'

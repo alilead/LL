@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/auth';
 import { getApiOrigin } from '@/lib/apiOrigin';
+import { EMPTY_LEAD_LIST_PAGE } from '@/lib/emptyApiFallbacks';
 
 // Get API URL from environment variables or use proxy in development
 const isDevelopment = import.meta.env.DEV;
@@ -123,7 +124,7 @@ api.interceptors.response.use(
           return Promise.resolve({ data: { items: [], total: 0 } });
         }
         if (currentUrl.includes('/leads')) {
-          return Promise.resolve({ data: { items: [], total: 0 } });
+          return Promise.resolve({ data: { ...EMPTY_LEAD_LIST_PAGE } });
         }
         if (currentUrl.includes('/users')) {
           return Promise.resolve({ data: { items: [], total: 0 } });
@@ -141,7 +142,7 @@ api.interceptors.response.use(
           return Promise.resolve({ data: [] });
         }
         if (currentUrl.includes('/lead-stages')) {
-          return Promise.resolve({ data: { items: [] } });
+          return Promise.resolve({ data: [] });
         }
         if (currentUrl.includes('/information-requests')) {
           return Promise.resolve({ data: { items: [] } });
@@ -180,7 +181,7 @@ api.interceptors.response.use(
 
         // Return empty results for leads or users
         if (currentUrl.includes('/leads')) {
-          return Promise.resolve({ data: { items: [], total: 0 } });
+          return Promise.resolve({ data: { ...EMPTY_LEAD_LIST_PAGE } });
         }
         if (currentUrl.includes('/users')) {
           return Promise.resolve({ data: { items: [], total: 0 } });
@@ -206,7 +207,7 @@ api.interceptors.response.use(
           return Promise.resolve({ data: [] });
         }
         if (currentUrl.includes('/lead-stages')) {
-          return Promise.resolve({ data: { items: [] } });
+          return Promise.resolve({ data: [] });
         }
         if (currentUrl.includes('/information-requests')) {
           return Promise.resolve({ data: { items: [] } });

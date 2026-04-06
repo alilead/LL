@@ -38,6 +38,7 @@ import { ModernOrganization } from './pages/ModernOrganization'
 import { ModernTerritories } from './pages/ModernTerritories'
 import { ModernEmailSequences } from './pages/ModernEmailSequences'
 import { ModernQuoteList, ModernProductList } from './pages/ModernCPQ'
+import { ModernQuoteNewPage, ModernQuoteDetailPage } from './pages/ModernQuotePages'
 import { ModernForecasting } from './pages/ModernForecasting'
 import { ModernWorkflows } from './pages/ModernWorkflows'
 import { ModernConversations } from './pages/ModernConversations'
@@ -188,6 +189,22 @@ export const router = createBrowserRouter([
           {
             path: '/email-sequences',
             element: <ModernEmailSequences />
+          },
+          {
+            path: '/quotes',
+            element: <Navigate to="/cpq/quotes" replace />
+          },
+          {
+            path: '/cpq/quotes/new',
+            element: <ModernQuoteNewPage />
+          },
+          {
+            path: '/cpq/quotes/:id/edit',
+            element: <ModernQuoteDetailPage />
+          },
+          {
+            path: '/cpq/quotes/:id',
+            element: <ModernQuoteDetailPage />
           },
           {
             path: '/cpq/quotes',

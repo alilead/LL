@@ -86,7 +86,17 @@ export function ModernLeads() {
         sort_by: 'created_at',
         sort_desc: true,
       });
-      return res.data as LeadListResponse;
+      const raw = res.data as LeadListResponse & { items?: Lead[] };
+      const results = raw?.results ?? (Array.isArray(raw?.items) ? raw.items : []);
+      const total = typeof raw?.total === 'number' ? raw.total : results.length;
+      return {
+        ...raw,
+        results,
+        total,
+        page: raw?.page ?? 0,
+        size: raw?.size ?? results.length,
+        has_more: raw?.has_more ?? false,
+      } as LeadListResponse;
     },
     placeholderData: keepPreviousData,
   });
@@ -102,9 +112,10 @@ export function ModernLeads() {
   const pageStart = totalLeads === 0 ? 0 : page * pageSize + 1;
   const pageEnd = page * pageSize + leads.length;
 
-  const stages = Array.isArray(stagesResponse?.data)
-    ? stagesResponse.data
-    : (stagesResponse?.data?.data || stagesResponse?.data?.results || []);
+  const stagesRaw = stagesResponse?.data;
+  const stages = Array.isArray(stagesRaw)
+    ? stagesRaw
+    : (stagesRaw?.data || stagesRaw?.results || stagesRaw?.items || []);
 
   // Upload mutation
   const uploadMutation = useMutation({
@@ -244,7 +255,7 @@ export function ModernLeads() {
   // Initial load only — avoid replacing the whole page (and search input) on every refetch
   if ((isLoadingLeads && leadsPage === undefined) || (isLoadingStages && !stagesResponse)) {
     return (
-      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-8 flex items-center justify-center">
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-4 sm:p-6 md:p-8 flex items-center justify-center">
         <div className="flex flex-col items-center space-y-4">
           <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
           <p className="text-neutral-600 dark:text-neutral-400">Loading leads...</p>
@@ -262,7 +273,7 @@ export function ModernLeads() {
     .sort((a: any, b: any) => b.leads.length - a.leads.length);
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-8">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-4 sm:p-6 md:p-8">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
@@ -546,8 +557,8 @@ export function ModernLeads() {
 
       {/* Table View */}
       {view === 'table' && (
-        <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-sm border border-neutral-200 dark:border-neutral-700 overflow-hidden">
-          <table className="w-full">
+        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+          <table className="w-full min-w-[640px]">
             <thead className="bg-neutral-50 dark:bg-neutral-700/50 border-b border-neutral-200 dark:border-neutral-700">
               <tr>
                 <th className="px-6 py-3 text-left">

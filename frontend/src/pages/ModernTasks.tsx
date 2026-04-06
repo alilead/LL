@@ -1,32 +1,32 @@
 /**
- * Modern Tasks Page - Enterprise Grade Task Management
- *
- * Features:
- * - Full backend integration
- * - Kanban board view
- * - List view with filters
- * - Priority management
- * - Due date tracking
- * - Assignment management
+ * Modern Tasks Page — list + board with working row actions.
  */
 
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import api from '@/services/axios';
+import tasksAPI from '@/services/tasks';
+import { useToast } from '@/hooks/use-toast';
 import {
-  CheckSquare,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Plus,
   Filter,
   Search,
   Calendar,
-  User,
-  AlertCircle,
-  Clock,
   LayoutGrid,
   List,
   MoreVertical,
-  Loader2
+  Loader2,
+  Eye,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 
 interface Task {
@@ -41,12 +41,71 @@ interface Task {
   created_at: string;
 }
 
+function TaskActionsMenu({ taskId }: { taskId: number }) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => tasksAPI.deleteTask(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      toast({ title: 'Task deleted' });
+    },
+    onError: () => {
+      toast({ title: 'Could not delete task', variant: 'destructive' });
+    },
+  });
+
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+          aria-label="Task actions"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreVertical className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" sideOffset={4} className="z-[200] w-44">
+        <DropdownMenuItem
+          className="min-h-[44px] cursor-pointer"
+          onClick={() => navigate(`/tasks/${taskId}`)}
+        >
+          <Eye className="mr-2 h-4 w-4" />
+          View / edit
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="min-h-[44px] cursor-pointer"
+          onClick={() => navigate(`/tasks/${taskId}`)}
+        >
+          <Pencil className="mr-2 h-4 w-4" />
+          Open detail
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="min-h-[44px] cursor-pointer text-red-600 focus:text-red-600"
+          onClick={() => {
+            if (window.confirm('Delete this task?')) {
+              deleteMutation.mutate(taskId);
+            }
+          }}
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function ModernTasks() {
   const navigate = useNavigate();
   const [view, setView] = useState<'kanban' | 'list'>('list');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Fetch tasks from backend
   const { data: tasksResponse, isLoading } = useQuery({
     queryKey: ['tasks', searchQuery],
     queryFn: async () => {
@@ -55,7 +114,6 @@ export function ModernTasks() {
     },
   });
 
-  // Backend returns { items: Task[], total: number } — not a bare array
   const body = tasksResponse?.data;
   const tasks: Task[] = Array.isArray(body?.items)
     ? body.items
@@ -64,10 +122,10 @@ export function ModernTasks() {
       : [];
 
   const statuses = [
-    { id: 'PENDING', name: 'To Do', color: 'blue' },
-    { id: 'IN_PROGRESS', name: 'In Progress', color: 'yellow' },
-    { id: 'COMPLETED', name: 'Completed', color: 'green' },
-    { id: 'CANCELLED', name: 'Cancelled', color: 'gray' },
+    { id: 'PENDING', name: 'To Do', dot: 'bg-blue-500' },
+    { id: 'IN_PROGRESS', name: 'In Progress', dot: 'bg-yellow-500' },
+    { id: 'COMPLETED', name: 'Completed', dot: 'bg-green-500' },
+    { id: 'CANCELLED', name: 'Cancelled', dot: 'bg-gray-500' },
   ];
 
   const tasksByStatus = statuses.map((status) => ({
@@ -92,9 +150,9 @@ export function ModernTasks() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-8 flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-neutral-50 p-4 dark:bg-neutral-900">
         <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+          <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
           <p className="text-neutral-600 dark:text-neutral-400">Loading tasks...</p>
         </div>
       </div>
@@ -102,88 +160,86 @@ export function ModernTasks() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
+    <div className="min-h-screen bg-neutral-50 p-4 sm:p-6 md:p-8 dark:bg-neutral-900">
+      <div className="mb-6 md:mb-8">
+        <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-neutral-900 dark:text-neutral-50 mb-2">
+            <h1 className="mb-2 text-2xl font-bold text-neutral-900 dark:text-neutral-50 md:text-3xl">
               Tasks
             </h1>
-            <p className="text-neutral-600 dark:text-neutral-400">
+            <p className="text-sm text-neutral-600 dark:text-neutral-400 md:text-base">
               Manage and track your tasks • {tasks.length} total tasks
             </p>
           </div>
           <button
+            type="button"
             onClick={() => navigate('/tasks/new')}
-            className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
+            className="flex min-h-[44px] w-full items-center justify-center space-x-2 rounded-lg bg-primary-600 px-4 py-2.5 font-medium text-white shadow-sm transition-colors hover:bg-primary-700 sm:w-auto"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="h-5 w-5" />
             <span>New Task</span>
           </button>
         </div>
 
-        {/* Toolbar */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3 flex-1 max-w-2xl">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex max-w-2xl flex-1 flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
+              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-400" />
               <input
                 type="text"
                 placeholder="Search tasks..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="min-h-[44px] w-full rounded-lg border border-neutral-200 bg-white py-2.5 pl-10 pr-4 text-base dark:border-neutral-700 dark:bg-neutral-800"
               />
             </div>
-            <button className="flex items-center space-x-2 px-4 py-2.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors">
-              <Filter className="w-5 h-5 text-neutral-600 dark:text-neutral-400" />
+            <button
+              type="button"
+              className="flex min-h-[44px] items-center justify-center space-x-2 rounded-lg border border-neutral-200 bg-white px-4 py-2.5 dark:border-neutral-700 dark:bg-neutral-800"
+            >
+              <Filter className="h-5 w-5 text-neutral-600 dark:text-neutral-400" />
               <span className="text-neutral-700 dark:text-neutral-300">Filters</span>
             </button>
           </div>
 
-          {/* View Switcher */}
-          <div className="flex items-center bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-1">
+          <div className="flex items-center justify-center rounded-lg border border-neutral-200 bg-white p-1 dark:border-neutral-700 dark:bg-neutral-800">
             <button
+              type="button"
               onClick={() => setView('kanban')}
-              className={`flex items-center space-x-2 px-3 py-1.5 rounded-md transition-colors ${
+              className={`flex min-h-[44px] items-center space-x-2 rounded-md px-3 py-1.5 transition-colors ${
                 view === 'kanban'
-                  ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
-                  : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+                  ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400'
+                  : 'text-neutral-600 dark:text-neutral-400'
               }`}
             >
-              <LayoutGrid className="w-4 h-4" />
+              <LayoutGrid className="h-4 w-4" />
               <span className="text-sm font-medium">Board</span>
             </button>
             <button
+              type="button"
               onClick={() => setView('list')}
-              className={`flex items-center space-x-2 px-3 py-1.5 rounded-md transition-colors ${
+              className={`flex min-h-[44px] items-center space-x-2 rounded-md px-3 py-1.5 transition-colors ${
                 view === 'list'
-                  ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
-                  : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+                  ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400'
+                  : 'text-neutral-600 dark:text-neutral-400'
               }`}
             >
-              <List className="w-4 h-4" />
+              <List className="h-4 w-4" />
               <span className="text-sm font-medium">List</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Kanban View */}
       {view === 'kanban' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {tasksByStatus.map((status) => (
             <div key={status.id} className="flex flex-col">
-              <div className="flex items-center justify-between mb-4 pb-3 border-b-2 border-neutral-200 dark:border-neutral-700">
+              <div className="mb-4 flex items-center justify-between border-b-2 border-neutral-200 pb-3 dark:border-neutral-700">
                 <div className="flex items-center space-x-2">
-                  <div className={`w-3 h-3 rounded-full bg-${status.color}-500`} />
-                  <h3 className="font-semibold text-neutral-900 dark:text-neutral-50">
-                    {status.name}
-                  </h3>
-                  <span className="text-sm text-neutral-500 dark:text-neutral-400">
-                    {status.tasks.length}
-                  </span>
+                  <div className={`h-3 w-3 rounded-full ${status.dot}`} />
+                  <h3 className="font-semibold text-neutral-900 dark:text-neutral-50">{status.name}</h3>
+                  <span className="text-sm text-neutral-500 dark:text-neutral-400">{status.tasks.length}</span>
                 </div>
               </div>
 
@@ -191,30 +247,32 @@ export function ModernTasks() {
                 {status.tasks.map((task) => (
                   <div
                     key={task.id}
-                    className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700 hover:shadow-md transition-shadow cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => navigate(`/tasks/${task.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') navigate(`/tasks/${task.id}`);
+                    }}
+                    className="cursor-pointer rounded-lg border border-neutral-200 bg-white p-4 transition-shadow hover:shadow-md dark:border-neutral-700 dark:bg-neutral-800"
                   >
-                    <div className="flex items-start justify-between mb-2">
-                      <h4 className="font-medium text-neutral-900 dark:text-neutral-50 text-sm flex-1">
-                        {task.title}
-                      </h4>
-                      <button className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded">
-                        <MoreVertical className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
-                      </button>
+                    <div className="mb-2 flex items-start justify-between gap-2">
+                      <h4 className="flex-1 text-sm font-medium text-neutral-900 dark:text-neutral-50">{task.title}</h4>
+                      <TaskActionsMenu taskId={task.id} />
                     </div>
 
                     {task.description && (
-                      <p className="text-xs text-neutral-600 dark:text-neutral-400 mb-3 line-clamp-2">
+                      <p className="mb-3 line-clamp-2 text-xs text-neutral-600 dark:text-neutral-400">
                         {task.description}
                       </p>
                     )}
 
                     <div className="flex items-center justify-between">
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${getPriorityColor(task.priority)}`}>
+                      <span className={`rounded px-2 py-0.5 text-xs font-medium ${getPriorityColor(task.priority)}`}>
                         {task.priority}
                       </span>
                       {task.due_date && (
                         <div className="flex items-center text-xs text-neutral-600 dark:text-neutral-400">
-                          <Calendar className="w-3 h-3 mr-1" />
+                          <Calendar className="mr-1 h-3 w-3" />
                           {new Date(task.due_date).toLocaleDateString()}
                         </div>
                       )}
@@ -222,9 +280,7 @@ export function ModernTasks() {
                   </div>
                 ))}
                 {status.tasks.length === 0 && (
-                  <div className="text-center py-8 text-neutral-500 dark:text-neutral-400 text-sm">
-                    No tasks
-                  </div>
+                  <div className="py-8 text-center text-sm text-neutral-500 dark:text-neutral-400">No tasks</div>
                 )}
               </div>
             </div>
@@ -232,75 +288,74 @@ export function ModernTasks() {
         </div>
       )}
 
-      {/* List View */}
       {view === 'list' && (
-        <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-sm border border-neutral-200 dark:border-neutral-700 overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-neutral-50 dark:bg-neutral-700/50 border-b border-neutral-200 dark:border-neutral-700">
+        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800">
+          <table className="w-full min-w-[720px]">
+            <thead className="border-b border-neutral-200 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-700/50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                   Task
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                   Priority
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                   Due Date
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                   Assigned To
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
               {tasks.map((task) => (
-                <tr key={task.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-700/50 transition-colors">
-                  <td className="px-6 py-4">
+                <tr
+                  key={task.id}
+                  className="cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-700/50"
+                  onClick={() => navigate(`/tasks/${task.id}`)}
+                >
+                  <td className="px-4 py-4">
                     <div>
-                      <div className="font-medium text-neutral-900 dark:text-neutral-50">
-                        {task.title}
-                      </div>
+                      <div className="font-medium text-neutral-900 dark:text-neutral-50">{task.title}</div>
                       {task.description && (
-                        <div className="text-sm text-neutral-500 dark:text-neutral-400 line-clamp-1">
+                        <div className="line-clamp-1 text-sm text-neutral-500 dark:text-neutral-400">
                           {task.description}
                         </div>
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
-                      {statuses.find(s => s.id === task.status)?.name || task.status}
+                  <td className="px-4 py-4">
+                    <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+                      {statuses.find((s) => s.id === task.status)?.name || task.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPriorityColor(task.priority)}`}>
+                  <td className="px-4 py-4">
+                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${getPriorityColor(task.priority)}`}>
                       {task.priority}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-neutral-900 dark:text-neutral-50">
+                  <td className="px-4 py-4 text-sm text-neutral-900 dark:text-neutral-50">
                     {task.due_date ? new Date(task.due_date).toLocaleDateString() : '-'}
                   </td>
-                  <td className="px-6 py-4 text-sm text-neutral-900 dark:text-neutral-50">
+                  <td className="px-4 py-4 text-sm text-neutral-900 dark:text-neutral-50">
                     {task.assigned_to ? `${task.assigned_to.first_name} ${task.assigned_to.last_name}` : 'Unassigned'}
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors">
-                      <MoreVertical className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
-                    </button>
+                  <td className="px-4 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                    <TaskActionsMenu taskId={task.id} />
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
           {tasks.length === 0 && (
-            <div className="text-center py-12 text-neutral-500 dark:text-neutral-400">
-              No tasks found. Click "New Task" to create your first task.
+            <div className="py-12 text-center text-neutral-500 dark:text-neutral-400">
+              No tasks found. Click &quot;New Task&quot; to create your first task.
             </div>
           )}
         </div>
