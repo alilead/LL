@@ -48,6 +48,124 @@ import {
 } from "@/components/ui/Dialog";
 import { Button } from '@/components/ui/Button';
 
+function parseTotalCount(val: unknown, fallback: number): number {
+  if (typeof val === 'number' && Number.isFinite(val)) return val;
+  if (typeof val === 'string' && val.trim() !== '') {
+    const n = Number(val);
+    if (Number.isFinite(n)) return n;
+  }
+  return fallback;
+}
+
+function normalizeLeadListPayload(
+  data: unknown
+): LeadListResponse & { results: Lead[] } {
+  if (Array.isArray(data)) {
+    const list = data as Lead[];
+    return {
+      results: list,
+      total: list.length,
+      page: 0,
+      size: list.length,
+      has_more: false,
+    };
+  }
+  const raw = data as LeadListResponse & { items?: Lead[] };
+  const results: Lead[] =
+    (Array.isArray(raw?.results) ? raw.results : undefined) ??
+    (Array.isArray(raw?.items) ? raw.items : []) ??
+    [];
+  const total = parseTotalCount(raw?.total, results.length);
+  const hasMore =
+    typeof raw?.has_more === 'boolean'
+      ? raw.has_more
+      : typeof (raw as { hasMore?: boolean })?.hasMore === 'boolean'
+        ? (raw as { hasMore?: boolean }).hasMore!
+        : false;
+
+  return {
+    ...raw,
+    results,
+    total,
+    page: raw?.page ?? 0,
+    size: raw?.size ?? results.length,
+    has_more: hasMore,
+  } as LeadListResponse & { results: Lead[] };
+}
+
+type PaginationBarProps = {
+  page: number;
+  pageSize: number;
+  totalLeads: number;
+  totalPages: number;
+  canPrev: boolean;
+  canNext: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+  onPageSizeChange: (n: number) => void;
+};
+
+function LeadsPaginationBar({
+  page,
+  pageSize,
+  totalLeads,
+  totalPages,
+  canPrev,
+  canNext,
+  onPrev,
+  onNext,
+  onPageSizeChange,
+}: PaginationBarProps) {
+  return (
+    <div
+      className="flex flex-col gap-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-800/80 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
+      role="navigation"
+      aria-label="Leads pagination"
+    >
+      <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
+        <span className="font-medium">Rows per page</span>
+        <select
+          value={pageSize}
+          onChange={(e) => onPageSizeChange(Number(e.target.value))}
+          className="min-h-[44px] min-w-[5rem] rounded-md border border-neutral-200 bg-white px-3 py-2 text-base text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+        >
+          {[20, 50, 100, 200].map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+        <span className="text-neutral-500 dark:text-neutral-500">
+          {totalLeads > 0 ? `${totalLeads} total` : 'No leads'}
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
+        <button
+          type="button"
+          disabled={!canPrev}
+          onClick={onPrev}
+          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-700 disabled:pointer-events-none disabled:opacity-40 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Previous
+        </button>
+        <span className="min-w-[8rem] px-2 text-center text-sm tabular-nums text-neutral-700 dark:text-neutral-300">
+          Page {Math.min(page + 1, totalPages)} / {totalPages}
+        </span>
+        <button
+          type="button"
+          disabled={!canNext}
+          onClick={onNext}
+          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-700 disabled:pointer-events-none disabled:opacity-40 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+        >
+          Next
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ModernLeads() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -86,17 +204,7 @@ export function ModernLeads() {
         sort_by: 'created_at',
         sort_desc: true,
       });
-      const raw = res.data as LeadListResponse & { items?: Lead[] };
-      const results = raw?.results ?? (Array.isArray(raw?.items) ? raw.items : []);
-      const total = typeof raw?.total === 'number' ? raw.total : results.length;
-      return {
-        ...raw,
-        results,
-        total,
-        page: raw?.page ?? 0,
-        size: raw?.size ?? results.length,
-        has_more: raw?.has_more ?? false,
-      } as LeadListResponse;
+      return normalizeLeadListPayload(res.data) as LeadListResponse;
     },
     placeholderData: keepPreviousData,
   });
@@ -248,9 +356,11 @@ export function ModernLeads() {
     }
   };
 
-  const totalPages = Math.max(1, Math.ceil(totalLeads / pageSize));
+  const hasMore = leadsPage?.has_more === true;
+  const pagesFromTotal = Math.max(1, Math.ceil(totalLeads / pageSize));
+  const totalPages = Math.max(pagesFromTotal, page + (hasMore ? 2 : 1));
   const canPrev = page > 0;
-  const canNext = totalLeads > 0 && page < totalPages - 1;
+  const canNext = hasMore || (totalLeads > 0 && page < pagesFromTotal - 1);
 
   // Initial load only — avoid replacing the whole page (and search input) on every refetch
   if ((isLoadingLeads && leadsPage === undefined) || (isLoadingStages && !stagesResponse)) {
@@ -376,47 +486,21 @@ export function ModernLeads() {
         </div>
       </div>
 
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
-          <span>Rows per page</span>
-          <select
-            value={pageSize}
-            onChange={(e) => {
-              setPageSize(Number(e.target.value));
-              setPage(0);
-            }}
-            className="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm text-neutral-900 dark:text-neutral-100"
-          >
-            {[20, 50, 100, 200].map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            disabled={!canPrev}
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-            className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-200 disabled:opacity-40 disabled:pointer-events-none hover:bg-neutral-50 dark:hover:bg-neutral-700"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Previous
-          </button>
-          <span className="text-sm text-neutral-600 dark:text-neutral-400 tabular-nums px-2">
-            Page {Math.min(page + 1, totalPages)} / {totalPages}
-          </span>
-          <button
-            type="button"
-            disabled={!canNext}
-            onClick={() => setPage((p) => p + 1)}
-            className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-200 disabled:opacity-40 disabled:pointer-events-none hover:bg-neutral-50 dark:hover:bg-neutral-700"
-          >
-            Next
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
+      <div className="mb-6">
+        <LeadsPaginationBar
+          page={page}
+          pageSize={pageSize}
+          totalLeads={totalLeads}
+          totalPages={totalPages}
+          canPrev={canPrev}
+          canNext={canNext}
+          onPrev={() => setPage((p) => Math.max(0, p - 1))}
+          onNext={() => setPage((p) => p + 1)}
+          onPageSizeChange={(n) => {
+            setPageSize(n);
+            setPage(0);
+          }}
+        />
       </div>
 
       {/* Kanban View */}
@@ -640,6 +724,26 @@ export function ModernLeads() {
           )}
         </div>
       )}
+
+      <div className="mt-8 border-t border-neutral-200 pt-6 dark:border-neutral-700">
+        <p className="mb-3 text-center text-xs font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+          Pagination
+        </p>
+        <LeadsPaginationBar
+          page={page}
+          pageSize={pageSize}
+          totalLeads={totalLeads}
+          totalPages={totalPages}
+          canPrev={canPrev}
+          canNext={canNext}
+          onPrev={() => setPage((p) => Math.max(0, p - 1))}
+          onNext={() => setPage((p) => p + 1)}
+          onPageSizeChange={(n) => {
+            setPageSize(n);
+            setPage(0);
+          }}
+        />
+      </div>
 
       <Dialog open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
         <DialogContent className="sm:max-w-md">
