@@ -2,7 +2,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, case, extract, desc, asc, text, and_, or_
+from sqlalchemy import func, case, extract, desc, asc, text, and_, or_, literal
 from app.api import deps
 from app.models.user import User
 from app.models.lead import Lead
@@ -851,62 +851,82 @@ def get_geographic_insights(
         end_date = datetime.now()
     
     organization_id = current_user.organization_id  # Use current user's organization
-    
-    # Group by country/location if available
-    geographic_data = db.query(
-        Lead.country,
-        Lead.location,
-        func.count(Lead.id).label('lead_count')
-    ).filter(
-        Lead.organization_id == organization_id,
-        Lead.created_at >= start_date,
-        Lead.created_at <= end_date,
-        Lead.country.isnot(None)
-    ).group_by(Lead.country, Lead.location).all()
-    
+
+    # Group by region: prefer country, else location (many imports only set location).
+    region_expr = func.coalesce(
+        func.nullif(func.trim(Lead.country), ""),
+        func.nullif(func.trim(Lead.location), ""),
+        literal("Unknown"),
+    )
+
+    geographic_data = (
+        db.query(region_expr.label("region"), func.count(Lead.id).label("lead_count"))
+        .filter(
+            Lead.organization_id == organization_id,
+            Lead.is_deleted == False,
+            Lead.created_at >= start_date,
+            Lead.created_at <= end_date,
+            or_(Lead.country.isnot(None), Lead.location.isnot(None)),
+        )
+        .group_by(region_expr)
+        .all()
+    )
+
     insights = []
-    
+
     for geo_row in geographic_data:
-        country = geo_row.country
-        location = geo_row.location
+        region = geo_row.region or "Unknown"
         lead_count = geo_row.lead_count
-        
-        # Get deal count for this location
-        deal_count = db.query(func.count(Deal.id)).join(Lead).filter(
-            Lead.organization_id == organization_id,
-            Lead.country == country,
-            Lead.location == location if location else Lead.location.is_(None),
-            Deal.created_at >= start_date,
-            Deal.created_at <= end_date
-        ).scalar() or 0
-        
-        # Get total revenue for this location
-        total_revenue = db.query(func.sum(Deal.amount)).join(Lead).filter(
-            Lead.organization_id == organization_id,
-            Lead.country == country,
-            Lead.location == location if location else Lead.location.is_(None),
-            Deal.status == "Closed_Won",
-            Deal.updated_at >= start_date,
-            Deal.updated_at <= end_date
-        ).scalar() or 0
-        
-        # Calculate metrics
-        average_deal_size = (total_revenue / deal_count) if deal_count > 0 else 0
+
+        deal_count = (
+            db.query(func.count(Deal.id))
+            .join(Lead, Deal.lead_id == Lead.id)
+            .filter(
+                Lead.organization_id == organization_id,
+                Lead.is_deleted == False,
+                Deal.organization_id == organization_id,
+                region_expr == region,
+                Deal.created_at >= start_date,
+                Deal.created_at <= end_date,
+            )
+            .scalar()
+            or 0
+        )
+
+        total_revenue = (
+            db.query(func.sum(Deal.amount))
+            .join(Lead, Deal.lead_id == Lead.id)
+            .filter(
+                Lead.organization_id == organization_id,
+                Lead.is_deleted == False,
+                Deal.organization_id == organization_id,
+                region_expr == region,
+                Deal.status == DealStatus.Closed_Won,
+                Deal.updated_at >= start_date,
+                Deal.updated_at <= end_date,
+            )
+            .scalar()
+            or 0
+        )
+
+        average_deal_size = (float(total_revenue) / deal_count) if deal_count > 0 else 0
         conversion_rate = (deal_count / lead_count * 100) if lead_count > 0 else 0
-        market_penetration = min(50.0, lead_count / 10)  # Placeholder calculation
-        
-        insights.append(GeographicInsights(
-            country=country,
-            region=None,  # Could be enhanced with region data
-            city=location,  # Using location as city
-            lead_count=lead_count,
-            deal_count=deal_count,
-            total_revenue=float(total_revenue),
-            average_deal_size=float(average_deal_size),
-            conversion_rate=conversion_rate,
-            market_penetration=market_penetration
-        ))
-    
+        market_penetration = min(50.0, lead_count / 10)
+
+        insights.append(
+            GeographicInsights(
+                country=region,
+                region=None,
+                city=None,
+                lead_count=lead_count,
+                deal_count=deal_count,
+                total_revenue=float(total_revenue or 0),
+                average_deal_size=float(average_deal_size),
+                conversion_rate=conversion_rate,
+                market_penetration=market_penetration,
+            )
+        )
+
     return insights
 
 @router.get("/sector-analysis", response_model=List[SectorAnalysis])

@@ -2,7 +2,7 @@
  * CPQ (Configure-Price-Quote) API Service
  */
 
-import api from '@/lib/axios';
+import api from '../axios';
 
 export interface Product {
   id: number;

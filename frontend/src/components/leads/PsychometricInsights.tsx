@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -28,6 +29,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '@/services/axios';
+import { psychometricService } from '@/services/psychometricService';
+import type { BehavioralPrediction } from '@/services/psychometricService';
 
 interface PsychometricData {
   lead_id: number;
@@ -100,11 +103,24 @@ interface PsychometricInsightsProps {
 }
 
 const PsychometricInsights: React.FC<PsychometricInsightsProps> = ({ leadId, leadName }) => {
+  const queryClient = useQueryClient();
   const [psychometricData, setPsychometricData] = useState<PsychometricData | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
+
+  const {
+    data: behavioralPredictions,
+    isLoading: loadingPredictions,
+    error: predictionsQueryError,
+    refetch: refetchBehavioralPredictions,
+  } = useQuery({
+    queryKey: ['behavioral-predictions', leadId],
+    queryFn: () => psychometricService.getBehavioralPredictions(leadId),
+    enabled: Boolean(leadId),
+    staleTime: 120_000,
+  });
 
   const loadPsychometricData = async (refresh = false) => {
     if (refresh) setRefreshing(true);
@@ -119,6 +135,7 @@ const PsychometricInsights: React.FC<PsychometricInsightsProps> = ({ leadId, lea
       if (response.data.success) {
         setPsychometricData(response.data.data);
         setHasAnalyzed(true);
+        queryClient.invalidateQueries({ queryKey: ['behavioral-predictions', leadId] });
         toast.success('Psychometric analysis completed successfully!');
       } else {
         throw new Error('Failed to load psychometric data');
@@ -139,6 +156,54 @@ const PsychometricInsights: React.FC<PsychometricInsightsProps> = ({ leadId, lea
 
   const handleRefresh = () => {
     loadPsychometricData(true);
+  };
+
+  const handleExportInsights = () => {
+    if (!psychometricData) {
+      toast.error('No psychometric data to export yet.');
+      return;
+    }
+    const payload = {
+      lead_id: leadId,
+      lead_name: leadName ?? null,
+      exported_at: new Date().toISOString(),
+      psychometric: psychometricData,
+      behavioral_predictions: behavioralPredictions ?? null,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `lead-${leadId}-psychometric-insights.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Insights exported');
+  };
+
+  const handleShareInsights = async () => {
+    const url = typeof window !== 'undefined' ? window.location.href : '';
+    if (!url) return;
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: leadName ? `Psychometric insights — ${leadName}` : 'Psychometric insights',
+          url,
+        });
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast.success('Page link copied to clipboard');
+      }
+    } catch (e: unknown) {
+      if ((e as Error)?.name === 'AbortError') return;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success('Page link copied to clipboard');
+      } catch {
+        toast.error('Could not share or copy link');
+      }
+    }
   };
 
   const getPersonalityColor = (type: string): string => {
@@ -810,17 +875,107 @@ const PsychometricInsights: React.FC<PsychometricInsightsProps> = ({ leadId, lea
 
             {/* Predictions Tab */}
             <TabsContent value="predictions" className="p-6">
-              <div className="text-center py-8">
-                <BarChart3 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="font-medium text-gray-600 mb-2">Behavioral Predictions</h3>
-                <p className="text-sm text-gray-500 mb-4">
-                  Detailed behavioral predictions will be available soon.
-                </p>
-                <Button variant="outline" size="sm">
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Check for Updates
-                </Button>
-              </div>
+              {loadingPredictions && (
+                <div className="flex flex-col items-center justify-center py-10 text-sm text-gray-500">
+                  <RefreshCw className="w-8 h-8 mb-3 animate-spin text-primary-500" />
+                  Loading behavioral predictions…
+                </div>
+              )}
+              {predictionsQueryError && !loadingPredictions && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                  Could not load behavioral predictions. Use “Check for updates” to retry.
+                </div>
+              )}
+              {!loadingPredictions && !predictionsQueryError && behavioralPredictions && (
+                <div className="space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
+                      <h4 className="font-semibold text-gray-900 mb-2">Decision making</h4>
+                      <p className="text-sm text-gray-700">
+                        <strong>Style:</strong> {(behavioralPredictions as BehavioralPrediction).decision_making?.style}
+                      </p>
+                      <p className="text-sm text-gray-700 mt-1">
+                        <strong>Timeline:</strong> {(behavioralPredictions as BehavioralPrediction).decision_making?.timeline}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-2">
+                        <strong>Influencers:</strong>{' '}
+                        {((behavioralPredictions as BehavioralPrediction).decision_making?.influencers || []).join(', ') || '—'}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        <strong>Information needs:</strong>{' '}
+                        {((behavioralPredictions as BehavioralPrediction).decision_making?.information_needs || []).join(', ') || '—'}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
+                      <h4 className="font-semibold text-gray-900 mb-2">Communication preferences</h4>
+                      <p className="text-sm text-gray-700">
+                        <strong>Channels:</strong>{' '}
+                        {((behavioralPredictions as BehavioralPrediction).communication_preferences?.channel_priority || []).join(', ') || '—'}
+                      </p>
+                      <p className="text-sm text-gray-700 mt-1">
+                        <strong>Frequency:</strong>{' '}
+                        {(behavioralPredictions as BehavioralPrediction).communication_preferences?.frequency}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-2">
+                        <strong>Message style:</strong>{' '}
+                        {(behavioralPredictions as BehavioralPrediction).communication_preferences?.message_style}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
+                      <h4 className="font-semibold text-gray-900 mb-2">Stress response</h4>
+                      <p className="text-sm text-gray-600">
+                        <strong>Triggers:</strong>{' '}
+                        {((behavioralPredictions as BehavioralPrediction).stress_response?.triggers || []).join(', ') || '—'}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        <strong>Indicators:</strong>{' '}
+                        {((behavioralPredictions as BehavioralPrediction).stress_response?.indicators || []).join(', ') || '—'}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        <strong>Management:</strong>{' '}
+                        {((behavioralPredictions as BehavioralPrediction).stress_response?.management || []).join(', ') || '—'}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
+                      <h4 className="font-semibold text-gray-900 mb-2">Motivation</h4>
+                      <p className="text-sm text-gray-600">
+                        <strong>Drivers:</strong>{' '}
+                        {((behavioralPredictions as BehavioralPrediction).motivation_factors?.primary_drivers || []).join(', ') || '—'}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        <strong>Recognition:</strong>{' '}
+                        {(behavioralPredictions as BehavioralPrediction).motivation_factors?.recognition_style}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        <strong>Goals:</strong>{' '}
+                        {(behavioralPredictions as BehavioralPrediction).motivation_factors?.goal_orientation}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex justify-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={loadingPredictions}
+                      onClick={() => refetchBehavioralPredictions()}
+                    >
+                      <RefreshCw className={`w-4 h-4 mr-2 ${loadingPredictions ? 'animate-spin' : ''}`} />
+                      Check for updates
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {!loadingPredictions && !predictionsQueryError && !behavioralPredictions && (
+                <div className="text-center py-8">
+                  <BarChart3 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="font-medium text-gray-600 mb-2">Behavioral predictions</h3>
+                  <p className="text-sm text-gray-500 mb-4">No prediction payload returned yet.</p>
+                  <Button variant="outline" size="sm" onClick={() => refetchBehavioralPredictions()}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Check for updates
+                  </Button>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </CardContent>
@@ -836,11 +991,11 @@ const PsychometricInsights: React.FC<PsychometricInsightsProps> = ({ leadId, lea
               <span>Confidence: {Math.round(confidence_score * 100)}%</span>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" type="button" onClick={handleExportInsights}>
                 <Download className="w-4 h-4 mr-1" />
                 Export
               </Button>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" type="button" onClick={() => void handleShareInsights()}>
                 <Share2 className="w-4 h-4 mr-1" />
                 Share
               </Button>

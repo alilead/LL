@@ -61,6 +61,17 @@ export const messagesApi = {
     return response.data;
   },
 
+  /** Multipart upload; server stores file and sends a message referencing it */
+  sendMessageWithAttachment: async (receiverId: number, file: File): Promise<Message> => {
+    const formData = new FormData();
+    formData.append('receiver_id', String(receiverId));
+    formData.append('file', file);
+    const response = await api.post<Message>('/messages/send-attachment', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
   // Mark messages as read
   markAsRead: async (partnerId: number): Promise<{ marked_count: number }> => {
     const response = await api.post<{ marked_count: number }>(`/messages/mark-read/${partnerId}`);

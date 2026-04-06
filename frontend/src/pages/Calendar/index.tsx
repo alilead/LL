@@ -72,6 +72,7 @@ interface NewEventForm {
   user_id?: number;
   is_all_day: boolean;
   location: string;
+  timezone: string;
 }
 
 const eventTypes = [
@@ -155,7 +156,7 @@ export const CalendarPage = () => {
   const [selectedTimezone, setSelectedTimezone] = useState(getSystemTimezone());
   const [isDetailModalOpen, setDetailModalOpen] = useState(false);
   const [isNewEventDialogOpen, setNewEventDialogOpen] = useState(false);
-  const [newEvent, setNewEvent] = useState<NewEventForm>({
+  const [newEvent, setNewEvent] = useState<NewEventForm>(() => ({
     title: '',
     description: '',
     start_time: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
@@ -164,8 +165,9 @@ export const CalendarPage = () => {
     organization_id: user?.organization_id,
     user_id: user?.id,
     is_all_day: false,
-    location: ''
-  });
+    location: '',
+    timezone: getSystemTimezone(),
+  }));
 
   // Get date range based on view mode
   const getDateRange = () => {
@@ -308,7 +310,8 @@ export const CalendarPage = () => {
       event_type: newEvent.event_type,
       is_all_day: newEvent.is_all_day,
       organization_id: user?.organization_id || 0,
-      timezone: selectedTimezone
+      timezone: newEvent.timezone || selectedTimezone,
+      status: 'scheduled',
     };
 
     handleCreateEvent(eventData);
@@ -322,7 +325,8 @@ export const CalendarPage = () => {
       organization_id: user?.organization_id,
       user_id: user?.id,
       is_all_day: false,
-      location: ''
+      location: '',
+      timezone: getSystemTimezone(),
     });
   };
 
@@ -902,7 +906,8 @@ export const CalendarPage = () => {
                   organization_id: user?.organization_id,
                   user_id: user?.id,
                   is_all_day: false,
-                  location: ''
+                  location: '',
+                  timezone: getSystemTimezone(),
                 });
               }, 300);
             }
@@ -997,6 +1002,45 @@ export const CalendarPage = () => {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <Label className="text-sm font-semibold text-gray-700 mb-2 block">Event type</Label>
+                    <Select
+                      value={newEvent.event_type}
+                      onValueChange={(v) => setNewEvent({ ...newEvent, event_type: v })}
+                    >
+                      <SelectTrigger className="h-11 border-gray-200">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {eventTypes.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>
+                            {t.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-semibold text-gray-700 mb-2 block">Timezone</Label>
+                    <Select
+                      value={newEvent.timezone}
+                      onValueChange={(v) => setNewEvent({ ...newEvent, timezone: v })}
+                    >
+                      <SelectTrigger className="h-11 border-gray-200">
+                        <SelectValue placeholder="Timezone" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIMEZONE_OPTIONS.map((tz) => (
+                          <SelectItem key={tz.value} value={tz.value}>
+                            {tz.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="start_time" className="text-sm font-semibold text-gray-700 block mb-2">
@@ -1031,8 +1075,40 @@ export const CalendarPage = () => {
                   </div>
                 </div>
 
+                <div>
+                  <Label htmlFor="duration-preset" className="text-sm font-semibold text-gray-700 block mb-2">
+                    Quick duration (from start)
+                  </Label>
+                  <select
+                    id="duration-preset"
+                    defaultValue=""
+                    className="h-11 w-full rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-900"
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      e.target.selectedIndex = 0;
+                      if (!v) return;
+                      const minutes = Number(v);
+                      const start = new Date(newEvent.start_time);
+                      if (Number.isNaN(start.getTime())) return;
+                      const end = new Date(start.getTime() + minutes * 60 * 1000);
+                      setNewEvent({
+                        ...newEvent,
+                        end_time: format(end, "yyyy-MM-dd'T'HH:mm"),
+                      });
+                    }}
+                  >
+                    <option value="">Choose duration…</option>
+                    <option value="15">15 minutes</option>
+                    <option value="30">30 minutes</option>
+                    <option value="45">45 minutes</option>
+                    <option value="60">1 hour</option>
+                    <option value="90">1.5 hours</option>
+                    <option value="120">2 hours</option>
+                  </select>
+                </div>
+
                 <div className="space-y-3">
-                  <Label className="text-sm font-semibold text-gray-700">Duration</Label>
+                  <Label className="text-sm font-semibold text-gray-700">Duration mode</Label>
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"

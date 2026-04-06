@@ -2,8 +2,7 @@
  * Modern Leads Page - Connected to Real Backend API
  *
  * Features:
- * - Kanban Board view with real stages from backend
- * - Table view with advanced filters
+ * - Table view with search, pagination, import/export
  * - Quick actions
  * - Bulk operations
  * - Real-time search
@@ -15,21 +14,16 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { useNavigate } from 'react-router-dom';
 import { leadsAPI, type Lead } from '@/services/api/leads';
 import type { LeadListResponse } from '@/services/api';
-import { stagesAPI } from '@/services/api/stages';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthStore } from '@/store/auth';
 import {
-  LayoutGrid,
-  List,
   Search,
   Filter,
   Plus,
   Mail,
   Phone,
-  Calendar,
   MoreVertical,
   User,
-  Building2,
   Download,
   Upload,
   FileDown,
@@ -173,7 +167,6 @@ export function ModernLeads() {
   const { user } = useAuthStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [view, setView] = useState<'kanban' | 'table'>('kanban');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(0);
@@ -209,21 +202,10 @@ export function ModernLeads() {
     placeholderData: keepPreviousData,
   });
 
-  // Fetch stages from backend
-  const { data: stagesResponse, isLoading: isLoadingStages } = useQuery({
-    queryKey: ['stages'],
-    queryFn: stagesAPI.getAll,
-  });
-
   const leads: Lead[] = leadsPage?.results ?? [];
   const totalLeads = leadsPage?.total ?? 0;
   const pageStart = totalLeads === 0 ? 0 : page * pageSize + 1;
   const pageEnd = page * pageSize + leads.length;
-
-  const stagesRaw = stagesResponse?.data;
-  const stages = Array.isArray(stagesRaw)
-    ? stagesRaw
-    : (stagesRaw?.data || stagesRaw?.results || stagesRaw?.items || []);
 
   // Upload mutation
   const uploadMutation = useMutation({
@@ -363,7 +345,7 @@ export function ModernLeads() {
   const canNext = hasMore || (totalLeads > 0 && page < pagesFromTotal - 1);
 
   // Initial load only — avoid replacing the whole page (and search input) on every refetch
-  if ((isLoadingLeads && leadsPage === undefined) || (isLoadingStages && !stagesResponse)) {
+  if (isLoadingLeads && leadsPage === undefined) {
     return (
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-4 sm:p-6 md:p-8 flex items-center justify-center">
         <div className="flex flex-col items-center space-y-4">
@@ -373,14 +355,6 @@ export function ModernLeads() {
       </div>
     );
   }
-
-  // Group leads by stage for Kanban view
-  const leadsByStage = stages
-    .map((stage: any) => ({
-      ...stage,
-      leads: leads.filter((lead) => lead.stage_id === stage.id)
-    }))
-    .sort((a: any, b: any) => b.leads.length - a.leads.length);
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-4 sm:p-6 md:p-8">
@@ -439,33 +413,7 @@ export function ModernLeads() {
             </button>
           </div>
 
-          {/* View Switcher & Actions */}
           <div className="flex items-center space-x-3">
-            <div className="flex items-center bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-1">
-              <button
-                onClick={() => setView('kanban')}
-                className={`flex items-center space-x-2 px-3 py-1.5 rounded-md transition-colors ${
-                  view === 'kanban'
-                    ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
-                    : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
-                }`}
-              >
-                <LayoutGrid className="w-4 h-4" />
-                <span className="text-sm font-medium">Kanban</span>
-              </button>
-              <button
-                onClick={() => setView('table')}
-                className={`flex items-center space-x-2 px-3 py-1.5 rounded-md transition-colors ${
-                  view === 'table'
-                    ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
-                    : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
-                }`}
-              >
-                <List className="w-4 h-4" />
-                <span className="text-sm font-medium">Table</span>
-              </button>
-            </div>
-
             <button 
               onClick={() => setIsUploadDialogOpen(true)}
               className="flex items-center space-x-2 px-4 py-2.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
@@ -503,145 +451,7 @@ export function ModernLeads() {
         />
       </div>
 
-      {/* Kanban View */}
-      {view === 'kanban' && (
-        <div className="overflow-x-auto pb-4">
-          <div className="flex gap-6 min-w-max">
-            {leadsByStage.map((stage: any) => {
-              // Normalize stage name: replace "aaaa" with "New"
-              const stageName = stage.name === 'aaaa' || stage.name === 'AAAA' ? 'New' : stage.name;
-              
-              return (
-                <div key={stage.id} className="flex flex-col w-80 flex-shrink-0">
-                  {/* Stage Header */}
-                  <div className="flex items-center justify-between mb-4 pb-3 border-b-2 border-neutral-200 dark:border-neutral-700">
-                    <div className="flex items-center space-x-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: stage.color || '#6366f1' }}
-                      />
-                      <h3 className="font-semibold text-neutral-900 dark:text-neutral-50">
-                        {stageName}
-                      </h3>
-                      <span className="text-sm text-neutral-500 dark:text-neutral-400">
-                        {stage.leads.length}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => navigate('/leads/new')}
-                      className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition-colors"
-                    >
-                      <Plus className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
-                    </button>
-                  </div>
-
-                  {/* Lead Cards - Scrollable container */}
-                  <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
-                {stage.leads.map((lead: Lead) => (
-                  <div
-                    key={lead.id}
-                    onClick={() => navigate(`/leads/${lead.id}`)}
-                    className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700 hover:shadow-md transition-shadow cursor-pointer group"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/20 flex items-center justify-center">
-                          <User className="w-4 h-4 text-primary-600 dark:text-primary-400" />
-                        </div>
-                        <div>
-                          <h4 className="font-medium text-neutral-900 dark:text-neutral-50 text-sm">
-                            {lead.full_name || `${lead.first_name} ${lead.last_name}`}
-                          </h4>
-                          <p className="text-xs text-neutral-500 dark:text-neutral-400 flex items-center">
-                            <Building2 className="w-3 h-3 mr-1" />
-                            {lead.company || 'No company'}
-                          </p>
-                        </div>
-                      </div>
-                      <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition-all">
-                        <MoreVertical className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
-                      </button>
-                    </div>
-
-                    <div className="space-y-2 mb-3">
-                      {lead.email && (
-                        <div className="flex items-center text-xs text-neutral-600 dark:text-neutral-400">
-                          <Mail className="w-3 h-3 mr-1" />
-                          <span className="truncate">{lead.email}</span>
-                        </div>
-                      )}
-                      {(lead.telephone || lead.mobile) && (
-                        <div className="flex items-center text-xs text-neutral-600 dark:text-neutral-400">
-                          <Phone className="w-3 h-3 mr-1" />
-                          <span>{lead.telephone || lead.mobile}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {lead.tags && lead.tags.length > 0 && (
-                      <div className="flex items-center space-x-2 mb-3 flex-wrap gap-1">
-                        {lead.tags.slice(0, 2).map((tag) => (
-                          <span
-                            key={tag.id}
-                            className="px-2 py-0.5 bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded text-xs"
-                          >
-                            {tag.name}
-                          </span>
-                        ))}
-                        {lead.tags.length > 2 && (
-                          <span className="px-2 py-0.5 text-neutral-500 dark:text-neutral-400 text-xs">
-                            +{lead.tags.length - 2}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between pt-3 border-t border-neutral-100 dark:border-neutral-700">
-                      <div className="flex items-center space-x-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (lead.email) window.location.href = `mailto:${lead.email}`;
-                          }}
-                          className="p-1.5 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded transition-colors"
-                        >
-                          <Mail className="w-4 h-4 text-neutral-600 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (lead.telephone || lead.mobile) window.location.href = `tel:${lead.telephone || lead.mobile}`;
-                          }}
-                          className="p-1.5 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded transition-colors"
-                        >
-                          <Phone className="w-4 h-4 text-neutral-600 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400" />
-                        </button>
-                        <button className="p-1.5 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded transition-colors">
-                          <Calendar className="w-4 h-4 text-neutral-600 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400" />
-                        </button>
-                      </div>
-                      <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                        {lead.user?.first_name || 'Unassigned'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-                {stage.leads.length === 0 && (
-                  <div className="text-center py-8 text-neutral-500 dark:text-neutral-400 text-sm">
-                    No leads in this stage
-                  </div>
-                )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Table View */}
-      {view === 'table' && (
-        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
+      <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
           <table className="w-full min-w-[640px]">
             <thead className="bg-neutral-50 dark:bg-neutral-700/50 border-b border-neutral-200 dark:border-neutral-700">
               <tr>
@@ -723,7 +533,6 @@ export function ModernLeads() {
             </div>
           )}
         </div>
-      )}
 
       <div className="mt-8 border-t border-neutral-200 pt-6 dark:border-neutral-700">
         <p className="mb-3 text-center text-xs font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">

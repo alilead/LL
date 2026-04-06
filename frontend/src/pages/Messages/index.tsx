@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { useAuth } from '../../hooks/useAuth';
 import { onlineActivityService } from '../../services/onlineActivityService';
+import toast from 'react-hot-toast';
 
 export function MessagesPage() {
   const { user } = useAuth();
@@ -23,6 +24,8 @@ export function MessagesPage() {
   const [showUserInfo, setShowUserInfo] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
   // Auto scroll to bottom when new messages arrive
   useEffect(() => {
@@ -143,8 +146,28 @@ export function MessagesPage() {
       onlineActivityService.recordActivity();
     } catch (error) {
       console.error('Error sending message:', error);
+      toast.error('Could not send message');
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleAttachmentChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !selectedContact || uploadingAttachment) return;
+    setUploadingAttachment(true);
+    try {
+      await messagesApi.sendMessageWithAttachment(selectedContact.id, file);
+      await loadConversationMessages(selectedContact.id);
+      await loadConversations();
+      toast.success('Attachment sent');
+      onlineActivityService.recordActivity();
+    } catch (err) {
+      console.error('Error uploading attachment:', err);
+      toast.error('Could not send attachment');
+    } finally {
+      setUploadingAttachment(false);
     }
   };
 
@@ -697,9 +720,21 @@ export function MessagesPage() {
 
             {/* Message Input */}
             <div className="p-4 border-t border-gray-200 bg-white">
+              <input
+                ref={attachmentInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleAttachmentChange}
+              />
               <div className="flex items-end space-x-3">
-                <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-                  <Paperclip className="h-5 w-5" />
+                <button
+                  type="button"
+                  disabled={uploadingAttachment || !selectedContact}
+                  onClick={() => attachmentInputRef.current?.click()}
+                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-40"
+                  aria-label="Attach file"
+                >
+                  <Paperclip className={`h-5 w-5 ${uploadingAttachment ? 'animate-pulse' : ''}`} />
                 </button>
                 <div className="flex-1 relative">
                   <textarea

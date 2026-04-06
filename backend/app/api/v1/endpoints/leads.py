@@ -1,5 +1,8 @@
 from typing import Any, List, Optional
+import csv
+import io
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app import crud, models, schemas
 from app.api import deps
@@ -220,6 +223,118 @@ def read_leads(
             status_code=500,
             detail=f"An error occurred while retrieving leads: {str(e)}"
         )
+
+
+@router.get("/export/csv")
+def export_leads_csv(
+    db: Session = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_user),
+    search: Optional[str] = None,
+    sort_by: Optional[str] = "created_at",
+    sort_desc: bool = True,
+    tag: Optional[str] = None,
+) -> Any:
+    """
+    Export leads matching list filters as CSV (same scoping as GET /leads/).
+    Root cause fix: frontend called /leads/export/csv but no route existed (404).
+    """
+    try:
+        tag_id = None
+        if tag and tag != "all":
+            try:
+                tag_id = int(tag)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid tag ID format")
+
+        def row_for(lead: models.Lead) -> List[str]:
+            stage_name = lead.stage.name if getattr(lead, "stage", None) else ""
+            return [
+                str(lead.id),
+                lead.first_name or "",
+                lead.last_name or "",
+                lead.email or "",
+                lead.company or "",
+                lead.job_title or "",
+                lead.telephone or "",
+                lead.mobile or "",
+                lead.location or "",
+                lead.country or "",
+                str(lead.stage_id) if lead.stage_id is not None else "",
+                stage_name,
+                lead.source or "",
+                lead.created_at.isoformat() if lead.created_at else "",
+            ]
+
+        def generate():
+            buffer = io.StringIO()
+            writer = csv.writer(buffer)
+            writer.writerow(
+                [
+                    "id",
+                    "first_name",
+                    "last_name",
+                    "email",
+                    "company",
+                    "job_title",
+                    "telephone",
+                    "mobile",
+                    "location",
+                    "country",
+                    "stage_id",
+                    "stage_name",
+                    "source",
+                    "created_at",
+                ]
+            )
+            yield buffer.getvalue()
+            buffer.seek(0)
+            buffer.truncate(0)
+
+            skip = 0
+            batch_size = 2000
+            while True:
+                leads, _total = crud.lead.get_multi(
+                    db=db,
+                    skip=skip,
+                    limit=batch_size,
+                    organization_id=current_user.organization_id,
+                    search=search,
+                    sort_by=sort_by,
+                    sort_desc=sort_desc,
+                    tag_id=tag_id,
+                    is_admin=current_user.is_admin,
+                )
+                if not leads:
+                    break
+                for lead in leads:
+                    writer.writerow(row_for(lead))
+                chunk = buffer.getvalue()
+                buffer.seek(0)
+                buffer.truncate(0)
+                if chunk:
+                    yield chunk
+                if len(leads) < batch_size:
+                    break
+                skip += batch_size
+
+        filename = f"leads-export-{datetime.utcnow().date().isoformat()}.csv"
+        return StreamingResponse(
+            generate(),
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Cache-Control": "no-store",
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error exporting leads CSV: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"An error occurred while exporting leads: {str(e)}",
+        )
+
 
 @router.post("", response_model=schemas.LeadResponse)
 @router.post("/", response_model=schemas.LeadResponse)

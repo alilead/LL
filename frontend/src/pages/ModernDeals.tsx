@@ -8,6 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   DndContext,
   DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
   PointerSensor,
   useSensor,
   useSensors,
@@ -27,6 +29,15 @@ import {
   GripVertical,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/Dialog';
+import { Button } from '@/components/ui/Button';
 
 /** Backend DealStatus string values */
 type DealStatusStr =
@@ -226,6 +237,9 @@ export function ModernDeals() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<Set<DealStatusStr>>(() => new Set());
+  const [activeDeal, setActiveDeal] = useState<ApiDeal | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -273,10 +287,16 @@ export function ModernDeals() {
   });
 
   const filteredDeals = useMemo(() => {
+    let list = rawDeals;
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return rawDeals;
-    return rawDeals.filter((d) => d.name.toLowerCase().includes(q));
-  }, [rawDeals, searchQuery]);
+    if (q) {
+      list = list.filter((d) => d.name.toLowerCase().includes(q));
+    }
+    if (statusFilter.size > 0) {
+      list = list.filter((d) => statusFilter.has(d.status));
+    }
+    return list;
+  }, [rawDeals, searchQuery, statusFilter]);
 
   const dealsByStage = useMemo(() => {
     return STAGES.map((stage) => {
@@ -291,7 +311,14 @@ export function ModernDeals() {
     [filteredDeals],
   );
 
+  const handleDragStart = (event: DragStartEvent) => {
+    const dealId = Number(String(event.active.id).replace(/^deal-/, ''));
+    const d = rawDeals.find((x) => x.id === dealId) ?? null;
+    setActiveDeal(d);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDeal(null);
     const { active, over } = event;
     if (!over) return;
 
@@ -334,7 +361,7 @@ export function ModernDeals() {
               {searchQuery.trim() ? ` (${rawDeals.length} total)` : ''}
             </p>
             <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-500">
-              Drag the grip handle on a card to move it to another stage.
+              Drag the grip handle (⋮⋮) on a card to move it to another column. Columns highlight when you drag over them.
             </p>
           </div>
           <button
@@ -360,6 +387,7 @@ export function ModernDeals() {
           </div>
           <button
             type="button"
+            onClick={() => setFiltersOpen(true)}
             className="flex items-center space-x-2 px-4 py-2.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
           >
             <Filter className="w-5 h-5 text-neutral-600 dark:text-neutral-400" />
@@ -368,7 +396,12 @@ export function ModernDeals() {
         </div>
       </div>
 
-      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           {dealsByStage.map((stage) => (
             <div key={stage.id} className="flex flex-col">
@@ -405,7 +438,58 @@ export function ModernDeals() {
             </div>
           ))}
         </div>
+        <DragOverlay dropAnimation={null}>
+          {activeDeal ? (
+            <div className="pointer-events-none w-[280px] rounded-lg border border-primary-300 bg-white p-3 shadow-xl dark:border-primary-700 dark:bg-neutral-800">
+              <p className="text-sm font-medium text-neutral-900 dark:text-neutral-50">{activeDeal.name}</p>
+              <p className="text-xs text-neutral-500">
+                ${formatMoney(toAmountNumber(activeDeal.amount))} · {activeDeal.status}
+              </p>
+            </div>
+          ) : null}
+        </DragOverlay>
       </DndContext>
+
+      <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Filter deals</DialogTitle>
+            <DialogDescription>
+              Narrow the board by backend deal status. Leave all unchecked to show every status.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {(['Lead', 'Qualified', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost'] as DealStatusStr[]).map(
+              (s) => (
+                <label key={s} className="flex cursor-pointer items-center gap-2 text-sm text-neutral-800 dark:text-neutral-200">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-neutral-300"
+                    checked={statusFilter.has(s)}
+                    onChange={() => {
+                      setStatusFilter((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(s)) next.delete(s);
+                        else next.add(s);
+                        return next;
+                      });
+                    }}
+                  />
+                  {s}
+                </label>
+              )
+            )}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setStatusFilter(new Set())}>
+              Clear
+            </Button>
+            <Button type="button" onClick={() => setFiltersOpen(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

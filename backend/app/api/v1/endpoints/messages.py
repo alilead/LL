@@ -1,9 +1,13 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+import os
+import re
+import uuid
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
 from sqlalchemy.orm import Session
 from app.api import deps
 from app.crud.crud_message import message
 from app.models.user import User
+from app.core.config import settings
 from app.core.encryption import decrypt_message_content
 from app.schemas.message import (
     MessageCreate, 
@@ -14,6 +18,13 @@ from app.schemas.message import (
 )
 
 router = APIRouter()
+
+
+def _safe_filename(name: str) -> str:
+    base = os.path.basename(name or "file")
+    cleaned = re.sub(r"[^a-zA-Z0-9._-]", "_", base)
+    return (cleaned[:200] or "file")
+
 
 def create_message_response(msg, sender_name: str, sender_email: str, receiver_name: str, receiver_email: str) -> MessageFull:
     """Create MessageFull response with decrypted content"""
@@ -164,6 +175,57 @@ def send_message(
         receiver.full_name, 
         receiver.email
     )
+
+
+@router.post("/send-attachment", response_model=MessageFull)
+async def send_message_with_attachment(
+    receiver_id: int = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+):
+    """Send a message with a file attachment (stored under UPLOAD_DIR; content references filename)."""
+    receiver = db.query(User).filter(
+        User.id == receiver_id,
+        User.organization_id == current_user.organization_id,
+        User.is_active == True,
+    ).first()
+
+    if not receiver:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Receiver not found or not in same organization",
+        )
+
+    raw = await file.read()
+    if len(raw) > settings.MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="File exceeds maximum upload size",
+        )
+
+    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+    stored_name = f"{uuid.uuid4().hex}_{_safe_filename(file.filename)}"
+    path = os.path.join(settings.UPLOAD_DIR, stored_name)
+    with open(path, "wb") as fh:
+        fh.write(raw)
+
+    text = f"[Attachment: {file.filename}] ({len(raw)} bytes). Stored as {stored_name}."
+    new_message = message.create_message(
+        db=db,
+        message_in=MessageCreate(content=text, receiver_id=receiver_id),
+        sender_id=current_user.id,
+        organization_id=current_user.organization_id,
+    )
+
+    return create_message_response(
+        new_message,
+        current_user.full_name,
+        current_user.email,
+        receiver.full_name,
+        receiver.email,
+    )
+
 
 @router.post("/mark-read/{partner_id}")
 def mark_messages_as_read(

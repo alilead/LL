@@ -1,11 +1,26 @@
 /**
- * Full-page deal view (opened from the pipeline board).
+ * Full-page deal view with edit form (PUT /deals/{id}).
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '@/services/axios';
+import dealsAPI from '@/services/api/deals';
 import { ArrowLeft, Calendar, DollarSign, Loader2, User } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
+import { useToast } from '@/hooks/use-toast';
+
+const DEAL_STATUSES = [
+  'Lead',
+  'Qualified',
+  'Proposal',
+  'Negotiation',
+  'Closed Won',
+  'Closed Lost',
+] as const;
 
 interface ApiDeal {
   id: number;
@@ -22,7 +37,14 @@ interface ApiDeal {
 export function ModernDealDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const dealId = Number(id);
+
+  const [name, setName] = useState('');
+  const [amountStr, setAmountStr] = useState('');
+  const [status, setStatus] = useState<string>('Qualified');
+  const [validUntil, setValidUntil] = useState('');
 
   const { data: deal, isLoading, error } = useQuery({
     queryKey: ['deal', dealId],
@@ -31,6 +53,43 @@ export function ModernDealDetail() {
       return r.data;
     },
     enabled: Number.isFinite(dealId) && dealId > 0,
+  });
+
+  useEffect(() => {
+    if (!deal) return;
+    setName(deal.name);
+    setAmountStr(
+      typeof deal.amount === 'number' ? String(deal.amount) : String(deal.amount ?? '')
+    );
+    setStatus(DEAL_STATUSES.includes(deal.status as (typeof DEAL_STATUSES)[number]) ? deal.status : 'Qualified');
+    setValidUntil(deal.valid_until ? deal.valid_until.slice(0, 10) : '');
+  }, [deal]);
+
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      const amount = parseFloat(amountStr.replace(/,/g, ''));
+      if (!Number.isFinite(amount)) {
+        throw new Error('Invalid amount');
+      }
+      await dealsAPI.updateDeal(dealId, {
+        name: name.trim(),
+        amount,
+        status,
+        valid_until: validUntil || undefined,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deal', dealId] });
+      queryClient.invalidateQueries({ queryKey: ['deals'] });
+      toast({ title: 'Deal saved' });
+    },
+    onError: (err: unknown) => {
+      const msg =
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message?: string }).message)
+          : 'Could not save deal';
+      toast({ title: 'Save failed', description: msg, variant: 'destructive' });
+    },
   });
 
   if (!Number.isFinite(dealId) || dealId <= 0) {
@@ -71,7 +130,7 @@ export function ModernDealDetail() {
     );
   }
 
-  const amount =
+  const amountDisplay =
     typeof deal.amount === 'number' ? deal.amount : parseFloat(String(deal.amount)) || 0;
 
   return (
@@ -86,36 +145,96 @@ export function ModernDealDetail() {
       </button>
 
       <div className="max-w-2xl rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-8 shadow-sm">
-        <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-2">{deal.name}</h1>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-6">Status: {deal.status}</p>
+        <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-6">Edit deal</h1>
 
-        <div className="space-y-4 text-neutral-700 dark:text-neutral-300">
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            updateMutation.mutate();
+          }}
+        >
+          <div>
+            <Label htmlFor="deal-name">Name</Label>
+            <Input
+              id="deal-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-1"
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="deal-amount">Amount</Label>
+            <Input
+              id="deal-amount"
+              type="text"
+              inputMode="decimal"
+              value={amountStr}
+              onChange={(e) => setAmountStr(e.target.value)}
+              className="mt-1"
+            />
+            <p className="mt-1 text-xs text-neutral-500">Current value: ${amountDisplay.toLocaleString()}</p>
+          </div>
+          <div>
+            <Label htmlFor="deal-status">Status</Label>
+            <select
+              id="deal-status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="mt-1 flex h-11 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+            >
+              {DEAL_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label htmlFor="deal-close">Close by (optional)</Label>
+            <Input
+              id="deal-close"
+              type="date"
+              value={validUntil}
+              onChange={(e) => setValidUntil(e.target.value)}
+              className="mt-1"
+            />
+          </div>
+          <div className="flex flex-wrap gap-3 pt-2">
+            <Button type="submit" disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                'Save changes'
+              )}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => navigate(`/leads/${deal.lead_id}`)}>
+              Open lead #{deal.lead_id}
+            </Button>
+          </div>
+        </form>
+
+        <div className="mt-8 space-y-3 border-t border-neutral-200 pt-6 text-sm text-neutral-600 dark:text-neutral-300 dark:border-neutral-600">
           <div className="flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-neutral-400" />
-            <span className="font-semibold">${amount.toLocaleString()}</span>
+            <span>Currency ID: {deal.currency_id}</span>
           </div>
           {deal.valid_until && (
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-neutral-400" />
-              <span>Close by {new Date(deal.valid_until).toLocaleDateString()}</span>
+              <span>Original close date: {new Date(deal.valid_until).toLocaleDateString()}</span>
             </div>
           )}
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex items-center gap-2">
             <User className="w-4 h-4 text-neutral-400" />
             <span>
-              Lead #{deal.lead_id} · Assigned user #{deal.assigned_to_id}
+              Assigned user #{deal.assigned_to_id} · Created {new Date(deal.created_at).toLocaleString()}
             </span>
           </div>
-        </div>
-
-        <div className="mt-8 flex gap-3">
-          <button
-            type="button"
-            onClick={() => navigate(`/leads/${deal.lead_id}`)}
-            className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
-          >
-            Open lead
-          </button>
         </div>
       </div>
     </div>
