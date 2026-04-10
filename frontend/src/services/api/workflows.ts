@@ -17,6 +17,7 @@ export interface WorkflowEdge {
   source: string;
   target: string;
   label?: string;
+  data?: Record<string, unknown>;
 }
 
 export interface Workflow {
@@ -68,9 +69,25 @@ export const workflowsAPI = {
     description?: string;
     trigger_type: string;
     trigger_object: string;
-    flow_definition: any;
+    flow_definition: {
+      nodes: Array<{
+        id: string;
+        type: string;
+        label: string;
+        position: { x: number; y: number };
+        data: Record<string, unknown>;
+      }>;
+      edges: Array<{
+        id: string;
+        source: string;
+        target: string;
+        label?: string;
+        data?: Record<string, unknown>;
+      }>;
+    };
     entry_criteria?: any;
     is_active?: boolean;
+    status?: string;
   }): Promise<Workflow> => {
     const response = await api.post('/workflows', data);
     return response.data;
