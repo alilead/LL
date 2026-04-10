@@ -1,80 +1,69 @@
-# LeadLab changes — push status and verification checklist
+# LeadLab release — verification and QA
 
-**Remote sync:** `main` matches `origin/main` at commit `0f74895` (*feat: Supabase docs, routes, quotes/calendar/email UX, forecast delete*). Everything in that commit is **pushed**.
+## Git status
 
-**Not in git:** `Prompt.txt` (untracked on purpose). Add and commit separately if you want it in the repo.
+After your latest pull, confirm `main` includes the commits for this work (Supabase docs, UX fixes, `dayjs` / `@mui/system` build fixes, territories under Settings, `Prompt.txt` in repo).
 
----
-
-Use this list to verify behavior in staging or production. Check each row when you have confirmed it.
-
-## 1. Database and Supabase
-
-| Done | Item | What changed |
-|------|------|----------------|
-| [ ] | **1.1** Migration guide | `docs/SUPABASE_RENDER_LOCAL_SETUP.md` — Render/Vercel topology, Supabase migration, rollback, troubleshooting. |
-| [ ] | **1.2** Frontend Supabase client | `frontend/src/lib/supabaseClient.ts` — optional client from `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`. |
-| [ ] | **1.3** Env hints | `frontend/.env.development` — comments for Vite-prefixed Supabase vars. |
-| [ ] | **1.4** Dependency | `frontend/package.json` (+ lockfile) — `@supabase/supabase-js`. |
-
-## 2. Routing and navigation (IA)
-
-| Done | Item | What changed |
-|------|------|----------------|
-| [ ] | **2.1** Router | `frontend/src/router.tsx` — `/email-sequences/create`, `/email-sequences/:id`, `/notifications`; organization path aligned with settings. |
-| [ ] | **2.2** Sidebar | `frontend/src/components/ModernSidebar.tsx` — organization → settings area; notifications entry. |
-| [ ] | **2.3** Legacy sidebar label | `frontend/src/components/app-sidebar.tsx` — org display name set to **Newton meter**. |
-
-## 3. Email
-
-| Done | Item | What changed |
-|------|------|----------------|
-| [ ] | **3.1** Sequences UI | `frontend/src/pages/EmailSequences/SequenceBuilder.tsx` + `index.tsx` — create/edit sequence steps (no more missing route for “Create sequence”). |
-| [ ] | **3.2** Inbox and settings link | `frontend/src/pages/Emails/index.tsx` — “Go to settings” style flow points to `/settings/integrations`; mutation args aligned with API. |
-| [ ] | **3.3** Email API mapping | `frontend/src/services/emailAPI.ts` — folder → backend `direction` / `unread_only`; star/delete stubbed to avoid crashes if endpoints missing. |
-
-## 4. Notifications
-
-| Done | Item | What changed |
-|------|------|----------------|
-| [ ] | **4.1** Notifications page | `frontend/src/pages/ModernNotifications.tsx` — list, test create, mark all read. |
-| [ ] | **4.2** Settings tab | `frontend/src/pages/ModernSettings.tsx` — notification section wired to real API instead of placeholder-only. |
-
-## 5. Quotes, calendar, workflows
-
-| Done | Item | What changed |
-|------|------|----------------|
-| [ ] | **5.1** New quote flow | `frontend/src/pages/ModernQuotePages.tsx` — create quote form (products via CPQ, submit via `cpqAPI.createQuote`). |
-| [ ] | **5.2** Calendar modals | `frontend/src/pages/Calendar/index.tsx` — dialog sizing/scroll so create/edit events are not cropped. |
-| [ ] | **5.3** Workflow canvas | `frontend/src/pages/Workflows/WorkflowBuilder.tsx` — node drag and simple edge/connection drawing. |
-
-## 6. Forecasts and conversations
-
-| Done | Item | What changed |
-|------|------|----------------|
-| [ ] | **6.1** Delete forecast (API) | `backend/app/api/v1/endpoints/forecasting.py` — `DELETE /forecasts/{forecast_id}` for drafts (owner). |
-| [ ] | **6.2** Delete forecast (UI) | `frontend/src/services/api/forecasts.ts` + `frontend/src/pages/Forecasting/ForecastDashboard.tsx` — “Delete draft” action. |
-| [ ] | **6.3** Conversation analysis labels | `backend/app/api/v1/endpoints/conversations.py` — competitor/client placeholders replaced with **Newton meter**, **DLP**, **UN**, **David Schneider**. |
-| [ ] | **6.4** Conversation upload | `frontend/src/pages/ModernConversationUpload.tsx` — lead selector + recording create mutation (metadata persistence). |
+**Untracked:** nothing expected except local env files.
 
 ---
 
-## Quick reference
+## Build verification (local)
 
-| Area | Primary files |
-|------|----------------|
+| Step | Command | Expected |
+|------|---------|----------|
+| Install | `cd frontend && npm ci` or `npm install` | Completes without errors |
+| Build | `npm run build` | Vite build succeeds (fixes: `@mui/system`, `dayjs` for `react-big-calendar`) |
+
+---
+
+## Acceptance checklist (from product spec)
+
+Use **Pass** / **Fail** / **N/A** when you test in staging or production. Screenshot references are placeholders—attach your own file names where noted.
+
+| # | Requirement | Status | Notes / screenshot ref |
+|---|-------------|--------|-------------------------|
+| A1 | No 404 on **Email → Sequences → Create sequence** | | Routes: `/email-sequences/create`, `/email-sequences/:id` |
+| A2 | **SMTP**: account connect, inbox fetch, send | | *Requires backend + credentials; UI links to Integrations.* |
+| A3 | **Messages** file upload succeeds and message appears | | API: `POST /messages/send-attachment`; refresh list after send |
+| A4 | **Calendar** create/edit modal not cropped | | Scrollable dialog |
+| A5 | **Sales → Quotes → Create New** is a usable editor | | `ModernQuoteNewPage` + CPQ products |
+| A6 | **Workflow** canvas: drag, link, delete nodes | | Delete on node; edges drawn |
+| A7 | **Forecast** delete where required | | Draft delete API + dashboard button |
+| A8 | **Conversations** upload appears after completion | | `createRecording` + invalidate `call-recordings` |
+| A9 | **Leads export** CSV correct (no JSON error blob) | | `GET /leads/export/csv`; client rejects JSON error bodies |
+| A10 | **Organization / Settings / Territories** coherent IA | | Territories: `/settings/territories`; legacy `/territories` redirects |
+| A11 | **Notifications** page + settings section functional | | `/notifications`; settings tab |
+| A12 | Fake competitors replaced with **Newton meter, DLP, UN, David Schneider** | | `conversations` analysis text |
+| A13 | **Supabase migration** doc matches Vercel + Render + rollback | | `docs/SUPABASE_RENDER_LOCAL_SETUP.md` |
+
+---
+
+## Files by feature (reference)
+
+| Area | Files |
+|------|--------|
 | Supabase | `docs/SUPABASE_RENDER_LOCAL_SETUP.md`, `frontend/src/lib/supabaseClient.ts` |
-| Routes | `frontend/src/router.tsx` |
-| Email sequences | `frontend/src/pages/EmailSequences/SequenceBuilder.tsx` |
-| Emails | `frontend/src/pages/Emails/index.tsx`, `frontend/src/services/emailAPI.ts` |
+| Routes | `frontend/src/router.tsx` (sequences, notifications, org redirect, territories) |
+| Territories IA | `ModernSidebar.tsx`, `CommandPalette.tsx`, `ModernSettings.tsx` (Organization card) |
+| Email | `EmailSequences/SequenceBuilder.tsx`, `Emails/index.tsx`, `services/emailAPI.ts` |
 | Notifications | `ModernNotifications.tsx`, `ModernSettings.tsx` |
 | Quotes / calendar / workflows | `ModernQuotePages.tsx`, `Calendar/index.tsx`, `Workflows/WorkflowBuilder.tsx` |
-| Forecasts | `forecasting.py`, `ForecastDashboard.tsx`, `services/api/forecasts.ts` |
-| Conversations | `conversations.py`, `ModernConversationUpload.tsx` |
+| Forecasts | `backend/.../forecasting.py`, `ForecastDashboard.tsx`, `services/api/forecasts.ts` |
+| Conversations | `conversations.py`, `ModernConversationUpload.tsx`, `ConversationIntelligence/CallRecordings.tsx` |
+| Leads export | `backend/.../leads.py` (`export/csv`), `services/api/leads.ts` (`exportCSV`) |
+| Build | `frontend/package.json` (`@mui/system`, `dayjs`, `@supabase/supabase-js`) |
 
 ---
 
-## Known follow-ups (not in this commit)
+## Remaining risks
 
-- Frontend production build may still fail on a pre-existing **MUI / `@mui/system`** resolution issue — run `npm run build` after fixing deps.
-- Full **SMTP** sync/send and **message file uploads** may need more backend work beyond what this release wired in the UI.
+1. **SMTP end-to-end** depends on Render env, DNS, and app passwords; exercise with a real mailbox in staging.
+2. **Avatar / asset 404s** may still occur if `VITE_API_URL` or CDN paths differ—watch network tab.
+3. **Large CSV exports** use streaming on the server; very large orgs may need longer timeouts.
+
+---
+
+## Spec source
+
+See repository root **`Prompt.txt`** for the full fix list and mandatory output format.

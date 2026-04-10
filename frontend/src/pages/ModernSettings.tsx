@@ -22,6 +22,8 @@ import {
   X,
   Loader2,
   MessageSquare,
+  Map,
+  ChevronRight,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { updateProfile, uploadAvatar, changePassword } from '@/services/users';
@@ -42,6 +44,7 @@ const tabs = [
 
 export function ModernSettings() {
   const { tab } = useParams();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('profile');
 
   useEffect(() => {
@@ -50,6 +53,11 @@ export function ModernSettings() {
       setActiveTab(tab as Tab);
     }
   }, [tab]);
+
+  const goToTab = (id: Tab) => {
+    setActiveTab(id);
+    navigate(`/settings/${id}`);
+  };
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-8">
@@ -75,7 +83,8 @@ export function ModernSettings() {
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
+                    type="button"
+                    onClick={() => goToTab(tab.id)}
                     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
                       isActive
                         ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
@@ -384,6 +393,7 @@ function ProfileSettings() {
 }
 
 function OrganizationSettings() {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const orgId = user?.organization_id != null ? Number(user.organization_id) : null;
@@ -465,6 +475,28 @@ function OrganizationSettings() {
           Only organization administrators can change these fields. You can still view them.
         </p>
       )}
+
+      <div className="mb-6 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50/80 dark:bg-neutral-900/40 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 rounded-lg bg-primary-100 dark:bg-primary-900/30 p-2">
+            <Map className="h-5 w-5 text-primary-700 dark:text-primary-300" aria-hidden />
+          </div>
+          <div>
+            <h3 className="font-semibold text-neutral-900 dark:text-neutral-50">Territories</h3>
+            <p className="text-sm text-neutral-600 dark:text-neutral-400">
+              Sales territories and coverage live alongside organization settings.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/settings/territories')}
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-4 py-2.5 text-sm font-medium text-neutral-800 dark:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+        >
+          Open territories
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
 
       <div className="space-y-6">
         <div>

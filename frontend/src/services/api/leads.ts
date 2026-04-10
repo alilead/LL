@@ -286,7 +286,32 @@ export const leadsAPI = {
       params,
       responseType: 'blob',
     });
-    return response.data;
+    const blob = response.data as Blob;
+    const ct = String(response.headers['content-type'] || blob.type || '');
+    if (ct.includes('application/json') || ct.includes('json')) {
+      const text = await blob.text();
+      let msg = 'Export failed';
+      try {
+        const j = JSON.parse(text) as { detail?: unknown };
+        if (typeof j.detail === 'string') msg = j.detail;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(msg);
+    }
+    const head = await blob.slice(0, 1).text();
+    if (head === '{') {
+      const text = await blob.text();
+      let msg = 'Export failed';
+      try {
+        const j = JSON.parse(text) as { detail?: unknown };
+        if (typeof j.detail === 'string') msg = j.detail;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(msg);
+    }
+    return blob;
   },
 
   downloadTemplate: async (): Promise<Blob> => {

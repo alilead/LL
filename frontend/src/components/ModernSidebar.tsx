@@ -124,7 +124,7 @@ const navigation: NavItem[] = [
     path: '/settings/organization',
     children: [
       { name: 'Settings', icon: Building2, path: '/settings/organization' },
-      { name: 'Territories', icon: Map, path: '/territories' },
+      { name: 'Territories', icon: Map, path: '/settings/territories' },
     ],
   },
   {

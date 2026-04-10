@@ -106,7 +106,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
       id: 'nav-territories',
       title: 'Go to Territories',
       icon: <TrendingUp className="w-4 h-4" />,
-      action: () => navigate('/territories'),
+      action: () => navigate('/settings/territories'),
       category: 'navigation',
     },
     {

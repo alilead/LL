@@ -1,0 +1,117 @@
+# ROLE
+You are a senior full-stack fixer working in this repo. 
+Goal: stabilize production UX and API behavior for LeadLab, based on the provided bug list + screenshots.
+Current deployment architecture:
+- Frontend: Vercel
+- Backend: Render
+- Database: migrating to Supabase, but app is currently running with Render + Vercel in production
+
+# HARD REQUIREMENTS
+1. Do NOT break existing auth/session flows.
+2. Keep Render + Vercel deployment instructions accurate.
+3. Replace fake demo recommendations with real client names:
+   - Newton meter
+   - DLP
+   - UN
+   - David Schneider
+4. Merge duplicate navigation/settings structures:
+   - Organization + Settings
+   - Organization settings + Territories (single coherent IA)
+5. Add/repair notifications UX and API integration.
+6. Fix all listed broken routes, loops, upload, and editor issues.
+7. Update `docs/SUPABASE_RENDER_LOCAL_SETUP.md` to reflect **current reality**:
+   - still using Render + Vercel
+   - safe migration/testing path to Supabase
+   - rollback instructions
+8. Produce a final QA checklist with pass/fail per issue and screenshots references.
+
+# BUG LIST TO FIX (SOURCE OF TRUTH)
+## Navigation / IA
+- Merge Organization and Settings.
+- Merge organization tab into settings (`/organizations/settings` or territories) with clear single location.
+- Add Notifications section and make it functional.
+
+## Leads
+- Export behavior is incorrect (see screenshots). Fix leads export end-to-end.
+
+## Email / Sequences
+- Path: Email -> Sequences -> Create sequence gives 404. Fix route + backend endpoint wiring.
+- Path: Email -> Inbox -> Add email account -> Go to settings -> Connect Gmail loops back and never connects.
+- Provide working SMTP-based connection flow so user can:
+  - connect account
+  - fetch inbox
+  - send emails
+
+## Messages
+- File upload in messages fails. Fix backend endpoint, payload, storage handling, and frontend integration.
+
+## Calendar
+- Event create/edit modal UI is cropped. Fix layout/responsive behavior and overflow handling.
+
+## Sales / Quotes
+- Clicking Sales -> Quotes -> Create New shows placeholder:
+  “Use the quotes list to manage quotes when the full editor is available, or create via the API.”
+- Implement/restore usable quote editor UI.
+
+## Workflows
+- Canvas drag/drop and linking nodes is broken.
+- Unable to move around space correctly.
+- Add delete option for forecast/workflow entities where missing.
+
+## Conversations
+- Uploaded file does not appear after upload. Fix persistence + listing refresh/render.
+
+# SCREENSHOT-DRIVEN ERRORS TO VERIFY/FIX
+From console/network screenshots, prioritize endpoints failing with 404/4xx/5xx around:
+- email sequence creation
+- send attachment / file upload
+- avatar/user asset calls
+- workflow-related API routes
+- forecast routes
+Ensure each failed request is either fixed or intentionally handled with clear UI feedback.
+
+# IMPLEMENTATION PLAN (MANDATORY)
+1. Audit routes and API contracts:
+   - frontend route definitions
+   - backend router prefixes/endpoints
+   - axios/base URL/proxy config
+2. Reproduce each issue locally with logs.
+3. Fix by domain (Email, Messaging, Calendar, Sales, Workflows, Conversations, IA).
+4. Add defensive UI states for API failures.
+5. Add/update tests:
+   - route existence tests
+   - integration tests for critical endpoints
+   - frontend behavior tests for key flows
+6. Validate locally, then with production-like env config.
+
+# DOC UPDATE TASK
+Update `docs/SUPABASE_RENDER_LOCAL_SETUP.md` with:
+- explicit “Current production topology: Vercel frontend + Render backend”
+- how to point Render backend DATABASE_URL to Supabase
+- local testing steps (backend + frontend)
+- cutover checklist
+- rollback checklist
+- troubleshooting section for 404 loops, SMTP connection, upload failures
+
+# ACCEPTANCE CRITERIA
+- No 404 on Email sequence create flow.
+- SMTP account can be connected and used for inbox + send.
+- Messages file upload succeeds and file is visible after upload.
+- Calendar modal no longer cropped on create/edit.
+- Quotes “Create New” opens functional editor.
+- Workflow canvas supports drag/drop + node linking + delete where expected.
+- Forecast delete option exists where required.
+- Conversations upload appears in UI after completion.
+- Leads export works correctly.
+- Organization/Settings/Territories are merged into a coherent IA.
+- Notifications exists and is functional.
+- Fake recommendations replaced with real clients listed above.
+- Updated MD documentation is accurate for Render + Vercel + Supabase migration path.
+
+# OUTPUT FORMAT
+When done, provide:
+1. Files changed grouped by feature.
+2. Root cause + fix summary per bug.
+3. Any migrations/env vars required.
+4. Test evidence (commands + results).
+5. Remaining risks (if any).

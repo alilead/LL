@@ -164,6 +164,10 @@ export const router = createBrowserRouter([
             element: <ModernSettings />
           },
           {
+            path: '/settings/territories',
+            element: <ModernTerritories />
+          },
+          {
             path: '/settings/:tab',
             element: <ModernSettings />
           },
@@ -185,7 +189,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/territories',
-            element: <ModernTerritories />
+            element: <Navigate to="/settings/territories" replace />
           },
           {
             path: '/email-sequences',
