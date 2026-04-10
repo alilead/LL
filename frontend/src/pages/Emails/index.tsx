@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/ta
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/Select';
 import EmailComposeModal from './EmailComposeModal';
 import EmailDetailModal from './EmailDetailModal';
+import { useNavigate } from 'react-router-dom';
 import emailAPI, { EmailMessage, EmailAccount } from '../../services/emailAPI';
 
 const FOLDERS = [
@@ -21,6 +22,7 @@ const FOLDERS = [
 ];
 
 export const EmailsPage: React.FC = () => {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedAccount, setSelectedAccount] = useState<number | null>(null);
   const [selectedFolder, setSelectedFolder] = useState('inbox');
@@ -119,10 +121,11 @@ export const EmailsPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             <p className="text-gray-600 mb-4">
-              No email account has been added yet. You can add an email account from the settings page.
+              Connect your mailbox under Settings → Integrations (SMTP / Gmail app password). Stay there until the
+              connection succeeds—then return here for Inbox and Sent.
             </p>
-            <Button onClick={() => window.location.href = '/settings/integrations'}>
-              Go to Settings
+            <Button type="button" onClick={() => navigate('/settings/integrations')}>
+              Open Integrations
             </Button>
           </CardContent>
         </Card>

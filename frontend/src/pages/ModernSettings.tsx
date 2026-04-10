@@ -29,6 +29,7 @@ import { toast } from 'react-hot-toast';
 import { updateProfile, uploadAvatar, changePassword } from '@/services/users';
 import { useAuthStore } from '@/store/auth';
 import api from '@/lib/axios';
+import emailAPI from '@/services/emailAPI';
 
 type Tab = 'profile' | 'organization' | 'notifications' | 'security' | 'billing' | 'team' | 'integrations';
 
@@ -894,6 +895,201 @@ type IntegrationTile = {
   disconnectHint?: string;
 };
 
+function EmailIntegrationPanel() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [provider, setProvider] = useState<'gmail' | 'outlook' | 'yahoo' | 'custom'>('gmail');
+  const [emailAddr, setEmailAddr] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [imapHost, setImapHost] = useState('');
+  const [imapPort, setImapPort] = useState(993);
+  const [smtpHost, setSmtpHost] = useState('');
+  const [smtpPort, setSmtpPort] = useState(587);
+
+  const { data: mailAccounts = [], isLoading } = useQuery({
+    queryKey: ['email-accounts'],
+    queryFn: emailAPI.getAccounts,
+  });
+
+  const connectMutation = useMutation({
+    mutationFn: () =>
+      emailAPI.createAccount({
+        email: emailAddr.trim(),
+        password,
+        display_name: displayName.trim() || undefined,
+        provider_type: provider,
+        imap_server: provider === 'custom' ? imapHost.trim() : undefined,
+        imap_port: provider === 'custom' ? imapPort : undefined,
+        smtp_server: provider === 'custom' ? smtpHost.trim() : undefined,
+        smtp_port: provider === 'custom' ? smtpPort : undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['email-accounts'] });
+      setPassword('');
+      toast.success('Mailbox connected. Inbox sync runs in the background.');
+    },
+    onError: (err: unknown) => {
+      const detail =
+        err &&
+        typeof err === 'object' &&
+        'response' in err &&
+        (err as { response?: { data?: { detail?: unknown } } }).response?.data?.detail;
+      const msg =
+        typeof detail === 'string'
+          ? detail
+          : detail && typeof detail === 'object' && detail !== null && 'message' in detail
+            ? String((detail as { message?: string }).message)
+            : 'Could not connect mailbox. Check address, app password, and provider.';
+      toast.error(msg);
+    },
+  });
+
+  const canSubmit =
+    emailAddr.trim().length > 0 &&
+    password.length > 0 &&
+    (provider !== 'custom' || (imapHost.trim() && smtpHost.trim()));
+
+  return (
+    <div className="mb-10 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800/50 p-6">
+      <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50 mb-1">Email (IMAP / SMTP)</h3>
+      <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+        Connect here so you are not sent back to Inbox before credentials are saved. Gmail requires an{' '}
+        <span className="font-medium">App Password</span> (Google Account → Security → 2-Step Verification → App passwords).
+      </p>
+
+      {isLoading ? (
+        <p className="text-sm text-neutral-500 flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading accounts…
+        </p>
+      ) : mailAccounts.length > 0 ? (
+        <ul className="mb-4 space-y-2 text-sm">
+          {mailAccounts.map((a) => (
+            <li
+              key={a.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-200 dark:border-neutral-600 px-3 py-2"
+            >
+              <span className="font-medium text-neutral-800 dark:text-neutral-100">{a.email}</span>
+              <span className="text-neutral-500">{a.provider_type}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-neutral-500 mb-4">No mailbox connected yet.</p>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">Provider</label>
+          <select
+            value={provider}
+            onChange={(e) => setProvider(e.target.value as typeof provider)}
+            className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
+          >
+            <option value="gmail">Gmail (IMAP)</option>
+            <option value="outlook">Outlook / Microsoft 365</option>
+            <option value="yahoo">Yahoo</option>
+            <option value="custom">Custom SMTP / IMAP</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">Display name</label>
+          <input
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder="Shown as sender name"
+            className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">Email address</label>
+          <input
+            type="email"
+            value={emailAddr}
+            onChange={(e) => setEmailAddr(e.target.value)}
+            autoComplete="username"
+            className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">Password / app password</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
+            required
+          />
+        </div>
+      </div>
+
+      {provider === 'custom' && (
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">IMAP host</label>
+            <input
+              type="text"
+              value={imapHost}
+              onChange={(e) => setImapHost(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
+              placeholder="imap.example.com"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">IMAP port</label>
+            <input
+              type="number"
+              value={imapPort}
+              onChange={(e) => setImapPort(Number(e.target.value) || 993)}
+              className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">SMTP host</label>
+            <input
+              type="text"
+              value={smtpHost}
+              onChange={(e) => setSmtpHost(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
+              placeholder="smtp.example.com"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">SMTP port</label>
+            <input
+              type="number"
+              value={smtpPort}
+              onChange={(e) => setSmtpPort(Number(e.target.value) || 587)}
+              className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          disabled={!canSubmit || connectMutation.isPending}
+          onClick={() => connectMutation.mutate()}
+          className="rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+        >
+          {connectMutation.isPending ? 'Connecting…' : 'Connect mailbox'}
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate('/emails')}
+          className="rounded-lg border border-neutral-300 dark:border-neutral-600 px-4 py-2.5 text-sm font-medium text-neutral-800 dark:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+        >
+          Open Inbox
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function IntegrationsSettings() {
   const navigate = useNavigate();
 
@@ -919,13 +1115,6 @@ function IntegrationsSettings() {
       connected: false,
       disconnectHint: 'Slack workspace linking is not enabled for this environment yet.',
     },
-    {
-      id: 'gmail',
-      name: 'Gmail',
-      icon: Mail,
-      connected: false,
-      connectPath: '/emails',
-    },
   ];
 
   const handlePrimary = (tile: IntegrationTile) => {
@@ -935,9 +1124,6 @@ function IntegrationsSettings() {
     }
     if (tile.connectPath) {
       navigate(tile.connectPath);
-      if (tile.id === 'gmail') {
-        toast.success('On the Email page, add an account and choose Gmail.');
-      }
       return;
     }
     toast('This integration is not available yet.');
@@ -948,12 +1134,15 @@ function IntegrationsSettings() {
       <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-6">
         Integrations
       </h2>
-      <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
-        Connect Gmail from Email. HubSpot and Salesforce use the Data Import wizard (CSV and CRM sources). Other
-        connectors are shown as placeholders until enabled for your org.
+      <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-6">
+        Connect email below. HubSpot and Salesforce use the Data Import wizard (CSV and CRM sources). Other connectors
+        are placeholders until enabled for your org.
       </p>
 
-      <div className="grid grid-cols-2 gap-4">
+      <EmailIntegrationPanel />
+
+      <h3 className="text-md font-semibold text-neutral-900 dark:text-neutral-50 mb-3">CRM &amp; messaging</h3>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {tiles.map((tile) => {
           const Icon = tile.icon;
           return (

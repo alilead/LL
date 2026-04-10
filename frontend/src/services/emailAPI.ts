@@ -79,7 +79,49 @@ const emailAPI = {
   },
 
   async createAccount(data: CreateEmailAccountData): Promise<EmailAccount> {
-    const response = await api.post(`/email/accounts`, data);
+    const emailAddr = data.email.trim();
+    const display_name =
+      (data.display_name && data.display_name.trim()) || emailAddr.split('@')[0] || 'Mailbox';
+    const provider = data.provider_type.toLowerCase();
+
+    const body: {
+      email: string;
+      password: string;
+      display_name: string;
+      provider_type: string;
+      custom_settings?: {
+        imap: Record<string, unknown>;
+        smtp: Record<string, unknown>;
+      };
+    } = {
+      email: emailAddr,
+      password: data.password,
+      display_name,
+      provider_type: provider,
+    };
+
+    if (
+      provider === 'custom' ||
+      data.imap_server ||
+      data.smtp_server ||
+      data.imap_port ||
+      data.smtp_port
+    ) {
+      body.custom_settings = {
+        imap: {
+          imap_host: data.imap_server || '',
+          imap_port: data.imap_port ?? 993,
+          imap_use_ssl: true,
+        },
+        smtp: {
+          smtp_host: data.smtp_server || '',
+          smtp_port: data.smtp_port ?? 587,
+          smtp_use_tls: true,
+        },
+      };
+    }
+
+    const response = await api.post(`/email/accounts`, body);
     return response.data;
   },
 

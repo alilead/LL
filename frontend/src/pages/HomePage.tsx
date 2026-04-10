@@ -207,6 +207,20 @@ export function HomePage() {
                     <p className="text-sm text-gray-500 text-center">
                       Schedule a call with our lead generation experts
                     </p>
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+                      <Link
+                        to="/dashboard"
+                        className="text-center text-sm font-medium text-primary-600 hover:text-primary-700 underline-offset-4 hover:underline"
+                      >
+                        Open app dashboard
+                      </Link>
+                      <Link
+                        to="/settings/organization"
+                        className="text-center text-sm font-medium text-primary-600 hover:text-primary-700 underline-offset-4 hover:underline"
+                      >
+                        Organization &amp; settings
+                      </Link>
+                    </div>
                   </motion.div>
                 )}
 

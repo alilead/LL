@@ -72,21 +72,17 @@ const NODE_TEMPLATES: NodeTemplate[] = [
 interface WorkflowNodeComponentProps {
   node: WorkflowNode;
   isSelected: boolean;
-  onSelect: () => void;
+  onCardClick: (event: React.MouseEvent, nodeId: string) => void;
   onDelete: () => void;
-  onUpdate: (data: any) => void;
   onDragStart: (event: React.MouseEvent, nodeId: string) => void;
-  onConnectTarget: (targetNodeId: string) => void;
 }
 
 const WorkflowNodeComponent: React.FC<WorkflowNodeComponentProps> = ({
   node,
   isSelected,
-  onSelect,
+  onCardClick,
   onDelete,
-  onUpdate,
   onDragStart,
-  onConnectTarget
 }) => {
   const template = NODE_TEMPLATES.find(t => t.type === node.type);
   const Icon = template?.icon || Zap;
@@ -105,11 +101,10 @@ const WorkflowNodeComponent: React.FC<WorkflowNodeComponentProps> = ({
         left: node.position.x,
         top: node.position.y,
       }}
-      onClick={onSelect}
+      onClick={(e) => onCardClick(e, node.id)}
       onMouseDown={(e) => onDragStart(e, node.id)}
-      onDoubleClick={() => onConnectTarget(node.id)}
     >
-      <Card className="w-64 shadow-lg hover:shadow-xl transition-all">
+      <Card className="relative w-64 shadow-lg hover:shadow-xl transition-all">
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
             <div className={`p-2 rounded-lg ${template?.color || 'bg-gray-100'}`}>
@@ -251,15 +246,23 @@ export const WorkflowBuilder: React.FC = () => {
     setSelectedNodeId(null);
   }, []);
 
-  const updateNode = useCallback((nodeId: string, data: any) => {
+  const updateNode = useCallback((nodeId: string, patch: { label?: string; data?: Record<string, unknown> }) => {
     setWorkflow(prev => ({
       ...prev,
       flow_definition: {
-        nodes: (prev.flow_definition?.nodes || []).map(n =>
-          n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n
-        ),
-        edges: prev.flow_definition?.edges || []
-      }
+        nodes: (prev.flow_definition?.nodes || []).map((n) => {
+          if (n.id !== nodeId) return n;
+          return {
+            ...n,
+            ...(patch.label !== undefined ? { label: patch.label } : {}),
+            data:
+              patch.data !== undefined
+                ? { ...n.data, ...patch.data }
+                : n.data,
+          };
+        }),
+        edges: prev.flow_definition?.edges || [],
+      },
     }));
   }, []);
 
@@ -289,21 +292,39 @@ export const WorkflowBuilder: React.FC = () => {
     updateNodePosition(draggingNodeId, Math.max(0, event.clientX - dragOffset.x), Math.max(0, event.clientY - dragOffset.y));
   }, [draggingNodeId, dragOffset, updateNodePosition]);
 
-  const handleConnectTarget = useCallback((targetNodeId: string) => {
-    if (!selectedNodeId || selectedNodeId === targetNodeId) return;
-    const edgeId = `edge-${selectedNodeId}-${targetNodeId}`;
-    setWorkflow(prev => {
-      const edges = prev.flow_definition?.edges || [];
-      if (edges.some((e) => e.id === edgeId || (e.source === selectedNodeId && e.target === targetNodeId))) return prev;
-      return {
-        ...prev,
-        flow_definition: {
-          nodes: prev.flow_definition?.nodes || [],
-          edges: [...edges, { id: edgeId, source: selectedNodeId, target: targetNodeId }],
-        },
-      };
-    });
-  }, [selectedNodeId]);
+  const handleNodeClick = useCallback(
+    (event: React.MouseEvent, nodeId: string) => {
+      if (event.shiftKey && selectedNodeId && selectedNodeId !== nodeId) {
+        event.preventDefault();
+        event.stopPropagation();
+        const edgeId = `edge-${selectedNodeId}-${nodeId}`;
+        setWorkflow((prev) => {
+          const edges = prev.flow_definition?.edges || [];
+          if (
+            edges.some(
+              (e) => e.id === edgeId || (e.source === selectedNodeId && e.target === nodeId),
+            )
+          ) {
+            return prev;
+          }
+          return {
+            ...prev,
+            flow_definition: {
+              nodes: prev.flow_definition?.nodes || [],
+              edges: [...edges, { id: edgeId, source: selectedNodeId, target: nodeId }],
+            },
+          };
+        });
+        toast({
+          title: 'Linked',
+          description: 'Nodes connected. Shift+click another pair to add more edges.',
+        });
+        return;
+      }
+      setSelectedNodeId(nodeId);
+    },
+    [selectedNodeId, toast],
+  );
 
   if (isLoading) {
     return (
@@ -369,6 +390,10 @@ export const WorkflowBuilder: React.FC = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar - Action Palette */}
         <div className="w-80 bg-white border-r border-gray-200 overflow-y-auto p-4">
+          <p className="text-xs text-gray-600 mb-3 rounded-md bg-blue-50 border border-blue-100 px-3 py-2">
+            <strong>Link nodes:</strong> select one card, then <kbd className="rounded bg-white px-1">Shift</kbd>+click
+            another to draw a connection.
+          </p>
           <h3 className="text-sm font-semibold text-gray-700 mb-4">Actions & Triggers</h3>
 
           {/* Triggers */}
@@ -502,11 +527,9 @@ export const WorkflowBuilder: React.FC = () => {
                 key={node.id}
                 node={node}
                 isSelected={node.id === selectedNodeId}
-                onSelect={() => setSelectedNodeId(node.id)}
+                onCardClick={handleNodeClick}
                 onDelete={() => deleteNode(node.id)}
-                onUpdate={(data) => updateNode(node.id, data)}
                 onDragStart={handleDragStart}
-                onConnectTarget={handleConnectTarget}
               />
             ))}
           </AnimatePresence>
@@ -518,8 +541,7 @@ export const WorkflowBuilder: React.FC = () => {
                 <Zap className="h-16 w-16 mx-auto text-gray-300 mb-4" />
                 <h3 className="text-lg font-semibold text-gray-700 mb-2">Start Building Your Workflow</h3>
                 <p className="text-gray-500 mb-6">
-                  Click on actions from the sidebar to add them to your workflow canvas.
-                  Connect them to create powerful automation.
+                  Add steps from the sidebar, then link them: click the first node, Shift+click the second.
                 </p>
                 <Button onClick={() => addNode(NODE_TEMPLATES[0])}>
                   <Plus className="h-4 w-4 mr-2" />

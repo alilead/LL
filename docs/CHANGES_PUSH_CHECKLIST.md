@@ -24,11 +24,11 @@ Use **Pass** / **Fail** / **N/A** when you test in staging or production. Screen
 | # | Requirement | Status | Notes / screenshot ref |
 |---|-------------|--------|-------------------------|
 | A1 | No 404 on **Email → Sequences → Create sequence** | | Routes: `/email-sequences/create`, `/email-sequences/:id` |
-| A2 | **SMTP**: account connect, inbox fetch, send | | *Requires backend + credentials; UI links to Integrations.* |
+| A2 | **SMTP**: account connect, inbox fetch, send | | *Integrations tab has IMAP/SMTP form; `emailAPI.createAccount` sends `custom_settings` when needed.* |
 | A3 | **Messages** file upload succeeds and message appears | | API: `POST /messages/send-attachment`; refresh list after send |
 | A4 | **Calendar** create/edit modal not cropped | | Scrollable dialog |
 | A5 | **Sales → Quotes → Create New** is a usable editor | | `ModernQuoteNewPage` + CPQ products |
-| A6 | **Workflow** canvas: drag, link, delete nodes | | Delete on node; edges drawn |
+| A6 | **Workflow** canvas: drag, link, delete nodes | | **Shift+click** second node to link; delete on node; edges drawn |
 | A7 | **Forecast** delete where required | | Draft delete API + dashboard button |
 | A8 | **Conversations** upload appears after completion | | `createRecording` + invalidate `call-recordings` |
 | A9 | **Leads export** CSV correct (no JSON error blob) | | `GET /leads/export/csv`; client rejects JSON error bodies |
