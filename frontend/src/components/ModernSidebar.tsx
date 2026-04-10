@@ -22,6 +22,7 @@ import {
   LogOut,
   User,
   Building2,
+  Settings2,
   Workflow,
   MessageSquare,
   FileText,
@@ -119,11 +120,11 @@ const navigation: NavItem[] = [
     path: '/ai-insights',
   },
   {
-    name: 'Organization',
+    name: 'Company',
     icon: Building2,
-    path: '/settings/organization',
+    path: '/settings/company',
     children: [
-      { name: 'Settings', icon: Building2, path: '/settings/organization' },
+      { name: 'Company', icon: Settings2, path: '/settings/company' },
       { name: 'Territories', icon: Map, path: '/settings/territories' },
     ],
   },
@@ -140,14 +141,14 @@ const navigation: NavItem[] = [
 
 const bottomNavigation: NavItem[] = [
   {
-    name: 'Notifications',
-    icon: Bell,
-    path: '/notifications',
-  },
-  {
     name: 'Settings',
     icon: Settings,
     path: '/settings',
+  },
+  {
+    name: 'Notifications',
+    icon: Bell,
+    path: '/notifications',
   },
 ];
 

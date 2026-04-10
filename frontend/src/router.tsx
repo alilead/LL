@@ -168,6 +168,14 @@ export const router = createBrowserRouter([
             element: <ModernTerritories />
           },
           {
+            path: '/settings/organization',
+            element: <Navigate to="/settings/company" replace />
+          },
+          {
+            path: '/settings/general',
+            element: <Navigate to="/settings/company" replace />
+          },
+          {
             path: '/settings/:tab',
             element: <ModernSettings />
           },
@@ -185,7 +193,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/organization',
-            element: <Navigate to="/settings/organization" replace />
+            element: <Navigate to="/settings/company" replace />
           },
           {
             path: '/territories',

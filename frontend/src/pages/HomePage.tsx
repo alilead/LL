@@ -215,7 +215,7 @@ export function HomePage() {
                         Open app dashboard
                       </Link>
                       <Link
-                        to="/settings/organization"
+                        to="/settings/company"
                         className="text-center text-sm font-medium text-primary-600 hover:text-primary-700 underline-offset-4 hover:underline"
                       >
                         Organization &amp; settings

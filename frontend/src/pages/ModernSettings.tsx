@@ -8,8 +8,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   User,
-  Building2,
   Bell,
+  Building2,
   Lock,
   CreditCard,
   Users,
@@ -31,12 +31,12 @@ import { useAuthStore } from '@/store/auth';
 import api from '@/lib/axios';
 import emailAPI from '@/services/emailAPI';
 
-type Tab = 'profile' | 'organization' | 'notifications' | 'security' | 'billing' | 'team' | 'integrations';
+type Tab = 'profile' | 'notifications' | 'company' | 'security' | 'billing' | 'team' | 'integrations';
 
 const tabs = [
   { id: 'profile' as Tab, name: 'Profile', icon: User },
-  { id: 'organization' as Tab, name: 'Organization', icon: Building2 },
   { id: 'notifications' as Tab, name: 'Notifications', icon: Bell },
+  { id: 'company' as Tab, name: 'Company', icon: Building2 },
   { id: 'security' as Tab, name: 'Security', icon: Lock },
   { id: 'billing' as Tab, name: 'Billing', icon: CreditCard },
   { id: 'team' as Tab, name: 'Team', icon: Users },
@@ -49,7 +49,15 @@ export function ModernSettings() {
   const [activeTab, setActiveTab] = useState<Tab>('profile');
 
   useEffect(() => {
-    const allowed = new Set<Tab>(['profile', 'organization', 'notifications', 'security', 'billing', 'team', 'integrations']);
+    const allowed = new Set<Tab>([
+      'profile',
+      'notifications',
+      'company',
+      'security',
+      'billing',
+      'team',
+      'integrations',
+    ]);
     if (tab && allowed.has(tab as Tab)) {
       setActiveTab(tab as Tab);
     }
@@ -105,8 +113,8 @@ export function ModernSettings() {
         <div className="col-span-9">
           <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-sm border border-neutral-200 dark:border-neutral-700">
             {activeTab === 'profile' && <ProfileSettings />}
-            {activeTab === 'organization' && <OrganizationSettings />}
             {activeTab === 'notifications' && <NotificationSettings />}
+            {activeTab === 'company' && <OrganizationSettings />}
             {activeTab === 'security' && <SecuritySettings />}
             {activeTab === 'billing' && <BillingSettings />}
             {activeTab === 'team' && <TeamSettings />}
