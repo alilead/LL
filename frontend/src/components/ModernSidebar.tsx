@@ -32,7 +32,8 @@ import {
   Map,
   ShoppingCart,
   TrendingUp,
-  Phone
+  Phone,
+  Bell
 } from 'lucide-react';
 
 interface NavItem {
@@ -120,9 +121,9 @@ const navigation: NavItem[] = [
   {
     name: 'Organization',
     icon: Building2,
-    path: '/organization',
+    path: '/settings/organization',
     children: [
-      { name: 'Settings', icon: Building2, path: '/organization' },
+      { name: 'Settings', icon: Building2, path: '/settings/organization' },
       { name: 'Territories', icon: Map, path: '/territories' },
     ],
   },
@@ -138,6 +139,11 @@ const navigation: NavItem[] = [
 ];
 
 const bottomNavigation: NavItem[] = [
+  {
+    name: 'Notifications',
+    icon: Bell,
+    path: '/notifications',
+  },
   {
     name: 'Settings',
     icon: Settings,

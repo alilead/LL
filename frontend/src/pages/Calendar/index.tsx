@@ -914,7 +914,7 @@ export const CalendarPage = () => {
           }}
         >
           <DialogContent 
-            className="sm:max-w-[600px] p-0 overflow-hidden rounded-2xl border-0 shadow-xl"
+            className="sm:max-w-[760px] max-h-[90vh] p-0 overflow-hidden rounded-2xl border-0 shadow-xl"
             showCloseButton={false}
           >
             <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-5 border-b border-gray-100 relative">
@@ -934,7 +934,7 @@ export const CalendarPage = () => {
               </Button>
             </div>
             
-            <div className="px-6 py-6">
+            <div className="px-6 py-6 overflow-y-auto max-h-[65vh]">
               <div className="space-y-6">
                 <div>
                   <Label htmlFor="title" className="text-sm font-semibold text-gray-700 block mb-2">

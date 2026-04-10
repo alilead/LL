@@ -4,10 +4,47 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, ArrowLeft } from 'lucide-react';
+import { Upload, ArrowLeft, Loader2 } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { conversationsAPI } from '@/services/api/conversations';
+import { leadsAPI } from '@/services/api/leads';
+import { useAuthStore } from '@/store/auth';
+import toast from 'react-hot-toast';
 
 export function ModernConversationUpload() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+  const [file, setFile] = React.useState<File | null>(null);
+  const [leadId, setLeadId] = React.useState<number | null>(null);
+
+  const { data: leadsData } = useQuery({
+    queryKey: ['conversation-upload-leads'],
+    queryFn: async () => {
+      const res = await leadsAPI.getAll({ limit: 100, sort_by: 'created_at', sort_desc: true });
+      return Array.isArray((res as any).data) ? (res as any).data : ((res as any).data?.results || []);
+    },
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: async () => {
+      if (!file || !leadId || !user?.id) throw new Error('Select lead and file');
+      // Persist recording row first; URL can be replaced by backend processing later.
+      return conversationsAPI.createRecording({
+        user_id: user.id,
+        lead_id: leadId,
+        recording_url: `uploaded://${Date.now()}-${file.name}`,
+        duration_seconds: 0,
+        call_date: new Date().toISOString(),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['call-recordings'] });
+      toast.success('Recording uploaded');
+      navigate('/conversations');
+    },
+    onError: () => toast.error('Could not upload recording'),
+  });
   
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-8">
@@ -40,6 +77,7 @@ export function ModernConversationUpload() {
               accept="audio/*"
               className="hidden"
               id="file-upload"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
             />
             <label
               htmlFor="file-upload"
@@ -50,6 +88,32 @@ export function ModernConversationUpload() {
             <p className="mt-4 text-sm text-neutral-500 dark:text-neutral-400">
               Supported formats: MP3, WAV, M4A (Max 100MB)
             </p>
+            <div className="mt-6 w-full max-w-lg space-y-3">
+              <select
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+                value={leadId ?? ''}
+                onChange={(e) => setLeadId(Number(e.target.value) || null)}
+              >
+                <option value="">Select related lead</option>
+                {(leadsData || []).map((lead: any) => (
+                  <option key={lead.id} value={lead.id}>
+                    {lead.first_name} {lead.last_name} {lead.company ? `- ${lead.company}` : ''}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => uploadMutation.mutate()}
+                disabled={!file || !leadId || uploadMutation.isPending}
+                className="w-full rounded-lg bg-primary-600 px-4 py-2 text-white disabled:opacity-60"
+              >
+                {uploadMutation.isPending ? (
+                  <span className="inline-flex items-center"><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Uploading...</span>
+                ) : (
+                  `Upload${file ? `: ${file.name}` : ''}`
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>

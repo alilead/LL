@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/Label';
 import { useToast } from '@/hooks/use-toast';
 import {
   TrendingUp, Target, DollarSign, Award, Calendar,
-  Loader2, CheckCircle, Send, Edit, Plus
+  Loader2, CheckCircle, Send, Edit, Plus, Trash2
 } from 'lucide-react';
 import { PageContainer } from '@/components/ui/PageContainer';
 import { Badge } from '@/components/ui/Badge';
@@ -100,6 +100,14 @@ export const ForecastDashboard: React.FC = () => {
         description: 'Forecast submitted for review'
       });
     }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => forecastsAPI.deleteForecast(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-forecast'] });
+      toast({ title: 'Deleted', description: 'Draft forecast removed.' });
+    },
   });
 
   const handleEdit = () => {
@@ -280,6 +288,16 @@ export const ForecastDashboard: React.FC = () => {
               <Button onClick={() => submitMutation.mutate(myForecast.id)}>
                 <Send className="h-4 w-4 mr-2" />
                 Submit for Review
+              </Button>
+            )}
+            {myForecast && myForecast.id > 0 && myForecast.status === 'draft' && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => deleteMutation.mutate(myForecast.id)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Draft
               </Button>
             )}
           </div>

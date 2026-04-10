@@ -270,7 +270,10 @@ def _perform_analysis(
         {"timestamp": 300, "type": "buying_signal", "description": "Asked about timeline", "confidence": 0.9}
     ]
     competitor_mentions = [
-        {"competitor": "Competitor A", "timestamp": 180, "context": "Currently using Competitor A", "sentiment": -0.2}
+        {"competitor": "Newton meter", "timestamp": 180, "context": "Currently using Newton meter", "sentiment": -0.2},
+        {"competitor": "DLP", "timestamp": 240, "context": "Evaluating DLP this quarter", "sentiment": 0.1},
+        {"competitor": "UN", "timestamp": 320, "context": "UN requested compliance notes", "sentiment": 0.0},
+        {"competitor": "David Schneider", "timestamp": 410, "context": "Reference account: David Schneider", "sentiment": 0.2},
     ]
 
     # Update recording with analysis

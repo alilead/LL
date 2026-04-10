@@ -75,6 +75,8 @@ interface WorkflowNodeComponentProps {
   onSelect: () => void;
   onDelete: () => void;
   onUpdate: (data: any) => void;
+  onDragStart: (event: React.MouseEvent, nodeId: string) => void;
+  onConnectTarget: (targetNodeId: string) => void;
 }
 
 const WorkflowNodeComponent: React.FC<WorkflowNodeComponentProps> = ({
@@ -82,7 +84,9 @@ const WorkflowNodeComponent: React.FC<WorkflowNodeComponentProps> = ({
   isSelected,
   onSelect,
   onDelete,
-  onUpdate
+  onUpdate,
+  onDragStart,
+  onConnectTarget
 }) => {
   const template = NODE_TEMPLATES.find(t => t.type === node.type);
   const Icon = template?.icon || Zap;
@@ -102,6 +106,8 @@ const WorkflowNodeComponent: React.FC<WorkflowNodeComponentProps> = ({
         top: node.position.y,
       }}
       onClick={onSelect}
+      onMouseDown={(e) => onDragStart(e, node.id)}
+      onDoubleClick={() => onConnectTarget(node.id)}
     >
       <Card className="w-64 shadow-lg hover:shadow-xl transition-all">
         <CardContent className="p-4">
@@ -165,8 +171,8 @@ export const WorkflowBuilder: React.FC = () => {
   });
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
+  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   // Fetch existing workflow if editing
   const { data: existingWorkflow, isLoading } = useQuery({
@@ -258,6 +264,46 @@ export const WorkflowBuilder: React.FC = () => {
   }, []);
 
   const selectedNode = workflow.flow_definition?.nodes?.find(n => n.id === selectedNodeId);
+
+  const updateNodePosition = useCallback((nodeId: string, x: number, y: number) => {
+    setWorkflow(prev => ({
+      ...prev,
+      flow_definition: {
+        nodes: (prev.flow_definition?.nodes || []).map(n => n.id === nodeId ? { ...n, position: { x, y } } : n),
+        edges: prev.flow_definition?.edges || []
+      }
+    }));
+  }, []);
+
+  const handleDragStart = useCallback((event: React.MouseEvent, nodeId: string) => {
+    const node = workflow.flow_definition?.nodes?.find(n => n.id === nodeId);
+    if (!node) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setDraggingNodeId(nodeId);
+    setDragOffset({ x: event.clientX - node.position.x, y: event.clientY - node.position.y });
+  }, [workflow.flow_definition?.nodes]);
+
+  const handleCanvasMove = useCallback((event: React.MouseEvent) => {
+    if (!draggingNodeId) return;
+    updateNodePosition(draggingNodeId, Math.max(0, event.clientX - dragOffset.x), Math.max(0, event.clientY - dragOffset.y));
+  }, [draggingNodeId, dragOffset, updateNodePosition]);
+
+  const handleConnectTarget = useCallback((targetNodeId: string) => {
+    if (!selectedNodeId || selectedNodeId === targetNodeId) return;
+    const edgeId = `edge-${selectedNodeId}-${targetNodeId}`;
+    setWorkflow(prev => {
+      const edges = prev.flow_definition?.edges || [];
+      if (edges.some((e) => e.id === edgeId || (e.source === selectedNodeId && e.target === targetNodeId))) return prev;
+      return {
+        ...prev,
+        flow_definition: {
+          nodes: prev.flow_definition?.nodes || [],
+          edges: [...edges, { id: edgeId, source: selectedNodeId, target: targetNodeId }],
+        },
+      };
+    });
+  }, [selectedNodeId]);
 
   if (isLoading) {
     return (
@@ -432,7 +478,24 @@ export const WorkflowBuilder: React.FC = () => {
         </div>
 
         {/* Canvas */}
-        <div className="flex-1 relative overflow-hidden bg-[linear-gradient(rgba(0,0,0,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.05)_1px,transparent_1px)] bg-[size:20px_20px]">
+        <div
+          className="flex-1 relative overflow-hidden bg-[linear-gradient(rgba(0,0,0,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.05)_1px,transparent_1px)] bg-[size:20px_20px]"
+          onMouseMove={handleCanvasMove}
+          onMouseUp={() => setDraggingNodeId(null)}
+          onMouseLeave={() => setDraggingNodeId(null)}
+        >
+          <svg className="absolute inset-0 pointer-events-none h-full w-full">
+            {(workflow.flow_definition?.edges || []).map((edge) => {
+              const source = workflow.flow_definition?.nodes?.find((n) => n.id === edge.source);
+              const target = workflow.flow_definition?.nodes?.find((n) => n.id === edge.target);
+              if (!source || !target) return null;
+              const x1 = source.position.x + 128;
+              const y1 = source.position.y + 70;
+              const x2 = target.position.x + 128;
+              const y2 = target.position.y;
+              return <line key={edge.id} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#2563eb" strokeWidth="2" />;
+            })}
+          </svg>
           <AnimatePresence>
             {workflow.flow_definition?.nodes?.map(node => (
               <WorkflowNodeComponent
@@ -442,6 +505,8 @@ export const WorkflowBuilder: React.FC = () => {
                 onSelect={() => setSelectedNodeId(node.id)}
                 onDelete={() => deleteNode(node.id)}
                 onUpdate={(data) => updateNode(node.id, data)}
+                onDragStart={handleDragStart}
+                onConnectTarget={handleConnectTarget}
               />
             ))}
           </AnimatePresence>

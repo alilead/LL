@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   User,
   Building2,
@@ -41,7 +41,15 @@ const tabs = [
 ];
 
 export function ModernSettings() {
+  const { tab } = useParams();
   const [activeTab, setActiveTab] = useState<Tab>('profile');
+
+  useEffect(() => {
+    const allowed = new Set<Tab>(['profile', 'organization', 'notifications', 'security', 'billing', 'team', 'integrations']);
+    if (tab && allowed.has(tab as Tab)) {
+      setActiveTab(tab as Tab);
+    }
+  }, [tab]);
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-8">
@@ -531,37 +539,65 @@ function OrganizationSettings() {
 }
 
 function NotificationSettings() {
+  const queryClient = useQueryClient();
+  const { data: notifications = [], isLoading } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: async () => {
+      const r = await api.get('/notifications', { params: { limit: 20 } });
+      return Array.isArray(r.data) ? r.data : [];
+    },
+  });
+
+  const createTestMutation = useMutation({
+    mutationFn: async () => api.post('/notifications/test'),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+
+  const markAllMutation = useMutation({
+    mutationFn: async () => api.put('/notifications/read-all'),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+
   return (
     <div className="p-8">
       <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-6">
         Notification Preferences
       </h2>
-      <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
-        Preferences below are UI placeholders. Server-side notification settings will be wired in a future release.
-      </p>
+      <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">Manage and review your in-app notifications.</p>
 
-      <div className="space-y-6">
-        {[
-          { title: 'New Leads', description: 'Get notified when a new lead is created' },
-          { title: 'Deal Updates', description: 'Receive updates on deal status changes' },
-          { title: 'Email Campaigns', description: 'Notifications about campaign performance' },
-          { title: 'Team Activity', description: 'Updates from your team members' },
-        ].map((item, index) => (
-          <div key={index} className="flex items-center justify-between p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg">
-            <div>
-              <h4 className="font-medium text-neutral-900 dark:text-neutral-50 mb-1">
-                {item.title}
-              </h4>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                {item.description}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => createTestMutation.mutate()}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg"
+          >
+            Create test notification
+          </button>
+          <button
+            type="button"
+            onClick={() => markAllMutation.mutate()}
+            className="px-4 py-2 border rounded-lg"
+          >
+            Mark all read
+          </button>
+        </div>
+
+        {isLoading ? (
+          <p className="text-sm text-neutral-600">Loading notifications...</p>
+        ) : notifications.length === 0 ? (
+          <p className="text-sm text-neutral-600">No notifications yet.</p>
+        ) : (
+          notifications.map((item: any) => (
+            <div key={item.id} className="p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg">
+              <div className="font-medium text-neutral-900 dark:text-neutral-50">{item.title}</div>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">{item.message}</p>
+              <p className="text-xs text-neutral-500 mt-2">
+                {item.is_read ? 'Read' : 'Unread'} • {new Date(item.created_at).toLocaleString()}
               </p>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" defaultChecked className="sr-only peer" />
-              <div className="w-11 h-6 bg-neutral-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-neutral-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-neutral-600 peer-checked:bg-primary-600"></div>
-            </label>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );

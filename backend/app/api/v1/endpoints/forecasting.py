@@ -411,6 +411,29 @@ def adjust_forecast(
     return _forecast_to_dict(forecast)
 
 
+@router.delete("/{forecast_id}", response_model=dict)
+def delete_forecast(
+    forecast_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(deps.get_current_user)
+):
+    """Delete a draft forecast owned by the current user."""
+    forecast = db.query(Forecast).filter(
+        Forecast.id == forecast_id,
+        Forecast.user_id == current_user.id
+    ).first()
+
+    if not forecast:
+        raise HTTPException(status_code=404, detail="Forecast not found")
+
+    if forecast.status != ForecastStatus.DRAFT:
+        raise HTTPException(status_code=400, detail="Only draft forecasts can be deleted")
+
+    db.delete(forecast)
+    db.commit()
+    return {"message": "Forecast deleted"}
+
+
 # Helper function
 def _forecast_to_dict(forecast: Forecast) -> dict:
     """Convert forecast to dict"""

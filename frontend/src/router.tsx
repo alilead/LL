@@ -34,7 +34,6 @@ import { ModernCredits } from './pages/ModernCredits'
 import { ModernSettings } from './pages/ModernSettings'
 import { ModernEmails } from './pages/ModernEmails'
 import { ModernCustomization } from './pages/ModernCustomization'
-import { ModernOrganization } from './pages/ModernOrganization'
 import { ModernTerritories } from './pages/ModernTerritories'
 import { ModernEmailSequences } from './pages/ModernEmailSequences'
 import { ModernQuoteList, ModernProductList } from './pages/ModernCPQ'
@@ -46,6 +45,8 @@ import { ModernImportWizard, ModernImportHistory } from './pages/ModernDataImpor
 import { ModernTeam } from './pages/ModernTeam'
 import { ModernWorkflowNew } from './pages/ModernWorkflowNew'
 import { ModernConversationUpload } from './pages/ModernConversationUpload'
+import { SequenceBuilder } from './pages/EmailSequences'
+import { ModernNotifications } from './pages/ModernNotifications'
 
 export const router = createBrowserRouter([
   {
@@ -180,7 +181,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/organization',
-            element: <ModernOrganization />
+            element: <Navigate to="/settings/organization" replace />
           },
           {
             path: '/territories',
@@ -189,6 +190,14 @@ export const router = createBrowserRouter([
           {
             path: '/email-sequences',
             element: <ModernEmailSequences />
+          },
+          {
+            path: '/email-sequences/create',
+            element: <SequenceBuilder />
+          },
+          {
+            path: '/email-sequences/:id',
+            element: <SequenceBuilder />
           },
           {
             path: '/quotes',
@@ -245,6 +254,10 @@ export const router = createBrowserRouter([
           {
             path: '/data-import/history',
             element: <ModernImportHistory />
+          },
+          {
+            path: '/notifications',
+            element: <ModernNotifications />
           }
         ]
       }

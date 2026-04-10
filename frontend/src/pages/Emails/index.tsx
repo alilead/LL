@@ -43,16 +43,16 @@ export const EmailsPage: React.FC = () => {
 
   // Mutations
   const markAsReadMutation = useMutation({
-    mutationFn: ({ accountId, emailId }: { accountId: number; emailId: number }) =>
-      emailAPI.markAsRead(accountId, emailId),
+    mutationFn: ({ emailId }: { accountId: number; emailId: number }) =>
+      emailAPI.markAsRead(emailId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['emails', selectedAccount, selectedFolder] });
     },
   });
 
   const deleteEmailMutation = useMutation({
-    mutationFn: ({ accountId, emailId }: { accountId: number; emailId: number }) =>
-      emailAPI.deleteEmail(accountId, emailId),
+    mutationFn: ({ emailId }: { accountId: number; emailId: number }) =>
+      emailAPI.deleteEmail(emailId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['emails', selectedAccount, selectedFolder] });
       setSelectedEmail(null);
@@ -60,8 +60,8 @@ export const EmailsPage: React.FC = () => {
   });
 
   const toggleStarMutation = useMutation({
-    mutationFn: ({ accountId, emailId }: { accountId: number; emailId: number }) =>
-      emailAPI.toggleStar(accountId, emailId),
+    mutationFn: ({ emailId }: { accountId: number; emailId: number }) =>
+      emailAPI.toggleStar(emailId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['emails', selectedAccount, selectedFolder] });
     },
@@ -121,7 +121,7 @@ export const EmailsPage: React.FC = () => {
             <p className="text-gray-600 mb-4">
               No email account has been added yet. You can add an email account from the settings page.
             </p>
-            <Button onClick={() => window.location.href = '/settings'}>
+            <Button onClick={() => window.location.href = '/settings/integrations'}>
               Go to Settings
             </Button>
           </CardContent>

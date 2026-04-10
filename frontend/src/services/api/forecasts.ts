@@ -106,6 +106,10 @@ export const forecastsAPI = {
     return response.data;
   },
 
+  deleteForecast: async (id: number): Promise<void> => {
+    await api.delete(`/forecasts/${id}`);
+  },
+
   // Rollups
   getRollup: async (periodId: number, level: string, entityId?: number): Promise<any> => {
     const params: any = { period_id: periodId, rollup_level: level };
