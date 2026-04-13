@@ -1,8 +1,9 @@
 from typing import List, Optional, Any
 from pathlib import Path
 import mimetypes
+import base64
 from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 from app.api import deps
 from app.crud import crud_user
@@ -32,6 +33,11 @@ _EXT_TO_MIME = {
     ".gif": "image/gif",
     ".webp": "image/webp",
 }
+
+# 1×1 transparent PNG — returned when no avatar file exists (avoids 404 noise in browsers).
+_PLACEHOLDER_AVATAR_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+X2ZkAAAAASUVORK5CYII="
+)
 
 
 def _mime_from_filename(filename: str) -> Optional[str]:
@@ -206,10 +212,14 @@ async def upload_my_avatar(
 def get_my_avatar(
     current_user: UserModel = Depends(deps.get_current_user),
 ) -> Any:
-    """Return the current user's avatar image (requires Authorization)."""
+    """
+    Return the current user's avatar image (requires Authorization).
+    If none uploaded, returns 200 with a 1×1 transparent PNG so clients and <img> tags
+    do not treat the response as a hard error (Render disk is ephemeral — see docs).
+    """
     path = _find_avatar_file(int(current_user.id))
     if not path:
-        raise HTTPException(status_code=404, detail="No avatar uploaded")
+        return Response(content=_PLACEHOLDER_AVATAR_PNG, media_type="image/png")
     media = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
     return FileResponse(path, media_type=media)
 

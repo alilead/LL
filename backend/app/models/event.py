@@ -97,7 +97,7 @@ class EventAttendee(Base):
     event = relationship(
         "Event",
         back_populates="event_attendees",
-        overlaps="attendees"
+        overlaps="attendees,attended_events,event_attendees",
     )
     user = relationship(
         "User",

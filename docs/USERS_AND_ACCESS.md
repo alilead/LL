@@ -95,3 +95,11 @@ Result: Render uses Render Postgres with the same orgs and users as local; you c
 - [ ] Run `py scripts/list_users.py` and note which emails exist.
 - [ ] For each account you need, run `reset_password.py` with `RESET_EMAIL` and `RESET_PASSWORD`.
 - [ ] Log in on the app with that email and password to confirm.
+
+---
+
+## Profile avatars on Render
+
+Avatars are stored as files under `UPLOAD_DIR/avatars/` (see `GET/POST /api/v1/users/me/avatar`). **Render’s filesystem is ephemeral**: redeploys or restarts can delete uploaded images. If you need durable profile photos in production, point uploads at object storage (e.g. S3-compatible bucket or Supabase Storage) and serve URLs from the API instead of relying on local disk only.
+
+Until then, missing files return a **1×1 transparent PNG** (HTTP 200) so the UI does not treat “no photo yet” as a hard error.

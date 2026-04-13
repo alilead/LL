@@ -6,6 +6,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.base import RequestResponseEndpoint
 from app.core.config import settings
 from app.utils.logger import logger
+from app.utils.safe_request_body_log import safe_request_body_log
 
 class LoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(
@@ -64,8 +65,8 @@ class LoggingMiddleware(BaseHTTPMiddleware):
                             "Request Body",
                             extra={
                                 "request_id": request_id,
-                                "body": body.decode()
-                            }
+                                "body": safe_request_body_log(request.url.path, body),
+                            },
                         )
                 except Exception:
                     pass

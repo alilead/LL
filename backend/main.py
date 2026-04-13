@@ -8,6 +8,8 @@ import logging
 import os
 from datetime import datetime
 
+from app.utils.safe_request_body_log import safe_request_body_log
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("main")
@@ -123,7 +125,7 @@ async def log_requests(request: Request, call_next):
         try:
             body = await request.body()
             if body:
-                logger.debug(f"Request body: {body.decode()}")
+                logger.debug("Request body: %s", safe_request_body_log(request.url.path, body))
         except Exception as e:
             logger.error(f"Error reading request body: {e}")
     
