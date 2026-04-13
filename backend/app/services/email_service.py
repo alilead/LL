@@ -24,6 +24,63 @@ from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
 
+
+def _ipv4_create_connection(
+    address: Tuple[str, int],
+    timeout: Optional[float] = None,
+    source_address: Optional[Tuple[str, int]] = None,
+) -> socket.socket:
+    """
+    Like socket.create_connection but only tries IPv4 (AF_INET).
+    Avoids Errno 101 (network unreachable) on some cloud hosts when IPv6 is
+    resolved first but not routable from the container.
+    """
+    host, port = address
+    last_err: Optional[OSError] = None
+    for res in socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM):
+        af, socktype, proto, canonname, sa = res
+        sock: Optional[socket.socket] = None
+        try:
+            sock = socket.socket(af, socktype, proto)
+            if timeout is not None:
+                sock.settimeout(timeout)
+            if source_address is not None:
+                sock.bind(source_address)
+            sock.connect(sa)
+            return sock
+        except OSError as e:
+            last_err = e
+            if sock is not None:
+                sock.close()
+    if last_err is not None:
+        raise last_err
+    raise OSError(f"IPv4 address not found for {host!r}:{port}")
+
+
+class _IMAP4_SSL_IPv4(imaplib.IMAP4_SSL):
+    def _create_socket(self, timeout):
+        sock = _ipv4_create_connection((self.host, self.port), timeout)
+        return self.ssl_context.wrap_socket(sock, server_hostname=self.host)
+
+
+class _IMAP4_IPv4(imaplib.IMAP4):
+    def _create_socket(self, timeout):
+        return _ipv4_create_connection((self.host, self.port), timeout)
+
+
+class _SMTP_IPv4(smtplib.SMTP):
+    def _get_socket(self, host, port, timeout):
+        if timeout is not None and not timeout:
+            raise ValueError("Non-blocking socket (timeout=0) is not supported")
+        return _ipv4_create_connection((host, port), timeout, self.source_address)
+
+
+class _SMTP_SSL_IPv4(smtplib.SMTP_SSL):
+    def _get_socket(self, host, port, timeout):
+        new_socket = _ipv4_create_connection((host, port), timeout, self.source_address)
+        return self.context.wrap_socket(new_socket, server_hostname=self._host)
+
+
 class EmailService:
     """Core service for email operations using IMAP/SMTP"""
     
@@ -289,13 +346,13 @@ class EmailService:
             # Set socket timeout
             socket.setdefaulttimeout(30)  # 30 seconds timeout
             
-            # Try SSL first for IMAP
+            # Try SSL first for IMAP (IPv4-only sockets — avoids ENETUNREACH on some clouds)
             try:
-                imap = imaplib.IMAP4_SSL(imap_settings['imap_host'], imap_settings['imap_port'])
-            except:
+                imap = _IMAP4_SSL_IPv4(imap_settings['imap_host'], imap_settings['imap_port'])
+            except Exception:
                 # If SSL fails, try non-SSL
                 logger.info("IMAP SSL failed, trying non-SSL connection")
-                imap = imaplib.IMAP4(imap_settings['imap_host'], imap_settings['imap_port'])
+                imap = _IMAP4_IPv4(imap_settings['imap_host'], imap_settings['imap_port'])
             
             imap.login(email, password)
             imap.logout()
@@ -307,16 +364,16 @@ class EmailService:
             # Try SSL first for port 465
             if smtp_settings.get('smtp_port') == 465:
                 try:
-                    smtp = smtplib.SMTP_SSL(smtp_settings['smtp_host'], smtp_settings['smtp_port'], timeout=30)
+                    smtp = _SMTP_SSL_IPv4(smtp_settings['smtp_host'], smtp_settings['smtp_port'], timeout=30)
                     logger.info("SMTP SSL connection successful")
-                except:
+                except Exception:
                     # If SSL fails on 465, try regular SMTP with STARTTLS
                     logger.info("SMTP SSL failed on port 465, trying STARTTLS")
-                    smtp = smtplib.SMTP(smtp_settings['smtp_host'], 587, timeout=30)
+                    smtp = _SMTP_IPv4(smtp_settings['smtp_host'], 587, timeout=30)
                     smtp.starttls()
             else:
                 # For other ports, try regular SMTP with STARTTLS
-                smtp = smtplib.SMTP(smtp_settings['smtp_host'], smtp_settings['smtp_port'], timeout=30)
+                smtp = _SMTP_IPv4(smtp_settings['smtp_host'], smtp_settings['smtp_port'], timeout=30)
                 if smtp_settings.get('smtp_use_tls', True):
                     smtp.starttls()
             
@@ -368,7 +425,7 @@ class EmailService:
             
             # Connect to IMAP
             password = decrypt_password(account.password_encrypted)
-            imap = imaplib.IMAP4_SSL(account.imap_host, account.imap_port)
+            imap = _IMAP4_SSL_IPv4(account.imap_host, account.imap_port)
             imap.login(account.email, password)
             
             total_synced = 0
@@ -423,7 +480,7 @@ class EmailService:
                 "error": str(e)
             }
     
-    def _sync_folder(self, imap: imaplib.IMAP4_SSL, account: EmailAccount, folder: str, days_back: int) -> Tuple[int, int]:
+    def _sync_folder(self, imap: imaplib.IMAP4, account: EmailAccount, folder: str, days_back: int) -> Tuple[int, int]:
         """Sync emails from a specific folder"""
         try:
             # Try to select the folder
@@ -488,7 +545,7 @@ class EmailService:
             logger.error(f"Error syncing folder {folder}: {str(e)}")
             return 0, 0
     
-    def _sync_single_email(self, imap: imaplib.IMAP4_SSL, account: EmailAccount, email_id: bytes, folder: str) -> bool:
+    def _sync_single_email(self, imap: imaplib.IMAP4, account: EmailAccount, email_id: bytes, folder: str) -> bool:
         """Sync a single email"""
         try:
             # Fetch the full email
@@ -840,16 +897,16 @@ class EmailService:
                 # Try SSL first for port 465
                 if account.smtp_port == 465:
                     try:
-                        smtp = smtplib.SMTP_SSL(account.smtp_host, account.smtp_port, timeout=30)
+                        smtp = _SMTP_SSL_IPv4(account.smtp_host, account.smtp_port, timeout=30)
                         logger.info("SMTP SSL connection successful")
-                    except:
+                    except Exception:
                         # If SSL fails on 465, try regular SMTP with STARTTLS
                         logger.info("SMTP SSL failed on port 465, trying STARTTLS")
-                        smtp = smtplib.SMTP(account.smtp_host, 587, timeout=30)
+                        smtp = _SMTP_IPv4(account.smtp_host, 587, timeout=30)
                         smtp.starttls()
                 else:
                     # For other ports, try regular SMTP with STARTTLS
-                    smtp = smtplib.SMTP(account.smtp_host, account.smtp_port, timeout=30)
+                    smtp = _SMTP_IPv4(account.smtp_host, account.smtp_port, timeout=30)
                     if account.smtp_use_tls:
                         smtp.starttls()
                 
