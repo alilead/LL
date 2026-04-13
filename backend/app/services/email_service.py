@@ -234,44 +234,47 @@ class EmailService:
             raise ValueError(f"Failed to delete email account: {str(e)}")
     
     def _get_provider_settings(self, email: str, provider_type: str, custom_settings: Optional[Dict] = None) -> Tuple[Dict, Dict]:
-        """Auto-detect IMAP/SMTP settings based on email provider"""
-        
+        """Resolve IMAP/SMTP settings from explicit custom config, provider choice, then domain fallback."""
         domain = email.split('@')[1].lower()
-        
-        # Predefined settings for providers
-        provider_configs = {
-            'the-leadlab.com': {
-                'imap': {'imap_host': 'mail.the-leadlab.com', 'imap_port': 993, 'imap_use_ssl': True},
-                'smtp': {'smtp_host': 'mail.the-leadlab.com', 'smtp_port': 587, 'smtp_use_tls': True}
-            },
-            'gmail.com': {
-                'imap': {'imap_host': 'imap.gmail.com', 'imap_port': 993, 'imap_use_ssl': True},
-                'smtp': {'smtp_host': 'smtp.gmail.com', 'smtp_port': 587, 'smtp_use_tls': True}
-            },
-            'outlook.com': {
-                'imap': {'imap_host': 'outlook.office365.com', 'imap_port': 993, 'imap_use_ssl': True},
-                'smtp': {'smtp_host': 'smtp.office365.com', 'smtp_port': 587, 'smtp_use_tls': True}
-            },
-            'yahoo.com': {
-                'imap': {'imap_host': 'imap.mail.yahoo.com', 'imap_port': 993, 'imap_use_ssl': True},
-                'smtp': {'smtp_host': 'smtp.mail.yahoo.com', 'smtp_port': 587, 'smtp_use_tls': True}
-            }
-        }
-        
-        # If custom settings provided, use them
+        pt = (provider_type.value if hasattr(provider_type, 'value') else str(provider_type)).lower()
+
+        GMAIL_IMAP = {'imap_host': 'imap.gmail.com', 'imap_port': 993, 'imap_use_ssl': True}
+        GMAIL_SMTP = {'smtp_host': 'smtp.gmail.com', 'smtp_port': 587, 'smtp_use_tls': True}
+        OUTLOOK_IMAP = {'imap_host': 'outlook.office365.com', 'imap_port': 993, 'imap_use_ssl': True}
+        OUTLOOK_SMTP = {'smtp_host': 'smtp.office365.com', 'smtp_port': 587, 'smtp_use_tls': True}
+        YAHOO_IMAP = {'imap_host': 'imap.mail.yahoo.com', 'imap_port': 993, 'imap_use_ssl': True}
+        YAHOO_SMTP = {'smtp_host': 'smtp.mail.yahoo.com', 'smtp_port': 587, 'smtp_use_tls': True}
+
+        # Explicit IMAP/SMTP (custom provider or UI-provided hosts)
         if custom_settings:
-            return custom_settings.get('imap', {}), custom_settings.get('smtp', {})
-        
-        # If domain has predefined config, use it
+            imap = custom_settings.get('imap') or {}
+            smtp = custom_settings.get('smtp') or {}
+            if imap.get('imap_host') and smtp.get('smtp_host'):
+                return imap, smtp
+
+        # Known providers: use canonical servers for any domain (e.g. Google Workspace @the-leadlab.com)
+        if pt == 'gmail':
+            return GMAIL_IMAP, GMAIL_SMTP
+        if pt == 'outlook':
+            return OUTLOOK_IMAP, OUTLOOK_SMTP
+        if pt == 'yahoo':
+            return YAHOO_IMAP, YAHOO_SMTP
+        if pt == 'custom':
+            raise ValueError(
+                'Custom provider requires IMAP and SMTP hostnames (and ports). '
+                'Enter them in the custom server fields.'
+            )
+
+        # Domain-only fallback (legacy / unknown provider_type)
+        provider_configs = {
+            'gmail.com': {'imap': GMAIL_IMAP, 'smtp': GMAIL_SMTP},
+            'outlook.com': {'imap': OUTLOOK_IMAP, 'smtp': OUTLOOK_SMTP},
+            'yahoo.com': {'imap': YAHOO_IMAP, 'smtp': YAHOO_SMTP},
+        }
         if domain in provider_configs:
             config = provider_configs[domain]
             return config['imap'], config['smtp']
-        
-        # For unknown domains, try to auto-detect
-        if domain == 'the-leadlab.com':
-            return provider_configs['the-leadlab.com']['imap'], provider_configs['the-leadlab.com']['smtp']
-        
-        # Default settings for unknown providers
+
         return (
             {'imap_host': f'imap.{domain}', 'imap_port': 993, 'imap_use_ssl': True},
             {'smtp_host': f'smtp.{domain}', 'smtp_port': 465, 'smtp_use_tls': False}
