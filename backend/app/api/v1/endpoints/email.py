@@ -446,6 +446,9 @@ def create_email_account(
         
         return account
         
+    except HTTPException:
+        # Preserve explicit API responses (e.g. 409 duplicate account).
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
