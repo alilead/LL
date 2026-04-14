@@ -76,6 +76,13 @@ export const EmailsPage: React.FC = () => {
     },
   });
 
+  const syncAccountMutation = useMutation({
+    mutationFn: (accountId: number) => emailAPI.syncAccount(accountId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['emails', selectedAccount, selectedFolder] });
+    },
+  });
+
   // Set first account as selected when accounts load
   useEffect(() => {
     if (accounts && accounts.length > 0 && !selectedAccount) {
@@ -91,8 +98,20 @@ export const EmailsPage: React.FC = () => {
   };
 
   const handleRefresh = () => {
+    if (selectedAccount) {
+      syncAccountMutation.mutate(selectedAccount);
+    }
     refetchEmails();
   };
+
+  useEffect(() => {
+    if (!selectedAccount) return;
+    syncAccountMutation.mutate(selectedAccount);
+    const interval = window.setInterval(() => {
+      syncAccountMutation.mutate(selectedAccount);
+    }, 60000);
+    return () => window.clearInterval(interval);
+  }, [selectedAccount]);
 
   const formatEmailDate = (dateString: string) => {
     const date = new Date(dateString);

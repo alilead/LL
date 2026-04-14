@@ -147,6 +147,11 @@ const emailAPI = {
     return response.data;
   },
 
+  async syncAccount(id: number): Promise<{ message: string; status: string }> {
+    const response = await api.post(`/email/accounts/${id}/sync`);
+    return response.data;
+  },
+
   // Email Management
   async getEmails(accountId: number, folder: string = 'inbox', page: number = 1, limit: number = 50): Promise<{
     emails: EmailMessage[];
