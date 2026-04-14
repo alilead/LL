@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
 import { X, Paperclip, Send, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -60,9 +61,12 @@ export default function EmailComposeModal({
       handleClose();
     },
     onError: (error) => {
+      const backendDetail = axios.isAxiosError(error)
+        ? (error.response?.data?.detail as string | undefined)
+        : undefined;
       toast({
         title: 'Failed to send email',
-        description: error instanceof Error ? error.message : 'Please try again.',
+        description: backendDetail || (error instanceof Error ? error.message : 'Please try again.'),
         variant: 'destructive',
       });
     },
@@ -257,6 +261,18 @@ export default function EmailComposeModal({
               <Paperclip className="h-4 w-4 mr-2" />
               Attach
             </Button>
+            <div className="mt-2 space-y-1">
+              {attachments.length > 0 && (
+                <p className="text-xs text-gray-600">
+                  {attachments.length} file{attachments.length > 1 ? 's' : ''} selected:{" "}
+                  {attachments.slice(0, 2).map((file) => file.name).join(', ')}
+                  {attachments.length > 2 ? ` +${attachments.length - 2} more` : ''}
+                </p>
+              )}
+              <p className="text-xs text-amber-700">
+                Attachments are not sent yet by this endpoint.
+              </p>
+            </div>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={handleClose}>

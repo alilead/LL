@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Optional, List, Dict
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
 from sqlalchemy.orm import Session
 
 from app import crud, models, schemas
@@ -256,7 +256,11 @@ async def send_email(
     if success:
         return {"message": "Email sent successfully"}
     else:
-        raise HTTPException(status_code=500, detail="Failed to send email")
+        detail = email_service.last_send_error or "SMTP connection failed. Please verify email provider settings."
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Failed to send email: {detail}"
+        )
 
 
 @router.post("/send-template", response_model=schemas.email.SendEmailResponse)

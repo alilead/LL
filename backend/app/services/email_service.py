@@ -89,6 +89,7 @@ class EmailService:
     
     def __init__(self, db: Session):
         self.db = db
+        self.last_send_error: Optional[str] = None
     
     def add_email_account(
         self,
@@ -912,6 +913,7 @@ class EmailService:
         reply_to: Optional[str] = None
     ) -> bool:
         """Send email using SMTP"""
+        self.last_send_error = None
         account = self.db.query(EmailAccount).filter(EmailAccount.id == account_id).first()
         if not account:
             raise ValueError("Email account not found")
@@ -1009,5 +1011,6 @@ class EmailService:
             return True
             
         except Exception as e:
+            self.last_send_error = f"{type(e).__name__}: {str(e)}"
             logger.error("Failed to send email for %s: %s: %s", account.email, type(e).__name__, str(e))
             return False 
