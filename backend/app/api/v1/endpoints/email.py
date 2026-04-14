@@ -223,7 +223,7 @@ def delete_template(
     }
 
 
-@router.post("/send", response_model=Dict[str, str])
+@router.post("/send", response_model=Dict[str, Any])
 async def send_email(
     email_data: schemas.email_integration.EmailSend,
     db: Session = Depends(deps.get_db),
@@ -254,12 +254,20 @@ async def send_email(
     )
     
     if success:
-        return {"message": "Email sent successfully"}
+        provider_mode = getattr(settings, "EMAIL_PROVIDER", "auto").lower()
+        return {
+            "message": "Email sent successfully",
+            "transport": provider_mode,
+        }
     else:
-        detail = email_service.last_send_error or "SMTP connection failed. Please verify email provider settings."
+        detail = {
+            "code": email_service.last_send_error_code or "DELIVERY_FAILED",
+            "message": email_service.last_send_error or "Email delivery failed",
+            "retryable": email_service.last_send_retryable,
+        }
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Failed to send email: {detail}"
+            status_code=email_service.last_send_status_code or status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=detail
         )
 
 

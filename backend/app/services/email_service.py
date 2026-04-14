@@ -5,6 +5,7 @@ import email
 import re
 import socket
 import json
+import requests
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -20,6 +21,7 @@ from app.models.email_account import EmailAccount, EmailSyncStatus, EmailProvide
 from app.models.email_message import Email, EmailDirection, EmailStatus
 from app.models.email_attachment import EmailAttachment
 from app.core.security import decrypt_password, encrypt_password
+from app.core.config import settings
 from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
@@ -90,6 +92,21 @@ class EmailService:
     def __init__(self, db: Session):
         self.db = db
         self.last_send_error: Optional[str] = None
+        self.last_send_error_code: Optional[str] = None
+        self.last_send_retryable: bool = False
+        self.last_send_status_code: int = 503
+
+    def _set_send_error(
+        self,
+        code: str,
+        message: str,
+        retryable: bool,
+        status_code: int = 503,
+    ) -> None:
+        self.last_send_error_code = code
+        self.last_send_error = message
+        self.last_send_retryable = retryable
+        self.last_send_status_code = status_code
     
     def add_email_account(
         self,
@@ -912,105 +929,298 @@ class EmailService:
         bcc_emails: Optional[List[str]] = None,
         reply_to: Optional[str] = None
     ) -> bool:
-        """Send email using SMTP"""
+        """Send email via SMTP, API provider, or auto fallback."""
         self.last_send_error = None
+        self.last_send_error_code = None
+        self.last_send_retryable = False
+        self.last_send_status_code = 503
+
         account = self.db.query(EmailAccount).filter(EmailAccount.id == account_id).first()
         if not account:
             raise ValueError("Email account not found")
-        
+
         try:
-            password = decrypt_password(account.password_encrypted)
-            
-            # Create message
-            msg = MIMEMultipart('alternative')
-            msg['Subject'] = subject
-            msg['From'] = f"{account.display_name} <{account.email}>" if account.display_name else account.email
-            msg['To'] = ', '.join(to_emails)
-            
-            if cc_emails:
-                msg['Cc'] = ', '.join(cc_emails)
-            if reply_to:
-                msg['Reply-To'] = reply_to
-            
-            # Add text and HTML parts
-            if body_text:
-                text_part = MIMEText(body_text, 'plain')
-                msg.attach(text_part)
-            
-            if body_html:
-                html_part = MIMEText(body_html, 'html')
-                msg.attach(html_part)
-            
-            # Connect to SMTP and send
-            smtp = None
-            try:
-                smtp_timeout = SMTP_CONNECT_TIMEOUT_SECONDS
-                # Try SSL first for port 465
-                if account.smtp_port == 465:
-                    try:
-                        smtp = _SMTP_SSL_IPv4(account.smtp_host, account.smtp_port, timeout=smtp_timeout)
-                        logger.info("SMTP SSL connection successful")
-                    except Exception as e:
-                        logger.warning(
-                            "SMTP SSL failed on %s:%s for %s (%s), trying STARTTLS on 587",
-                            account.smtp_host,
-                            account.smtp_port,
-                            account.email,
-                            type(e).__name__,
-                        )
-                        smtp = _SMTP_IPv4(
-                            account.smtp_host,
-                            587,
-                            timeout=SMTP_FALLBACK_TIMEOUT_SECONDS,
-                        )
-                        smtp.ehlo()
-                        smtp.starttls()
-                        smtp.ehlo()
-                else:
-                    smtp = _SMTP_IPv4(account.smtp_host, account.smtp_port, timeout=smtp_timeout)
-                    if account.smtp_use_tls:
-                        smtp.ehlo()
-                        smtp.starttls()
-                        smtp.ehlo()
-
-                smtp.login(account.email, password)
-
-                all_recipients = to_emails + (cc_emails or []) + (bcc_emails or [])
-                smtp.send_message(msg, to_addrs=all_recipients)
-
-            finally:
-                if smtp:
-                    try:
-                        smtp.quit()
-                    except Exception:
-                        pass
-            
-            # Save sent email to database
-            sent_email = Email(
-                message_id=msg['Message-ID'] or f"sent-{datetime.utcnow().timestamp()}",
+            msg = self._build_message(
+                account=account,
+                to_emails=to_emails,
+                cc_emails=cc_emails,
                 subject=subject,
-                from_email=account.email,
-                from_name=account.display_name,
-                to_emails=json.dumps(to_emails) if to_emails else json.dumps([]),
-                cc_emails=json.dumps(cc_emails) if cc_emails else json.dumps([]),
-                bcc_emails=json.dumps(bcc_emails) if bcc_emails else json.dumps([]),
+                reply_to=reply_to,
                 body_text=body_text,
                 body_html=body_html,
-                direction=EmailDirection.outgoing,
-                status=EmailStatus.read,
-                sent_date=datetime.utcnow(),
-                received_date=datetime.utcnow(),
-                folder_name='SENT',
-                email_account_id=account.id,
-                organization_id=account.organization_id
             )
-            
-            self.db.add(sent_email)
-            self.db.commit()
-            
+
+            provider_mode = getattr(settings, "EMAIL_PROVIDER", "auto").lower().strip()
+            if provider_mode not in {"smtp", "api", "auto"}:
+                provider_mode = "auto"
+
+            transport_used = ""
+            sent = False
+            if provider_mode == "smtp":
+                sent = self._send_email_smtp(account, msg, to_emails, cc_emails, bcc_emails)
+                transport_used = "smtp"
+            elif provider_mode == "api":
+                sent = self._send_email_provider_api(account, to_emails, cc_emails, bcc_emails, subject, body_text, body_html)
+                transport_used = "api"
+            else:
+                sent = self._send_email_smtp(account, msg, to_emails, cc_emails, bcc_emails)
+                transport_used = "smtp"
+                if not sent:
+                    logger.warning("SMTP delivery failed for account %s, trying provider API fallback", account.id)
+                    sent = self._send_email_provider_api(account, to_emails, cc_emails, bcc_emails, subject, body_text, body_html)
+                    transport_used = "api"
+
+            if not sent:
+                return False
+
+            self._persist_sent_email(
+                account=account,
+                subject=subject,
+                body_text=body_text,
+                body_html=body_html,
+                to_emails=to_emails,
+                cc_emails=cc_emails,
+                bcc_emails=bcc_emails,
+                message_id=msg.get("Message-ID"),
+            )
+            logger.info("Email delivered successfully via %s transport for account %s", transport_used, account.id)
             return True
-            
+
         except Exception as e:
-            self.last_send_error = f"{type(e).__name__}: {str(e)}"
+            self._set_send_error(
+                code="DELIVERY_FAILED",
+                message=f"{type(e).__name__}: {str(e)}",
+                retryable=False,
+                status_code=503,
+            )
             logger.error("Failed to send email for %s: %s: %s", account.email, type(e).__name__, str(e))
-            return False 
+            return False
+
+    def _build_message(
+        self,
+        account: EmailAccount,
+        to_emails: List[str],
+        cc_emails: Optional[List[str]],
+        subject: str,
+        reply_to: Optional[str],
+        body_text: Optional[str],
+        body_html: Optional[str],
+    ) -> MIMEMultipart:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = f"{account.display_name} <{account.email}>" if account.display_name else account.email
+        msg['To'] = ', '.join(to_emails)
+        if cc_emails:
+            msg['Cc'] = ', '.join(cc_emails)
+        if reply_to:
+            msg['Reply-To'] = reply_to
+        if body_text:
+            msg.attach(MIMEText(body_text, 'plain'))
+        if body_html:
+            msg.attach(MIMEText(body_html, 'html'))
+        return msg
+
+    def _send_email_smtp(
+        self,
+        account: EmailAccount,
+        msg: MIMEMultipart,
+        to_emails: List[str],
+        cc_emails: Optional[List[str]],
+        bcc_emails: Optional[List[str]],
+    ) -> bool:
+        smtp = None
+        try:
+            password = decrypt_password(account.password_encrypted)
+            smtp_timeout = SMTP_CONNECT_TIMEOUT_SECONDS
+            if account.smtp_port == 465:
+                try:
+                    smtp = _SMTP_SSL_IPv4(account.smtp_host, account.smtp_port, timeout=smtp_timeout)
+                    logger.info("SMTP SSL connection successful")
+                except Exception as e:
+                    logger.warning(
+                        "SMTP SSL failed on %s:%s for %s (%s), trying STARTTLS on 587",
+                        account.smtp_host,
+                        account.smtp_port,
+                        account.email,
+                        type(e).__name__,
+                    )
+                    smtp = _SMTP_IPv4(account.smtp_host, 587, timeout=SMTP_FALLBACK_TIMEOUT_SECONDS)
+                    smtp.ehlo()
+                    smtp.starttls()
+                    smtp.ehlo()
+            else:
+                smtp = _SMTP_IPv4(account.smtp_host, account.smtp_port, timeout=smtp_timeout)
+                if account.smtp_use_tls:
+                    smtp.ehlo()
+                    smtp.starttls()
+                    smtp.ehlo()
+
+            smtp.login(account.email, password)
+            all_recipients = to_emails + (cc_emails or []) + (bcc_emails or [])
+            smtp.send_message(msg, to_addrs=all_recipients)
+            return True
+        except TimeoutError as e:
+            self._set_send_error(
+                code="SMTP_TIMEOUT",
+                message=f"SMTP timeout: {str(e)}",
+                retryable=True,
+                status_code=503,
+            )
+            return False
+        except socket.timeout as e:
+            self._set_send_error(
+                code="SMTP_TIMEOUT",
+                message=f"SMTP timeout: {str(e)}",
+                retryable=True,
+                status_code=503,
+            )
+            return False
+        except smtplib.SMTPAuthenticationError as e:
+            self._set_send_error(
+                code="SMTP_AUTH_FAILED",
+                message=f"SMTP authentication failed: {str(e)}",
+                retryable=False,
+                status_code=503,
+            )
+            return False
+        except Exception as e:
+            self._set_send_error(
+                code="SMTP_SEND_FAILED",
+                message=f"SMTP send failed: {type(e).__name__}: {str(e)}",
+                retryable=True,
+                status_code=503,
+            )
+            return False
+        finally:
+            if smtp:
+                try:
+                    smtp.quit()
+                except Exception:
+                    pass
+
+    def _send_email_provider_api(
+        self,
+        account: EmailAccount,
+        to_emails: List[str],
+        cc_emails: Optional[List[str]],
+        bcc_emails: Optional[List[str]],
+        subject: str,
+        body_text: Optional[str],
+        body_html: Optional[str],
+    ) -> bool:
+        resend_api_key = getattr(settings, "RESEND_API_KEY", None)
+        if not resend_api_key:
+            self._set_send_error(
+                code="PROVIDER_NOT_CONFIGURED",
+                message="RESEND_API_KEY is not configured",
+                retryable=False,
+                status_code=503,
+            )
+            return False
+
+        from_email = getattr(settings, "RESEND_FROM_EMAIL", None) or settings.EMAILS_FROM_EMAIL or account.email
+        from_name = getattr(settings, "SMTP_FROM_NAME", "LeadLab")
+        timeout_seconds = int(getattr(settings, "EMAIL_PROVIDER_TIMEOUT_SECONDS", 12))
+
+        payload: Dict[str, object] = {
+            "from": f"{from_name} <{from_email}>",
+            "to": to_emails,
+            "subject": subject,
+            "text": body_text or (body_html or ""),
+            "html": body_html or None,
+        }
+        if cc_emails:
+            payload["cc"] = cc_emails
+        if bcc_emails:
+            payload["bcc"] = bcc_emails
+
+        headers = {
+            "Authorization": f"Bearer {resend_api_key}",
+            "Content-Type": "application/json",
+        }
+
+        last_error: Optional[str] = None
+        for attempt in range(2):
+            try:
+                response = requests.post(
+                    "https://api.resend.com/emails",
+                    headers=headers,
+                    json=payload,
+                    timeout=(timeout_seconds, timeout_seconds),
+                )
+
+                if 200 <= response.status_code < 300:
+                    return True
+
+                body_text_resp = response.text[:500]
+                if response.status_code in (401, 403):
+                    self._set_send_error(
+                        code="PROVIDER_AUTH_FAILED",
+                        message=f"Provider authentication failed ({response.status_code})",
+                        retryable=False,
+                        status_code=503,
+                    )
+                    return False
+                if response.status_code in (400, 422):
+                    self._set_send_error(
+                        code="PROVIDER_REJECTED",
+                        message=f"Provider rejected email payload ({response.status_code}): {body_text_resp}",
+                        retryable=False,
+                        status_code=400,
+                    )
+                    return False
+                if response.status_code >= 500:
+                    last_error = f"Provider temporary error ({response.status_code}): {body_text_resp}"
+                    continue
+
+                self._set_send_error(
+                    code="PROVIDER_ERROR",
+                    message=f"Provider error ({response.status_code}): {body_text_resp}",
+                    retryable=False,
+                    status_code=503,
+                )
+                return False
+            except requests.Timeout as e:
+                last_error = f"Provider timeout: {str(e)}"
+            except requests.RequestException as e:
+                last_error = f"Provider request failed: {str(e)}"
+
+        self._set_send_error(
+            code="PROVIDER_UNAVAILABLE",
+            message=last_error or "Provider unavailable",
+            retryable=True,
+            status_code=503,
+        )
+        return False
+
+    def _persist_sent_email(
+        self,
+        account: EmailAccount,
+        subject: str,
+        body_text: Optional[str],
+        body_html: Optional[str],
+        to_emails: List[str],
+        cc_emails: Optional[List[str]],
+        bcc_emails: Optional[List[str]],
+        message_id: Optional[str],
+    ) -> None:
+        sent_email = Email(
+            message_id=message_id or f"sent-{datetime.utcnow().timestamp()}",
+            subject=subject,
+            from_email=account.email,
+            from_name=account.display_name,
+            to_emails=json.dumps(to_emails) if to_emails else json.dumps([]),
+            cc_emails=json.dumps(cc_emails) if cc_emails else json.dumps([]),
+            bcc_emails=json.dumps(bcc_emails) if bcc_emails else json.dumps([]),
+            body_text=body_text,
+            body_html=body_html,
+            direction=EmailDirection.outgoing,
+            status=EmailStatus.read,
+            sent_date=datetime.utcnow(),
+            received_date=datetime.utcnow(),
+            folder_name='SENT',
+            email_account_id=account.id,
+            organization_id=account.organization_id,
+        )
+        self.db.add(sent_email)
+        self.db.commit()

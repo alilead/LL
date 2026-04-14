@@ -43,6 +43,8 @@ Required environment variables:
 - `ENV=production`
 - `EMAILS_FROM_EMAIL=noreply@send.the-leadlab.com` (Resend verified domain)
 - `RESEND_API_KEY` (Resend API key for email sending)
+- `EMAIL_PROVIDER=auto` (`smtp`, `api`, or `auto`)
+- `RESEND_FROM_EMAIL=noreply@send.the-leadlab.com`
 
 Optional environment variables (can be added later):
 - `LINKEDIN_CLIENT_ID`
@@ -51,6 +53,7 @@ Optional environment variables (can be added later):
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` (only if not using Resend)
+- `EMAIL_PROVIDER_TIMEOUT_SECONDS=12`
 
 Render health check:
 - `https://api.the-leadlab.com/api/v1/health`
@@ -107,7 +110,12 @@ To use Resend for email delivery (recommended):
    - DNS records are already configured by Resend
    - Just use `noreply@send.the-leadlab.com` as the from email
 
-**Note:** The code automatically uses Resend API when `RESEND_API_KEY` is set. No SMTP configuration needed.
+**Transport modes:**
+- `EMAIL_PROVIDER=api` → use Resend API only (recommended on Render).
+- `EMAIL_PROVIDER=smtp` → use SMTP only.
+- `EMAIL_PROVIDER=auto` → try SMTP first, then fallback to Resend API.
+
+**Note:** In `auto`, a blocked SMTP egress path no longer prevents delivery when Resend is configured.
 
 ## Custom API Domain
 To enable `api.the-leadlab.com`:

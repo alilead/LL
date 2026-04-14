@@ -1,6 +1,5 @@
 import React, { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
 import { X, Paperclip, Send, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -9,6 +8,7 @@ import { Label } from '@/components/ui/Label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
+import { extractEmailErrorMessage } from '@/lib/emailError';
 import emailAPI from '../../services/emailAPI';
 
 interface EmailComposeModalProps {
@@ -61,12 +61,10 @@ export default function EmailComposeModal({
       handleClose();
     },
     onError: (error) => {
-      const backendDetail = axios.isAxiosError(error)
-        ? (error.response?.data?.detail as string | undefined)
-        : undefined;
+      const errorMessage = extractEmailErrorMessage(error);
       toast({
-        title: 'Failed to send email',
-        description: backendDetail || (error instanceof Error ? error.message : 'Please try again.'),
+        title: errorMessage.title,
+        description: errorMessage.description,
         variant: 'destructive',
       });
     },
