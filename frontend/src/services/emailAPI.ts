@@ -54,6 +54,14 @@ export interface SendEmailData {
   attachments?: File[];
 }
 
+const parseRecipients = (value?: string): string[] => {
+  if (!value) return [];
+  return value
+    .split(/[;,]/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+};
+
 export interface CreateEmailAccountData {
   email: string;
   password: string;
@@ -171,26 +179,17 @@ const emailAPI = {
   },
 
   async sendEmail(data: SendEmailData): Promise<EmailMessage> {
-    const formData = new FormData();
-    formData.append('account_id', data.account_id.toString());
-    formData.append('to', data.to);
-    formData.append('subject', data.subject);
-    formData.append('body', data.body);
-    
-    if (data.cc) formData.append('cc', data.cc);
-    if (data.bcc) formData.append('bcc', data.bcc);
-    
-    if (data.attachments) {
-      data.attachments.forEach(file => {
-        formData.append('attachments', file);
-      });
-    }
+    const payload = {
+      account_id: data.account_id,
+      to_emails: parseRecipients(data.to),
+      cc_emails: parseRecipients(data.cc),
+      bcc_emails: parseRecipients(data.bcc),
+      subject: data.subject,
+      body_text: data.body,
+      body_html: data.body,
+    };
 
-    const response = await api.post(`/email/send`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const response = await api.post(`/email/send`, payload);
     return response.data;
   },
 
