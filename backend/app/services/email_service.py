@@ -948,15 +948,6 @@ class EmailService:
                     try:
                         smtp = _SMTP_SSL_IPv4(account.smtp_host, account.smtp_port, timeout=smtp_timeout)
                         logger.info("SMTP SSL connection successful")
-                    except socket.timeout as e:
-                        logger.error(
-                            "SMTP SSL timeout on %s:%s for %s: %s",
-                            account.smtp_host,
-                            account.smtp_port,
-                            account.email,
-                            str(e),
-                        )
-                        raise
                     except Exception as e:
                         logger.warning(
                             "SMTP SSL failed on %s:%s for %s (%s), trying STARTTLS on 587",
