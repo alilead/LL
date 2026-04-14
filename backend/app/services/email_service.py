@@ -129,8 +129,8 @@ class EmailService:
                 custom_settings=custom_settings
             )
             
-            # Test connection before saving
-            if not self._test_connection(email, password, imap_settings, smtp_settings):
+            # For inbox visibility, IMAP must succeed; SMTP issues are non-blocking at connect time.
+            if not self._test_connection(email, password, imap_settings, smtp_settings, require_smtp=False):
                 raise ValueError("Failed to connect to email server. Please check credentials.")
             
             # Encrypt password
@@ -338,7 +338,14 @@ class EmailService:
             {'smtp_host': f'smtp.{domain}', 'smtp_port': 465, 'smtp_use_tls': False}
         )
     
-    def _test_connection(self, email: str, password: str, imap_settings: Dict, smtp_settings: Dict) -> bool:
+    def _test_connection(
+        self,
+        email: str,
+        password: str,
+        imap_settings: Dict,
+        smtp_settings: Dict,
+        require_smtp: bool = True,
+    ) -> bool:
         """
         Test IMAP and SMTP with per-connection timeouts only.
         Avoids socket.setdefaulttimeout(), which is process-wide and can interact badly with
@@ -348,7 +355,6 @@ class EmailService:
         smtp = None
         try:
             logger.info(f"Testing IMAP connection to {imap_settings['imap_host']}:{imap_settings['imap_port']}")
-
             try:
                 imap = _IMAP4_SSL_IPv4(
                     imap_settings["imap_host"], imap_settings["imap_port"], timeout=timeout_s
@@ -360,79 +366,89 @@ class EmailService:
             imap.login(email, password)
             imap.logout()
             logger.info(f"IMAP connection successful for {email}")
-
-            logger.info(
-                f"Testing SMTP connection to {smtp_settings['smtp_host']}:{smtp_settings['smtp_port']}"
-            )
-
-            for attempt in range(2):
-                try:
-                    if smtp_settings.get("smtp_port") == 465:
-                        try:
-                            smtp = _SMTP_SSL_IPv4(
-                                smtp_settings["smtp_host"],
-                                smtp_settings["smtp_port"],
-                                timeout=timeout_s,
-                            )
-                            logger.info("SMTP SSL connection successful")
-                        except Exception:
-                            logger.info("SMTP SSL failed on port 465, trying STARTTLS")
-                            smtp = _SMTP_IPv4(smtp_settings["smtp_host"], 587, timeout=timeout_s)
-                            smtp.starttls()
-                    else:
-                        smtp = _SMTP_IPv4(
-                            smtp_settings["smtp_host"],
-                            smtp_settings["smtp_port"],
-                            timeout=timeout_s,
-                        )
-                        if smtp_settings.get("smtp_use_tls", True):
-                            smtp.starttls()
-
-                    smtp.login(email, password)
-                    smtp.quit()
-                    smtp = None
-                    logger.info(f"SMTP connection successful for {email}")
-                    return True
-                except socket.timeout:
-                    if smtp is not None:
-                        try:
-                            smtp.quit()
-                        except Exception:
-                            pass
-                        smtp = None
-                    if attempt == 0:
-                        logger.warning(
-                            "SMTP timeout for %s, retrying once (attempt %s/2)",
-                            email,
-                            attempt + 1,
-                        )
-                        continue
-                    logger.error(
-                        f"SMTP connection timeout for {email} after retry — server may be slow or blocked (outbound 587)"
-                    )
-                    return False
-
         except socket.timeout:
-            logger.error(f"Connection timeout for {email} - server may be unreachable")
+            logger.error(f"IMAP connection timeout for {email} - server may be unreachable")
             return False
         except imaplib.IMAP4.error as e:
             logger.error(f"IMAP authentication failed for {email}: {str(e)}")
             return False
-        except smtplib.SMTPAuthenticationError as e:
-            logger.error(f"SMTP authentication failed for {email}: {str(e)}")
-            return False
-        except smtplib.SMTPConnectError as e:
-            logger.error(f"SMTP connection failed for {email}: {str(e)}")
-            return False
         except Exception as e:
-            logger.error(f"Connection test failed for {email}: {str(e)}")
+            logger.error(f"IMAP connection test failed for {email}: {str(e)}")
             return False
-        finally:
-            if smtp is not None:
-                try:
-                    smtp.quit()
-                except Exception:
-                    pass
+
+        logger.info(
+            f"Testing SMTP connection to {smtp_settings['smtp_host']}:{smtp_settings['smtp_port']}"
+        )
+        for attempt in range(2):
+            try:
+                if smtp_settings.get("smtp_port") == 465:
+                    try:
+                        smtp = _SMTP_SSL_IPv4(
+                            smtp_settings["smtp_host"],
+                            smtp_settings["smtp_port"],
+                            timeout=timeout_s,
+                        )
+                        logger.info("SMTP SSL connection successful")
+                    except Exception:
+                        logger.info("SMTP SSL failed on port 465, trying STARTTLS")
+                        smtp = _SMTP_IPv4(smtp_settings["smtp_host"], 587, timeout=timeout_s)
+                        smtp.starttls()
+                else:
+                    smtp = _SMTP_IPv4(
+                        smtp_settings["smtp_host"],
+                        smtp_settings["smtp_port"],
+                        timeout=timeout_s,
+                    )
+                    if smtp_settings.get("smtp_use_tls", True):
+                        smtp.starttls()
+
+                smtp.login(email, password)
+                smtp.quit()
+                smtp = None
+                logger.info(f"SMTP connection successful for {email}")
+                return True
+            except socket.timeout:
+                if smtp is not None:
+                    try:
+                        smtp.quit()
+                    except Exception:
+                        pass
+                    smtp = None
+                if attempt == 0:
+                    logger.warning(
+                        "SMTP timeout for %s, retrying once (attempt %s/2)",
+                        email,
+                        attempt + 1,
+                    )
+                    continue
+                msg = (
+                    f"SMTP connection timeout for {email} after retry — "
+                    "inbox sync remains available; outbound email may be unavailable"
+                )
+                if require_smtp:
+                    logger.error(msg)
+                    return False
+                logger.warning(msg)
+                return True
+            except smtplib.SMTPAuthenticationError as e:
+                if require_smtp:
+                    logger.error(f"SMTP authentication failed for {email}: {str(e)}")
+                    return False
+                logger.warning(f"SMTP authentication failed for {email}: {str(e)}")
+                return True
+            except smtplib.SMTPConnectError as e:
+                if require_smtp:
+                    logger.error(f"SMTP connection failed for {email}: {str(e)}")
+                    return False
+                logger.warning(f"SMTP connection failed for {email}: {str(e)}")
+                return True
+            except Exception as e:
+                if require_smtp:
+                    logger.error(f"SMTP connection test failed for {email}: {str(e)}")
+                    return False
+                logger.warning(f"SMTP connection test failed for {email}: {str(e)}")
+                return True
+        return True
     
     def sync_account_emails(self, account_id: int, days_back: int = 30) -> Dict:
         """Sync emails for an account"""
