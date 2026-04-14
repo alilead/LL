@@ -24,6 +24,9 @@ from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
 
+SMTP_CONNECT_TIMEOUT_SECONDS = 12
+SMTP_FALLBACK_TIMEOUT_SECONDS = 8
+
 
 def _ipv4_create_connection(
     address: Tuple[str, int],
@@ -939,20 +942,43 @@ class EmailService:
             # Connect to SMTP and send
             smtp = None
             try:
-                smtp_timeout = 60
+                smtp_timeout = SMTP_CONNECT_TIMEOUT_SECONDS
                 # Try SSL first for port 465
                 if account.smtp_port == 465:
                     try:
                         smtp = _SMTP_SSL_IPv4(account.smtp_host, account.smtp_port, timeout=smtp_timeout)
                         logger.info("SMTP SSL connection successful")
-                    except Exception:
-                        logger.info("SMTP SSL failed on port 465, trying STARTTLS")
-                        smtp = _SMTP_IPv4(account.smtp_host, 587, timeout=smtp_timeout)
+                    except socket.timeout as e:
+                        logger.error(
+                            "SMTP SSL timeout on %s:%s for %s: %s",
+                            account.smtp_host,
+                            account.smtp_port,
+                            account.email,
+                            str(e),
+                        )
+                        raise
+                    except Exception as e:
+                        logger.warning(
+                            "SMTP SSL failed on %s:%s for %s (%s), trying STARTTLS on 587",
+                            account.smtp_host,
+                            account.smtp_port,
+                            account.email,
+                            type(e).__name__,
+                        )
+                        smtp = _SMTP_IPv4(
+                            account.smtp_host,
+                            587,
+                            timeout=SMTP_FALLBACK_TIMEOUT_SECONDS,
+                        )
+                        smtp.ehlo()
                         smtp.starttls()
+                        smtp.ehlo()
                 else:
                     smtp = _SMTP_IPv4(account.smtp_host, account.smtp_port, timeout=smtp_timeout)
                     if account.smtp_use_tls:
+                        smtp.ehlo()
                         smtp.starttls()
+                        smtp.ehlo()
 
                 smtp.login(account.email, password)
 
@@ -992,5 +1018,5 @@ class EmailService:
             return True
             
         except Exception as e:
-            logger.error(f"Failed to send email: {str(e)}")
+            logger.error("Failed to send email for %s: %s: %s", account.email, type(e).__name__, str(e))
             return False 
