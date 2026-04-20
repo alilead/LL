@@ -83,6 +83,7 @@ const TeamManagement: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [selectedExistingUserId, setSelectedExistingUserId] = useState<string>('');
+  const [existingUserSearch, setExistingUserSearch] = useState('');
 
   const getErrorMessage = (error: any, fallback: string) => {
     const detail = error?.response?.data?.detail;
@@ -161,6 +162,22 @@ const TeamManagement: React.FC = () => {
     if (!currentOrgId) return false;
     if (!candidate.is_active) return false;
     return Number(candidate.organization_id) !== currentOrgId;
+  });
+  const displayedTeamMembers = teamMembers.length
+    ? teamMembers
+    : (allUsersResponse || []).filter((candidate: User) => {
+        if (!currentOrgId) return false;
+        if (!candidate.is_active) return false;
+        return Number(candidate.organization_id) === currentOrgId;
+      });
+  const normalizedExistingUserSearch = existingUserSearch.trim().toLowerCase();
+  const filteredAddableUsers = addableUsers.filter((candidate: User) => {
+    if (!normalizedExistingUserSearch) return true;
+    const fullName = `${candidate.first_name || ''} ${candidate.last_name || ''}`.trim().toLowerCase();
+    return (
+      fullName.includes(normalizedExistingUserSearch) ||
+      candidate.email.toLowerCase().includes(normalizedExistingUserSearch)
+    );
   });
 
   // Mutations
@@ -498,7 +515,7 @@ const TeamManagement: React.FC = () => {
               : 'text-gray-600 hover:text-gray-900'
           }`}
         >
-          Team Members ({teamMembers.length})
+          Team Members ({displayedTeamMembers.length})
         </button>
         <button
           onClick={() => setSelectedTab('invitations')}
@@ -520,7 +537,7 @@ const TeamManagement: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Members</p>
-                  <p className="text-2xl font-bold text-gray-900">{teamMembers.length}</p>
+                  <p className="text-2xl font-bold text-gray-900">{displayedTeamMembers.length}</p>
                 </div>
                 <Users className="h-8 w-8 text-blue-500" />
               </div>
@@ -581,12 +598,18 @@ const TeamManagement: React.FC = () => {
                 Move an existing active user from another organization into your organization/team.
               </p>
               <div className="flex flex-col md:flex-row gap-3">
+                <Input
+                  placeholder="Search by name or email..."
+                  value={existingUserSearch}
+                  onChange={(e) => setExistingUserSearch(e.target.value)}
+                  className="md:w-[280px] bg-white"
+                />
                 <Select value={selectedExistingUserId} onValueChange={setSelectedExistingUserId}>
                   <SelectTrigger className="md:w-[420px] bg-white">
                     <SelectValue placeholder="Select existing user..." />
                   </SelectTrigger>
-                  <SelectContent>
-                    {addableUsers.map((candidate: User) => (
+                  <SelectContent className="max-h-72 overflow-y-auto">
+                    {filteredAddableUsers.map((candidate: User) => (
                       <SelectItem key={candidate.id} value={String(candidate.id)}>
                         {candidate.first_name} {candidate.last_name} - {candidate.email}
                       </SelectItem>
@@ -626,7 +649,7 @@ const TeamManagement: React.FC = () => {
                   Retry
                 </Button>
               </div>
-            ) : teamMembers.length === 0 ? (
+            ) : displayedTeamMembers.length === 0 ? (
               <div className="text-center py-8">
                 <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No team members yet</h3>
@@ -638,7 +661,7 @@ const TeamManagement: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {teamMembers.map((member: User) => (
+                {displayedTeamMembers.map((member: User) => (
                   <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center space-x-4">
                       <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
