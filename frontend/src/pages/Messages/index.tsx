@@ -355,6 +355,28 @@ export function MessagesPage() {
     return onlineUsers.has(userId);
   };
 
+  const parseAttachmentMessage = (content: string) => {
+    const match = content.match(/^\[Attachment:\s*(.+?)\]\s*\((\d+)\s+bytes\)\.\s*Stored as\s+([^.]+)\.?$/i);
+    if (!match) return null;
+    const fileName = match[1];
+    const sizeBytes = Number(match[2] || 0);
+    const storedName = match[3];
+    const extension = fileName.includes('.') ? fileName.split('.').pop()?.toUpperCase() : 'FILE';
+    return {
+      fileName,
+      sizeBytes,
+      storedName,
+      extension: extension || 'FILE',
+      url: `/api/v1/messages/attachments/${encodeURIComponent(storedName)}`,
+    };
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   // Check if message is a call invitation
   const isCallInvitation = (content: string) => {
     return content.includes('Call Invitation') && content.includes('meet.jit.si');
@@ -677,25 +699,62 @@ export function MessagesPage() {
                               </p>
                             </div>
                           </div>
-                        ) : (
-                          /* Regular Message */
-                        <div
-                          className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${
-                            isOwnMessage
-                              ? 'bg-purple-600 text-white rounded-br-md'
-                              : 'bg-white text-gray-900 border border-gray-200 rounded-bl-md'
-                          }`}
-                        >
-                          <p className="text-sm leading-relaxed">{message.content}</p>
-                          <p
-                            className={`text-xs mt-2 ${
-                              isOwnMessage ? 'text-purple-200' : 'text-gray-500'
-                            }`}
-                          >
-                            {formatMessageTime(message.created_at)}
-                          </p>
-                        </div>
-                        )}
+                        ) : (() => {
+                          const attachment = parseAttachmentMessage(message.content);
+                          if (attachment) {
+                            return (
+                              <div
+                                className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${
+                                  isOwnMessage
+                                    ? 'bg-purple-600 text-white rounded-br-md'
+                                    : 'bg-white text-gray-900 border border-gray-200 rounded-bl-md'
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-sm font-semibold">{attachment.fileName}</p>
+                                    <p className={`text-xs ${isOwnMessage ? 'text-purple-200' : 'text-gray-500'}`}>
+                                      {attachment.extension} · {formatFileSize(attachment.sizeBytes)}
+                                    </p>
+                                  </div>
+                                  <a
+                                    href={attachment.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className={`text-xs underline ${isOwnMessage ? 'text-white' : 'text-purple-600'}`}
+                                  >
+                                    Open
+                                  </a>
+                                </div>
+                                <p
+                                  className={`text-xs mt-2 ${
+                                    isOwnMessage ? 'text-purple-200' : 'text-gray-500'
+                                  }`}
+                                >
+                                  {formatMessageTime(message.created_at)}
+                                </p>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div
+                              className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${
+                                isOwnMessage
+                                  ? 'bg-purple-600 text-white rounded-br-md'
+                                  : 'bg-white text-gray-900 border border-gray-200 rounded-bl-md'
+                              }`}
+                            >
+                              <p className="text-sm leading-relaxed">{message.content}</p>
+                              <p
+                                className={`text-xs mt-2 ${
+                                  isOwnMessage ? 'text-purple-200' : 'text-gray-500'
+                                }`}
+                              >
+                                {formatMessageTime(message.created_at)}
+                              </p>
+                            </div>
+                          );
+                        })()}
                       </div>
                     );
                   })}

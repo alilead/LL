@@ -108,6 +108,24 @@ const defaultEventData: EventCreateInput = {
   timezone: getSystemTimezone()
 };
 
+const MEETING_LINK_PREFIX = '[meeting-link]';
+const MEETING_LINK_SUFFIX = '[/meeting-link]';
+
+function extractMeetingLink(description?: string | null): { meetingLink: string; cleanDescription: string } {
+  if (!description) return { meetingLink: '', cleanDescription: '' };
+  const match = description.match(/\[meeting-link\](.*?)\[\/meeting-link\]/i);
+  const meetingLink = match?.[1]?.trim() || '';
+  const cleanDescription = description.replace(/\[meeting-link\].*?\[\/meeting-link\]\s*/gi, '').trim();
+  return { meetingLink, cleanDescription };
+}
+
+function mergeMeetingLink(description: string, meetingLink?: string): string {
+  const clean = description.trim();
+  const link = (meetingLink || '').trim();
+  if (!link) return clean;
+  return `${MEETING_LINK_PREFIX}${link}${MEETING_LINK_SUFFIX}\n${clean}`.trim();
+}
+
 const eventTypes = [
   { 
     value: 'meeting', 
@@ -209,10 +227,12 @@ export default function EventDetailModal({ event, onClose, onDelete, open }: Eve
   const { user } = useAuthStore();
   const [isEditing, setIsEditing] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [meetingLink, setMeetingLink] = useState('');
 
   useEffect(() => {
     if (open && event) {
       try {
+        const parsed = extractMeetingLink(event.description);
         const eventTimezone = event.timezone || getSystemTimezone();
         setSelectedTimezone(eventTimezone);
         
@@ -225,7 +245,7 @@ export default function EventDetailModal({ event, onClose, onDelete, open }: Eve
           
           setEditedEvent({
             title: event.title || '',
-            description: event.description || '',
+            description: parsed.cleanDescription || '',
             start_date: formatInTimeZone(now, eventTimezone, "yyyy-MM-dd'T'HH:mm"),
             end_date: formatInTimeZone(thirtyMinutesLater, eventTimezone, "yyyy-MM-dd'T'HH:mm"),
             location: event.location || '',
@@ -265,7 +285,7 @@ export default function EventDetailModal({ event, onClose, onDelete, open }: Eve
         
         setEditedEvent({
           title: event.title || '',
-          description: event.description || '',
+          description: parsed.cleanDescription || '',
           start_date: formattedStartDate,
           end_date: formattedEndDate,
           location: event.location || '',
@@ -276,6 +296,7 @@ export default function EventDetailModal({ event, onClose, onDelete, open }: Eve
           user_id: user?.id || 0,
           timezone: eventTimezone
         });
+        setMeetingLink(parsed.meetingLink);
       } catch (error) {
         console.error('Error processing event dates:', error);
         toast.error('Error loading event details. Using default values.');
@@ -287,13 +308,14 @@ export default function EventDetailModal({ event, onClose, onDelete, open }: Eve
         setEditedEvent({
           ...defaultEventData,
           title: event.title || '',
-          description: event.description || '',
+          description: extractMeetingLink(event.description).cleanDescription || '',
           start_date: formatInTimeZone(now, systemTimezone, "yyyy-MM-dd'T'HH:mm"),
           end_date: formatInTimeZone(thirtyMinutesLater, systemTimezone, "yyyy-MM-dd'T'HH:mm"),
           organization_id: user?.organization_id || 0,
           user_id: user?.id || 0,
           timezone: systemTimezone
         });
+        setMeetingLink('');
       }
     } else if (open) {
       const systemTimezone = getSystemTimezone();
@@ -313,6 +335,7 @@ export default function EventDetailModal({ event, onClose, onDelete, open }: Eve
         user_id: user?.id || 0,
         timezone: systemTimezone
       });
+      setMeetingLink('');
     }
   }, [event, open, user, onClose]);
 
@@ -333,7 +356,7 @@ export default function EventDetailModal({ event, onClose, onDelete, open }: Eve
       
       const updateData = {
         title: editedEvent.title,
-        description: editedEvent.description || null,
+        description: mergeMeetingLink(editedEvent.description || '', meetingLink) || null,
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
         location: editedEvent.location || null,
@@ -400,7 +423,7 @@ export default function EventDetailModal({ event, onClose, onDelete, open }: Eve
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent 
-        className="sm:max-w-[700px] p-0 overflow-hidden rounded-2xl border-0 shadow-2xl"
+        className="sm:max-w-[700px] max-h-[88vh] p-0 overflow-hidden rounded-2xl border-0 shadow-2xl"
         showCloseButton={false}
       >
         {isConfirmingDelete ? (
@@ -476,7 +499,7 @@ export default function EventDetailModal({ event, onClose, onDelete, open }: Eve
             </div>
 
             {/* Content */}
-            <div className="px-8 py-6">
+            <div className="max-h-[60vh] overflow-y-auto px-8 py-6">
               {isEditing ? (
                 <div className="space-y-6">
                   <div>
@@ -500,6 +523,20 @@ export default function EventDetailModal({ event, onClose, onDelete, open }: Eve
                       placeholder="Add event description..."
                     />
                   </div>
+
+                  {(editedEvent.event_type === 'meeting' || editedEvent.event_type === 'call' || editedEvent.event_type === 'video_call') && (
+                    <div>
+                      <Label htmlFor="meeting-link" className="text-sm font-semibold text-gray-700 block mb-2">Meeting Link</Label>
+                      <Input
+                        id="meeting-link"
+                        type="url"
+                        value={meetingLink}
+                        onChange={(e) => setMeetingLink(e.target.value)}
+                        className="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-lg text-base"
+                        placeholder="https://meet.google.com/..."
+                      />
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
@@ -650,9 +687,23 @@ export default function EventDetailModal({ event, onClose, onDelete, open }: Eve
                         </div>
                         <div className="flex-1">
                           <span className="text-sm font-medium text-gray-500 uppercase tracking-wide">Description</span>
-                          <p className="text-gray-900 mt-2 leading-relaxed whitespace-pre-wrap">{event.description}</p>
+                          <p className="text-gray-900 mt-2 leading-relaxed whitespace-pre-wrap">{extractMeetingLink(event.description).cleanDescription}</p>
                         </div>
                       </div>
+                    </div>
+                  )}
+
+                  {extractMeetingLink(event.description).meetingLink && (
+                    <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                      <span className="text-sm font-medium text-gray-500 uppercase tracking-wide">Meeting Link</span>
+                      <a
+                        href={extractMeetingLink(event.description).meetingLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 block font-medium text-indigo-600 hover:underline break-all"
+                      >
+                        {extractMeetingLink(event.description).meetingLink}
+                      </a>
                     </div>
                   )}
 

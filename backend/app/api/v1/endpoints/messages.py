@@ -3,10 +3,12 @@ import os
 import re
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.api import deps
 from app.crud.crud_message import message
 from app.models.user import User
+from app.models.message import Message as MessageModel
 from app.core.config import settings
 from app.core.encryption import decrypt_message_content
 from app.schemas.message import (
@@ -255,6 +257,32 @@ def mark_messages_as_read(
     )
     
     return {"marked_count": count}
+
+
+@router.get("/attachments/{stored_name}")
+def download_attachment(
+    stored_name: str,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+):
+    """
+    Download a message attachment by stored filename, only if user is a participant.
+    """
+    attachment_pattern = f"Stored as {stored_name}"
+    candidate_messages = db.query(MessageModel).filter(
+        MessageModel.organization_id == current_user.organization_id,
+        ((MessageModel.sender_id == current_user.id) | (MessageModel.receiver_id == current_user.id))
+    ).all()
+
+    allowed = any(attachment_pattern in decrypt_message_content(msg.content) for msg in candidate_messages)
+    if not allowed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
+
+    file_path = os.path.join(settings.UPLOAD_DIR, stored_name)
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment file not found")
+
+    return FileResponse(path=file_path, filename=stored_name, media_type="application/octet-stream")
 
 @router.get("/users", response_model=List[ConversationUser])
 def get_organization_users(

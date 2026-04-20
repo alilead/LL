@@ -73,6 +73,17 @@ interface NewEventForm {
   is_all_day: boolean;
   location: string;
   timezone: string;
+  meeting_link: string;
+}
+
+const MEETING_LINK_PREFIX = '[meeting-link]';
+const MEETING_LINK_SUFFIX = '[/meeting-link]';
+
+function mergeMeetingLink(description: string, meetingLink?: string): string {
+  const clean = description.trim();
+  const link = (meetingLink || '').trim();
+  if (!link) return clean;
+  return `${MEETING_LINK_PREFIX}${link}${MEETING_LINK_SUFFIX}\n${clean}`.trim();
 }
 
 const eventTypes = [
@@ -167,6 +178,7 @@ export const CalendarPage = () => {
     is_all_day: false,
     location: '',
     timezone: getSystemTimezone(),
+    meeting_link: '',
   }));
 
   // Get date range based on view mode
@@ -303,7 +315,7 @@ export const CalendarPage = () => {
 
     const eventData: EventCreateInput = {
       title: newEvent.title,
-      description: newEvent.description || null,
+      description: mergeMeetingLink(newEvent.description || '', newEvent.meeting_link) || null,
       start_date: new Date(newEvent.start_time).toISOString(),
       end_date: new Date(newEvent.end_time).toISOString(),
       location: newEvent.location || null,
@@ -327,6 +339,7 @@ export const CalendarPage = () => {
       is_all_day: false,
       location: '',
       timezone: getSystemTimezone(),
+      meeting_link: '',
     });
   };
 
@@ -908,6 +921,7 @@ export const CalendarPage = () => {
                   is_all_day: false,
                   location: '',
                   timezone: getSystemTimezone(),
+                  meeting_link: '',
                 });
               }, 300);
             }
@@ -977,6 +991,22 @@ export const CalendarPage = () => {
                     />
                   </div>
                 </div>
+
+                {(newEvent.event_type === 'meeting' || newEvent.event_type === 'call' || newEvent.event_type === 'video_call') && (
+                  <div>
+                    <Label htmlFor="meeting_link" className="text-sm font-semibold text-gray-700 block mb-2">
+                      Meeting Link
+                    </Label>
+                    <Input
+                      id="meeting_link"
+                      type="url"
+                      value={newEvent.meeting_link}
+                      onChange={(e) => setNewEvent({ ...newEvent, meeting_link: e.target.value })}
+                      className="border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 h-11"
+                      placeholder="https://meet.google.com/..."
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-3">
                   <Label className="text-sm font-semibold text-gray-700">Event Type</Label>
