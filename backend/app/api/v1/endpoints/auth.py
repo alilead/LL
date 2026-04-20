@@ -13,6 +13,7 @@ from app.core.email import email_sender
 from app.utils.auth import generate_password_reset_token, verify_password_reset_token, generate_email_verification_token, verify_email_verification_token
 import logging
 import json
+from sqlalchemy.exc import IntegrityError
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -77,11 +78,19 @@ async def register(
         
         return User.model_validate(user)
 
-    except Exception as e:
-        print(f"Registration error for {register_in.email}: {str(e)}")
+    except HTTPException:
+        raise
+    except IntegrityError as e:
+        logger.exception("Registration integrity error for %s", register_in.email)
         raise HTTPException(
-            status_code=400,
-            detail=str(e)
+            status_code=409,
+            detail="Could not create account right now due to a data conflict. Please try again."
+        )
+    except Exception as e:
+        logger.exception("Registration error for %s", register_in.email)
+        raise HTTPException(
+            status_code=500,
+            detail="Account creation failed. Please try again."
         )
 
 @router.post("/login", response_model=TokenResponse)

@@ -920,6 +920,7 @@ export function InvoiceMaker() {
                       'TRY': '₺',
                       'USD': '$',
                       'EUR': '€',
+                      'CHF': 'CHF',
                       'GBP': '£',
                       'JPY': '¥'
                     };
@@ -937,6 +938,7 @@ export function InvoiceMaker() {
                     <SelectItem value="TRY">Turkish Lira (₺)</SelectItem>
                     <SelectItem value="USD">US Dollar ($)</SelectItem>
                     <SelectItem value="EUR">Euro (€)</SelectItem>
+                      <SelectItem value="CHF">Swiss Franc (CHF)</SelectItem>
                     <SelectItem value="GBP">British Pound (£)</SelectItem>
                     <SelectItem value="JPY">Japanese Yen (¥)</SelectItem>
                   </SelectContent>
@@ -1105,7 +1107,7 @@ export function InvoiceMaker() {
                       <td className="py-2 font-medium">{invoice.invoiceNumber}</td>
                       <td className="py-2">{invoice.clientName || 'N/A'}</td>
                       <td className="py-2">{invoice.clientCompany || 'N/A'}</td>
-                      <td className="py-2">₺{invoice.total.toFixed(2)}</td>
+                      <td className="py-2">{invoice.currencySymbol || '₺'}{invoice.total.toFixed(2)}</td>
                       <td className="py-2">
                         <Badge className={`
                           ${invoice.status === 'paid' ? 'bg-green-100 text-green-800' : ''}

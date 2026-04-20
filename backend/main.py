@@ -7,6 +7,7 @@ from app.middleware.security import SecurityMiddleware
 import logging
 import os
 from datetime import datetime
+from sqlalchemy import text
 
 from app.utils.safe_request_body_log import safe_request_body_log
 
@@ -20,6 +21,46 @@ app = FastAPI(
     description="Lead management system backend",
     version="1.0.0"
 )
+
+
+def _sync_table_sequence(table_name: str, id_column: str = "id") -> None:
+    """
+    Align PostgreSQL serial sequence with MAX(id) after imports/backfills.
+    Safe no-op for non-PostgreSQL databases.
+    """
+    from app.db.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        db.execute(
+            text(
+                f"""
+                SELECT setval(
+                    pg_get_serial_sequence('{table_name}', '{id_column}'),
+                    COALESCE((SELECT MAX({id_column}) FROM {table_name}), 1),
+                    true
+                )
+                """
+            )
+        )
+        db.commit()
+        logger.info("Sequence synced for %s.%s", table_name, id_column)
+    except Exception as exc:
+        db.rollback()
+        logger.warning(
+            "Skipping sequence sync for %s.%s: %s",
+            table_name,
+            id_column,
+            str(exc),
+        )
+    finally:
+        db.close()
+
+
+@app.on_event("startup")
+async def startup_sequence_guard() -> None:
+    # Keep this list small and focused on tables that are user-created frequently.
+    _sync_table_sequence("organizations", "id")
 
 # Health check endpoint - Keep both versions for compatibility
 @app.get("/")
