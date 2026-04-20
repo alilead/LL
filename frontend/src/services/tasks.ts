@@ -110,6 +110,14 @@ export interface TaskStats {
   overdue: number;
 }
 
+export interface TaskAttachment {
+  filename: string;
+  stored_name: string;
+  size_bytes: number;
+  content_type?: string;
+  uploaded_at?: string;
+}
+
 function normalizeDueDate(isoOrLocal: string): string {
   const d = new Date(isoOrLocal);
   if (Number.isNaN(d.getTime())) {
@@ -170,6 +178,25 @@ export const getTaskStats = async (): Promise<TaskStats> => {
   return response.data;
 };
 
+export const listTaskAttachments = async (taskId: number | string): Promise<TaskAttachment[]> => {
+  const response = await api.get(`/tasks/${taskId}/attachments`);
+  return response.data;
+};
+
+export const uploadTaskAttachment = async (taskId: number | string, file: File): Promise<TaskAttachment> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await api.post(`/tasks/${taskId}/attachments`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data;
+};
+
+export const deleteTaskAttachment = async (taskId: number | string, storedName: string): Promise<{ message: string }> => {
+  const response = await api.delete(`/tasks/${taskId}/attachments/${encodeURIComponent(storedName)}`);
+  return response.data;
+};
+
 export const getMyTasks = async (filters?: Omit<TaskFilters, 'assigned_to'>): Promise<TaskListResponse> => {
   const params = new URLSearchParams();
   if (filters) {
@@ -202,6 +229,9 @@ export const tasksAPI = {
   deleteTask,
   completeTask,
   getTaskStats,
+  listTaskAttachments,
+  uploadTaskAttachment,
+  deleteTaskAttachment,
   getMyTasks,
   bulkUpdateTasks,
 };

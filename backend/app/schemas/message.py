@@ -5,6 +5,12 @@ from typing import List, Optional
 class MessageBase(BaseModel):
     content: str
 
+class MessageAttachment(BaseModel):
+    filename: str
+    stored_name: str
+    size_bytes: int
+    content_type: Optional[str] = None
+
 class MessageCreate(MessageBase):
     receiver_id: int
 
@@ -39,6 +45,7 @@ class MessageFull(Message):
     sender_email: str
     receiver_name: str
     receiver_email: str
+    attachment: Optional[MessageAttachment] = None
 
 # Conversation schemas
 class ConversationUser(BaseModel):

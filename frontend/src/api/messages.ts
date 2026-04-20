@@ -23,6 +23,12 @@ export interface Message {
   sender_email: string;
   receiver_name: string;
   receiver_email: string;
+  attachment?: {
+    filename: string;
+    stored_name: string;
+    size_bytes: number;
+    content_type?: string;
+  } | null;
 }
 
 export interface ConversationSummary {

@@ -1,7 +1,9 @@
-from typing import List
+from typing import List, Optional
 import os
 import re
 import uuid
+import json
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -16,10 +18,13 @@ from app.schemas.message import (
     MessageFull, 
     ConversationSummary, 
     ConversationMessages,
-    ConversationUser
+    ConversationUser,
+    MessageAttachment,
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+ATTACHMENT_PREFIX = "[[ATTACHMENT_V2]]"
 
 
 def _safe_filename(name: str) -> str:
@@ -28,11 +33,44 @@ def _safe_filename(name: str) -> str:
     return (cleaned[:200] or "file")
 
 
+def _serialize_attachment_message(
+    *,
+    filename: str,
+    stored_name: str,
+    size_bytes: int,
+    content_type: Optional[str],
+) -> str:
+    payload = {
+        "filename": filename,
+        "stored_name": stored_name,
+        "size_bytes": int(size_bytes),
+        "content_type": content_type or "application/octet-stream",
+    }
+    return f"{ATTACHMENT_PREFIX}{json.dumps(payload, separators=(',', ':'))}"
+
+
+def _parse_attachment_message(content: str) -> Optional[dict]:
+    if not content.startswith(ATTACHMENT_PREFIX):
+        return None
+    raw_payload = content[len(ATTACHMENT_PREFIX):].strip()
+    try:
+        payload = json.loads(raw_payload)
+    except json.JSONDecodeError:
+        return None
+    required = {"filename", "stored_name", "size_bytes"}
+    if not isinstance(payload, dict) or not required.issubset(set(payload.keys())):
+        return None
+    return payload
+
+
 def create_message_response(msg, sender_name: str, sender_email: str, receiver_name: str, receiver_email: str) -> MessageFull:
     """Create MessageFull response with decrypted content"""
+    decrypted_content = decrypt_message_content(msg.content)
+    attachment_payload = _parse_attachment_message(decrypted_content)
+    message_content = decrypted_content if not attachment_payload else f"Attachment: {attachment_payload['filename']}"
     return MessageFull(
         id=msg.id,
-        content=decrypt_message_content(msg.content),  # Decrypt for API response
+        content=message_content,
         sender_id=msg.sender_id,
         receiver_id=msg.receiver_id,
         organization_id=msg.organization_id,
@@ -42,7 +80,17 @@ def create_message_response(msg, sender_name: str, sender_email: str, receiver_n
         sender_name=sender_name,
         sender_email=sender_email,
         receiver_name=receiver_name,
-        receiver_email=receiver_email
+        receiver_email=receiver_email,
+        attachment=(
+            MessageAttachment(
+                filename=str(attachment_payload["filename"]),
+                stored_name=str(attachment_payload["stored_name"]),
+                size_bytes=int(attachment_payload["size_bytes"]),
+                content_type=str(attachment_payload.get("content_type") or "application/octet-stream"),
+            )
+            if attachment_payload
+            else None
+        ),
     )
 
 @router.get("/conversations", response_model=List[ConversationSummary])
@@ -212,7 +260,12 @@ async def send_message_with_attachment(
     with open(path, "wb") as fh:
         fh.write(raw)
 
-    text = f"[Attachment: {file.filename}] ({len(raw)} bytes). Stored as {stored_name}."
+    text = _serialize_attachment_message(
+        filename=file.filename or "attachment",
+        stored_name=stored_name,
+        size_bytes=len(raw),
+        content_type=file.content_type,
+    )
     new_message = message.create_message(
         db=db,
         message_in=MessageCreate(content=text, receiver_id=receiver_id),
@@ -268,14 +321,19 @@ def download_attachment(
     """
     Download a message attachment by stored filename, only if user is a participant.
     """
-    attachment_pattern = f"Stored as {stored_name}"
     candidate_messages = db.query(MessageModel).filter(
         MessageModel.organization_id == current_user.organization_id,
         ((MessageModel.sender_id == current_user.id) | (MessageModel.receiver_id == current_user.id))
     ).all()
 
-    allowed = any(attachment_pattern in decrypt_message_content(msg.content) for msg in candidate_messages)
+    allowed = False
+    for msg in candidate_messages:
+        parsed = _parse_attachment_message(decrypt_message_content(msg.content))
+        if parsed and parsed.get("stored_name") == stored_name:
+            allowed = True
+            break
     if not allowed:
+        logger.warning("Attachment access denied user=%s stored_name=%s", current_user.id, stored_name)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
 
     file_path = os.path.join(settings.UPLOAD_DIR, stored_name)

@@ -700,7 +700,17 @@ export function MessagesPage() {
                             </div>
                           </div>
                         ) : (() => {
-                          const attachment = parseAttachmentMessage(message.content);
+                          const attachment = message.attachment
+                            ? {
+                                fileName: message.attachment.filename,
+                                sizeBytes: message.attachment.size_bytes,
+                                storedName: message.attachment.stored_name,
+                                extension: message.attachment.filename.includes('.')
+                                  ? message.attachment.filename.split('.').pop()?.toUpperCase() || 'FILE'
+                                  : 'FILE',
+                                url: `/api/v1/messages/attachments/${encodeURIComponent(message.attachment.stored_name)}`,
+                              }
+                            : parseAttachmentMessage(message.content);
                           if (attachment) {
                             return (
                               <div

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
-import { Search } from 'lucide-react';
+import { Search, Paperclip, Upload, Trash2 as TrashIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import tasksAPI, { TaskPriority, TaskStatus } from '@/services/tasks';
 import type { Task } from '@/services/tasks';
@@ -27,6 +27,7 @@ export function TaskDetailModal({ task, isOpen, onClose }: TaskDetailModalProps)
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [userPopoverOpen, setUserPopoverOpen] = useState(false);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
   // Helper function to capitalize first letter
   const capitalizeFirstLetter = (str: string) => {
@@ -145,6 +146,50 @@ export function TaskDetailModal({ task, isOpen, onClose }: TaskDetailModalProps)
       console.error('Error deleting task:', error);
     },
   });
+
+  const {
+    data: attachments = [],
+    isLoading: isLoadingAttachments,
+    refetch: refetchAttachments,
+  } = useQuery({
+    queryKey: ['task-attachments', currentTask?.id],
+    queryFn: () => tasksAPI.listTaskAttachments(currentTask!.id),
+    enabled: !!currentTask?.id && isOpen,
+  });
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const handleAttachmentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !currentTask?.id) return;
+    setUploadingAttachment(true);
+    try {
+      await tasksAPI.uploadTaskAttachment(currentTask.id, file);
+      await refetchAttachments();
+      toast.success('Attachment uploaded');
+    } catch {
+      toast.error('Could not upload attachment');
+    } finally {
+      setUploadingAttachment(false);
+    }
+  };
+
+  const handleDeleteAttachment = async (storedName: string) => {
+    if (!currentTask?.id) return;
+    if (!window.confirm('Delete this attachment?')) return;
+    try {
+      await tasksAPI.deleteTaskAttachment(currentTask.id, storedName);
+      await refetchAttachments();
+      toast.success('Attachment deleted');
+    } catch {
+      toast.error('Could not delete attachment');
+    }
+  };
 
   const handleEdit = () => {
     setFormData(currentTask || {});
@@ -491,12 +536,49 @@ export function TaskDetailModal({ task, isOpen, onClose }: TaskDetailModalProps)
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4">
-                  <h4 className="text-sm font-medium text-gray-700">Attachments</h4>
-                  <p className="mt-1 text-sm text-gray-600">
-                    Attachment upload UI is prepared here. Backend task attachment endpoint is not available yet.
-                  </p>
-                  <p className="mt-1 text-xs text-gray-500">TODO: wire file upload when task attachment API is ready.</p>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                      <Paperclip className="h-4 w-4" />
+                      Attachments
+                    </h4>
+                    <label className="inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs cursor-pointer bg-white hover:bg-gray-100">
+                      <Upload className="h-3.5 w-3.5" />
+                      {uploadingAttachment ? 'Uploading...' : 'Upload file'}
+                      <input type="file" className="hidden" onChange={handleAttachmentUpload} disabled={uploadingAttachment} />
+                    </label>
+                  </div>
+                  {isLoadingAttachments ? (
+                    <p className="mt-2 text-sm text-gray-500">Loading attachments...</p>
+                  ) : attachments.length === 0 ? (
+                    <p className="mt-2 text-sm text-gray-500">No attachments yet.</p>
+                  ) : (
+                    <div className="mt-3 space-y-2">
+                      {attachments.map((attachment) => (
+                        <div key={attachment.stored_name} className="flex items-center justify-between rounded border bg-white px-3 py-2">
+                          <a
+                            href={`/api/v1/tasks/${currentTask.id}/attachments/${encodeURIComponent(attachment.stored_name)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-sm text-blue-700 hover:underline"
+                          >
+                            {attachment.filename}
+                          </a>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">{formatFileSize(attachment.size_bytes)}</span>
+                            <button
+                              type="button"
+                              className="text-red-600 hover:text-red-700"
+                              onClick={() => handleDeleteAttachment(attachment.stored_name)}
+                              aria-label="Delete attachment"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Action Buttons */}
