@@ -1,26 +1,10 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from app.core.config import settings
+"""
+Legacy DB module kept for compatibility with older imports.
 
-# Create database URL
-SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
-
-# Create engine
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    pool_size=settings.MYSQL_POOL_SIZE,
-    max_overflow=settings.MYSQL_MAX_OVERFLOW,
-    pool_timeout=settings.MYSQL_POOL_TIMEOUT,
-    pool_pre_ping=True,
-    pool_recycle=1800
-)
-
-# Create session
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Create base model
-Base = declarative_base()
+Use the canonical SQLAlchemy objects from app.db.base to avoid creating
+additional connection pools in the same process.
+"""
+from app.db.base import engine, SessionLocal, Base
 
 # Database dependency
 def get_db():

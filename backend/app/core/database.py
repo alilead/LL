@@ -1,21 +1,10 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from app.core.config import settings
+"""
+Core DB compatibility module.
 
-# Create SQLAlchemy engine
-engine = create_engine(
-    settings.DATABASE_URL,
-    pool_size=settings.MYSQL_POOL_SIZE,
-    max_overflow=settings.MYSQL_MAX_OVERFLOW,
-    pool_timeout=settings.MYSQL_POOL_TIMEOUT
-)
-
-# Create SessionLocal class
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Create Base class
-Base = declarative_base()
+Re-export shared engine/session from app.db.base so the app maintains a
+single SQLAlchemy pool instead of multiple independent pools.
+"""
+from app.db.base import engine, SessionLocal, Base
 
 # Dependency to get DB session
 def get_db():
