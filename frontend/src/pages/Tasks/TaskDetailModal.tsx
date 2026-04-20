@@ -12,6 +12,7 @@ import tasksAPI, { TaskPriority, TaskStatus } from '@/services/tasks';
 import type { Task } from '@/services/tasks';
 import { toast } from 'react-hot-toast';
 import usersAPI, { User } from '@/services/api/users';
+import { openAttachmentInNewTab, taskAttachmentUrl } from '@/lib/apiAttachmentUrls';
 
 interface TaskDetailModalProps {
   task: Task | null;
@@ -28,6 +29,7 @@ export function TaskDetailModal({ task, isOpen, onClose }: TaskDetailModalProps)
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [userPopoverOpen, setUserPopoverOpen] = useState(false);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [openingTaskAttachmentKey, setOpeningTaskAttachmentKey] = useState<string | null>(null);
 
   // Helper function to capitalize first letter
   const capitalizeFirstLetter = (str: string) => {
@@ -556,14 +558,29 @@ export function TaskDetailModal({ task, isOpen, onClose }: TaskDetailModalProps)
                     <div className="mt-3 space-y-2">
                       {attachments.map((attachment) => (
                         <div key={attachment.stored_name} className="flex items-center justify-between rounded border bg-white px-3 py-2">
-                          <a
-                            href={`/api/v1/tasks/${currentTask.id}/attachments/${encodeURIComponent(attachment.stored_name)}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-sm text-blue-700 hover:underline"
+                          <button
+                            type="button"
+                            disabled={openingTaskAttachmentKey === `${currentTask.id}-${attachment.stored_name}`}
+                            onClick={async () => {
+                              const key = `${currentTask.id}-${attachment.stored_name}`;
+                              try {
+                                setOpeningTaskAttachmentKey(key);
+                                await openAttachmentInNewTab(
+                                  taskAttachmentUrl(currentTask.id, attachment.stored_name)
+                                );
+                              } catch (e) {
+                                console.error(e);
+                                toast.error('Could not open attachment');
+                              } finally {
+                                setOpeningTaskAttachmentKey(null);
+                              }
+                            }}
+                            className="text-sm text-blue-700 hover:underline text-left disabled:opacity-50"
                           >
-                            {attachment.filename}
-                          </a>
+                            {openingTaskAttachmentKey === `${currentTask.id}-${attachment.stored_name}`
+                              ? 'Opening…'
+                              : attachment.filename}
+                          </button>
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-gray-500">{formatFileSize(attachment.size_bytes)}</span>
                             <button

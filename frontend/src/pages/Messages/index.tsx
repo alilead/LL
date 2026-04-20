@@ -7,6 +7,7 @@ import { Card } from '../../components/ui/Card';
 import { useAuth } from '../../hooks/useAuth';
 import { onlineActivityService } from '../../services/onlineActivityService';
 import toast from 'react-hot-toast';
+import { messageAttachmentUrl, openAttachmentInNewTab } from '@/lib/apiAttachmentUrls';
 
 export function MessagesPage() {
   const { user } = useAuth();
@@ -27,6 +28,7 @@ export function MessagesPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [openingAttachmentKey, setOpeningAttachmentKey] = useState<string | null>(null);
 
   // Auto scroll to bottom when new messages arrive
   useEffect(() => {
@@ -368,7 +370,6 @@ export function MessagesPage() {
       sizeBytes,
       storedName,
       extension: extension || 'FILE',
-      url: `/api/v1/messages/attachments/${encodeURIComponent(storedName)}`,
     };
   };
 
@@ -723,10 +724,10 @@ export function MessagesPage() {
                                 extension: message.attachment.filename.includes('.')
                                   ? message.attachment.filename.split('.').pop()?.toUpperCase() || 'FILE'
                                   : 'FILE',
-                                url: `/api/v1/messages/attachments/${encodeURIComponent(message.attachment.stored_name)}`,
                               }
                             : parseAttachmentMessage(message.content);
                           if (attachment) {
+                            const attKey = `${message.id}-${attachment.storedName}`;
                             return (
                               <div
                                 className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${
@@ -742,14 +743,26 @@ export function MessagesPage() {
                                       {attachment.extension} · {formatFileSize(attachment.sizeBytes)}
                                     </p>
                                   </div>
-                                  <a
-                                    href={attachment.url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className={`text-xs underline ${isOwnMessage ? 'text-white' : 'text-purple-600'}`}
+                                  <button
+                                    type="button"
+                                    disabled={openingAttachmentKey === attKey}
+                                    onClick={async () => {
+                                      try {
+                                        setOpeningAttachmentKey(attKey);
+                                        await openAttachmentInNewTab(
+                                          messageAttachmentUrl(attachment.storedName)
+                                        );
+                                      } catch (err) {
+                                        console.error(err);
+                                        toast.error('Could not open attachment');
+                                      } finally {
+                                        setOpeningAttachmentKey(null);
+                                      }
+                                    }}
+                                    className={`text-xs underline disabled:opacity-50 ${isOwnMessage ? 'text-white' : 'text-purple-600'}`}
                                   >
-                                    Open
-                                  </a>
+                                    {openingAttachmentKey === attKey ? 'Opening…' : 'Open'}
+                                  </button>
                                 </div>
                                 <p
                                   className={`text-xs mt-2 ${
