@@ -19,8 +19,18 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
 
-# Properties to receive via API on update
-class UserUpdate(UserBase):
+# Properties to receive via API on update (all optional for PATCH/partial updates)
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    company: Optional[str] = None
+    job_title: Optional[str] = None
+    is_active: Optional[bool] = None
+    is_superuser: Optional[bool] = None
+    is_admin: Optional[bool] = None
+    organization_id: Optional[int] = None
     password: Optional[str] = None
 
 class UserInDBBase(UserBase):

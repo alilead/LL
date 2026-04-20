@@ -84,6 +84,26 @@ const TeamManagement: React.FC = () => {
   const { user } = useAuthStore();
   const [selectedExistingUserId, setSelectedExistingUserId] = useState<string>('');
 
+  const getErrorMessage = (error: any, fallback: string) => {
+    const detail = error?.response?.data?.detail;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+      return detail
+        .map((entry: any) => {
+          if (typeof entry === 'string') return entry;
+          if (entry?.msg) return String(entry.msg);
+          return null;
+        })
+        .filter(Boolean)
+        .join(', ') || fallback;
+    }
+    if (detail && typeof detail === 'object') {
+      if (typeof detail.msg === 'string') return detail.msg;
+      return fallback;
+    }
+    return error?.message || fallback;
+  };
+
   // Form setup
   const form = useForm<InviteFormData>({
     resolver: zodResolver(inviteSchema),
@@ -154,7 +174,7 @@ const TeamManagement: React.FC = () => {
       toast.success('Team invitation sent successfully!');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Failed to send invitation');
+      toast.error(getErrorMessage(error, 'Failed to send invitation'));
     },
   });
 
@@ -166,7 +186,7 @@ const TeamManagement: React.FC = () => {
       toast.success('Invitation cancelled successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Failed to cancel invitation');
+      toast.error(getErrorMessage(error, 'Failed to cancel invitation'));
     },
   });
 
@@ -177,7 +197,7 @@ const TeamManagement: React.FC = () => {
       toast.success('Invitation resent successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Failed to resend invitation');
+      toast.error(getErrorMessage(error, 'Failed to resend invitation'));
     },
   });
 
@@ -193,7 +213,7 @@ const TeamManagement: React.FC = () => {
       toast.success('Existing user added to your organization');
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.detail || 'Could not add existing user');
+      toast.error(getErrorMessage(error, 'Could not add existing user'));
     },
   });
 
