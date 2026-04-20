@@ -752,9 +752,11 @@ export function MessagesPage() {
                                         await openAttachmentInNewTab(
                                           messageAttachmentUrl(attachment.storedName)
                                         );
-                                      } catch (err) {
+                                      } catch (err: unknown) {
                                         console.error(err);
-                                        toast.error('Could not open attachment');
+                                        const msg =
+                                          err instanceof Error ? err.message : 'Could not open attachment';
+                                        toast.error(msg);
                                       } finally {
                                         setOpeningAttachmentKey(null);
                                       }

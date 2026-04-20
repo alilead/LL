@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, Boolean, LargeBinary
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 from datetime import datetime
@@ -17,6 +17,10 @@ class Message(Base):
     sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     receiver_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+
+    # Optional binary storage for chat attachments (survives ephemeral server disk e.g. Render)
+    attachment_blob = Column(LargeBinary, nullable=True)
+    attachment_content_type = Column(String(255), nullable=True)
 
     # Relationships
     sender = relationship("User", foreign_keys=[sender_id], back_populates="sent_messages")

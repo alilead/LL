@@ -26,7 +26,15 @@ export async function fetchAttachmentWithAuth(url: string): Promise<Blob> {
     credentials: 'include',
   });
   if (!res.ok) {
-    throw new Error(`Attachment request failed: ${res.status}`);
+    let detail = `Request failed (${res.status})`;
+    try {
+      const j = await res.json();
+      if (typeof j.detail === 'string') detail = j.detail;
+      else if (j.detail) detail = JSON.stringify(j.detail);
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
   }
   return res.blob();
 }

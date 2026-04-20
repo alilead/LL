@@ -5,7 +5,7 @@ import uuid
 import json
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 from app.api import deps
 from app.crud.crud_message import message
@@ -254,12 +254,7 @@ async def send_message_with_attachment(
             detail="File exceeds maximum upload size",
         )
 
-    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     stored_name = f"{uuid.uuid4().hex}_{_safe_filename(file.filename)}"
-    path = os.path.join(settings.UPLOAD_DIR, stored_name)
-    with open(path, "wb") as fh:
-        fh.write(raw)
-
     text = _serialize_attachment_message(
         filename=file.filename or "attachment",
         stored_name=stored_name,
@@ -272,9 +267,19 @@ async def send_message_with_attachment(
         sender_id=current_user.id,
         organization_id=current_user.organization_id,
     )
+    # Persist bytes in DB so attachments work after redeploy (ephemeral disk on PaaS)
+    db.query(MessageModel).filter(MessageModel.id == new_message.id).update(
+        {
+            "attachment_blob": raw,
+            "attachment_content_type": (file.content_type or "application/octet-stream")[:255],
+        },
+        synchronize_session=False,
+    )
+    db.commit()
+    updated = db.query(MessageModel).filter(MessageModel.id == new_message.id).first()
 
     return create_message_response(
-        new_message,
+        updated,
         current_user.full_name,
         current_user.email,
         receiver.full_name,
@@ -326,19 +331,39 @@ def download_attachment(
         ((MessageModel.sender_id == current_user.id) | (MessageModel.receiver_id == current_user.id))
     ).all()
 
-    allowed = False
+    matching_msg: Optional[MessageModel] = None
+    parsed_meta: Optional[dict] = None
     for msg in candidate_messages:
         parsed = _parse_attachment_message(decrypt_message_content(msg.content))
         if parsed and parsed.get("stored_name") == stored_name:
-            allowed = True
+            matching_msg = msg
+            parsed_meta = parsed
             break
-    if not allowed:
+    if not matching_msg:
         logger.warning("Attachment access denied user=%s stored_name=%s", current_user.id, stored_name)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
 
+    if matching_msg.attachment_blob:
+        media = (
+            matching_msg.attachment_content_type
+            or (parsed_meta.get("content_type") if parsed_meta else None)
+            or "application/octet-stream"
+        )
+        filename = (parsed_meta or {}).get("filename") or stored_name
+        return Response(
+            content=bytes(matching_msg.attachment_blob),
+            media_type=str(media),
+            headers={
+                "Content-Disposition": f'inline; filename="{_safe_filename(str(filename))}"',
+            },
+        )
+
     file_path = os.path.join(settings.UPLOAD_DIR, stored_name)
     if not os.path.isfile(file_path):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment file not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Attachment file is missing from storage (e.g. after a server redeploy). Ask the sender to resend the file.",
+        )
 
     return FileResponse(path=file_path, filename=stored_name, media_type="application/octet-stream")
 
