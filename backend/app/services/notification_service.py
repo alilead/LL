@@ -1,4 +1,5 @@
 from typing import Optional, List
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from app.models.notification import Notification
 from app.models.user import User
@@ -137,10 +138,10 @@ class NotificationService:
         organization_id: int
     ):
         """Notify organization managers when a new user registers"""
-        # Get organization managers
+        # Notify users who can manage the org (DB column is `role`, not organization_role)
         managers = db.query(User).filter(
             User.organization_id == organization_id,
-            User.organization_role == "MANAGER"
+            or_(User.role == "manager", User.role == "admin"),
         ).all()
         
         notifications = []

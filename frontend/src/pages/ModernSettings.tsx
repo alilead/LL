@@ -813,6 +813,7 @@ type OrgMemberRow = {
 
 function TeamSettings() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const { data: members = [], isLoading, error } = useQuery({
     queryKey: ['organization-users-settings'],
     queryFn: async () => {
@@ -844,8 +845,26 @@ function TeamSettings() {
         </button>
       </div>
 
-      <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
-        People in your organization. Admins can add users from the Admin panel.
+      <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4 max-w-2xl">
+        This list matches your organization directory: the same people appear in Team management, task
+        assignees, and Messages when you start a new conversation (everyone except you).
+        Use <span className="font-medium text-neutral-800 dark:text-neutral-200">Invite / manage users</span> to
+        invite or move members.
+        {user?.is_admin ? (
+          <>
+            {' '}
+            As an admin, you can also open the{' '}
+            <button
+              type="button"
+              className="text-primary-600 hover:text-primary-700 font-medium underline-offset-2 hover:underline"
+              onClick={() => navigate('/admin')}
+            >
+              Admin panel
+            </button>
+            {' '}
+            for broader user management.
+          </>
+        ) : null}
       </p>
 
       {isLoading && (

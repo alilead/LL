@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { Search, Send, Plus, Users, MoreVertical, Phone, Video, Info, Smile, Paperclip, Hash, AtSign, ExternalLink } from 'lucide-react';
 import { messagesApi, ConversationSummary, ConversationMessages, Message, ConversationUser } from '../../api/messages';
 import { Button } from '../../components/ui/Button';
@@ -443,6 +444,20 @@ export function MessagesPage() {
                 <div className="p-8 text-center text-gray-500">
                   <Users className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                   <p className="text-sm">{searchText ? 'No teammates found' : 'No teammates available'}</p>
+                  {!searchText && (
+                    <p className="text-xs text-gray-400 mt-3 max-w-xs mx-auto leading-relaxed">
+                      Teammates are everyone in your organization (you are not listed here). Add or invite people
+                      under{' '}
+                      <Link to="/settings/team" className="text-purple-600 hover:underline font-medium">
+                        Settings → Team
+                      </Link>{' '}
+                      or{' '}
+                      <Link to="/team-management" className="text-purple-600 hover:underline font-medium">
+                        Team management
+                      </Link>
+                      .
+                    </p>
+                  )}
                 </div>
               ) : (
                 filteredUsers.map((user) => (

@@ -145,8 +145,9 @@ class User(Base):
 
     @property
     def is_organization_manager(self) -> bool:
-        """Check if user is organization manager"""
-        return self.organization_role == OrganizationRole.MANAGER
+        """Check if user is organization manager (DB stores `role`, not organization_role)."""
+        r = (self.role or "").lower()
+        return r in ("manager", "org_manager", "organization_manager")
     
     @property
     def can_manage_organization(self) -> bool:
@@ -158,10 +159,12 @@ class User(Base):
         """Get display role for UI"""
         if self.is_admin:
             return "Administrator"
-        elif self.is_organization_manager:
+        if self.is_organization_manager:
             return "Organization Manager"
-        else:
-            return self.organization_role.value.lower().title()
+        r = (self.role or "").lower()
+        if r == "viewer":
+            return "Viewer"
+        return "Member"
 
     def __repr__(self) -> str:
         return f"<User {self.email}>"

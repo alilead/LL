@@ -17,6 +17,28 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
+def _organization_role_for_api(user: UserModel) -> str:
+    """
+    Map DB user to API organization_role (viewer | member | manager).
+    Production DB uses `users.role`; `organization_role` may not exist on the model.
+    """
+    raw = getattr(user, "organization_role", None)
+    if raw is not None:
+        if hasattr(raw, "value"):
+            return str(raw.value).lower()
+        return str(raw).lower()
+    role_val = getattr(user, "role", None) or ""
+    r = str(role_val).strip().lower()
+    if r in ("admin", "superuser", "super_admin"):
+        return "manager"
+    if r in ("manager", "org_manager", "organization_manager"):
+        return "manager"
+    if r in ("viewer", "read_only"):
+        return "viewer"
+    return "member"
+
+
 _AVATAR_ALLOWED_TYPES = frozenset({"image/jpeg", "image/png", "image/gif", "image/webp"})
 _AVATAR_MAX_BYTES = 2 * 1024 * 1024  # 2MB
 _AVATAR_SUFFIX = {
@@ -254,19 +276,13 @@ def get_organization_users(
         user_responses = []
         for user in users:
             try:
-                # Safely convert organization_role - handle enum, string, or None
-                org_role = "member"  # default
-                if user.organization_role:
-                    if hasattr(user.organization_role, 'value'):
-                        org_role = str(user.organization_role.value).lower()
-                    else:
-                        org_role = str(user.organization_role).lower()
+                org_role = _organization_role_for_api(user)
 
                 user_response = UserResponse(
                     id=int(user.id),
                     email=str(user.email),
-                    first_name=str(user.first_name),
-                    last_name=str(user.last_name),
+                    first_name=user.first_name or "",
+                    last_name=user.last_name or "",
                     is_active=bool(user.is_active),
                     is_admin=bool(user.is_admin),
                     organization_id=int(user.organization_id),
