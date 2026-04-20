@@ -1,14 +1,18 @@
 import api from '@/lib/axios';
 
-// Backend-Go compatible TeamInvitation types
 export interface TeamInvitation {
-  id: string;
+  id: number;
   email: string;
-  role: string;
-  organization_id: string;
-  invited_by: string;
-  status: 'pending' | 'accepted' | 'declined' | 'expired';
+  first_name?: string;
+  last_name?: string;
+  role: 'manager' | 'member' | 'viewer' | 'admin';
+  organization_id: number;
+  invited_by_id?: number;
+  invited_by_name?: string;
+  organization_name?: string;
+  status: 'pending' | 'accepted' | 'cancelled' | 'expired';
   expires_at: string;
+  message?: string;
   created_at: string;
   updated_at: string;
 }
@@ -16,47 +20,20 @@ export interface TeamInvitation {
 export interface InvitationCreateInput {
   email: string;
   role: string;
-}
-
-export interface InvitationListResponse {
-  invitations: TeamInvitation[];
-  total: number;
-  page: number;
-  limit: number;
-  has_more: boolean;
-}
-
-export interface InvitationFilters {
-  status?: string;
-  role?: string;
-  page?: number;
-  limit?: number;
+  first_name?: string;
+  last_name?: string;
+  message?: string;
 }
 
 export interface InvitationAcceptInput {
-  token: string;
   password: string;
-  first_name: string;
-  last_name: string;
+  first_name?: string;
+  last_name?: string;
 }
 
 // Team Invitation API endpoints
-export const getInvitations = async (filters?: InvitationFilters): Promise<InvitationListResponse> => {
-  const params = new URLSearchParams();
-  if (filters) {
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        params.append(key, value.toString());
-      }
-    });
-  }
-  
-  const response = await api.get(`/team-invitations?${params.toString()}`);
-  return response.data;
-};
-
-export const getInvitation = async (id: string): Promise<TeamInvitation> => {
-  const response = await api.get(`/team-invitations/${id}`);
+export const getInvitations = async (status?: string): Promise<TeamInvitation[]> => {
+  const response = await api.get('/team-invitations', { params: status ? { status } : undefined });
   return response.data;
 };
 
@@ -65,90 +42,39 @@ export const createInvitation = async (data: InvitationCreateInput): Promise<Tea
   return response.data;
 };
 
-export const resendInvitation = async (id: string): Promise<{ message: string }> => {
+export const resendInvitation = async (id: number): Promise<{ message: string }> => {
   const response = await api.post(`/team-invitations/${id}/resend`);
   return response.data;
 };
 
-export const cancelInvitation = async (id: string): Promise<{ message: string }> => {
+export const cancelInvitation = async (id: number): Promise<{ message: string }> => {
   const response = await api.delete(`/team-invitations/${id}`);
   return response.data;
 };
 
-export const acceptInvitation = async (data: InvitationAcceptInput): Promise<{ message: string; user: any }> => {
-  const response = await api.post('/team-invitations/accept', data);
+export const getInvitationByToken = async (token: string): Promise<TeamInvitation> => {
+  const response = await api.get(`/team-invitations/token/${token}`);
   return response.data;
 };
 
-export const declineInvitation = async (token: string): Promise<{ message: string }> => {
-  const response = await api.post('/team-invitations/decline', { token });
+export const acceptInvitation = async (token: string, data: InvitationAcceptInput): Promise<{ message: string; user_id: number }> => {
+  const response = await api.post(`/team-invitations/accept/${token}`, data);
   return response.data;
 };
 
-export const validateInvitation = async (token: string): Promise<TeamInvitation> => {
-  const response = await api.get(`/team-invitations/validate/${token}`);
+export const getStats = async (): Promise<Record<string, number>> => {
+  const response = await api.get('/team-invitations/stats');
   return response.data;
 };
 
-// teamInvitationsAPI export'u ekleniyor
 export const teamInvitationsAPI = {
-  getAll: async (filters?: InvitationFilters): Promise<InvitationListResponse> => {
-    const params = new URLSearchParams();
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          params.append(key, value.toString());
-        }
-      });
-    }
-    
-    const response = await api.get(`/team-invitations?${params.toString()}`);
-    return response.data;
-  },
-
-  getById: async (id: string): Promise<TeamInvitation> => {
-    const response = await api.get(`/team-invitations/${id}`);
-    return response.data;
-  },
-
-  create: async (data: InvitationCreateInput): Promise<TeamInvitation> => {
-    const response = await api.post('/team-invitations', data);
-    return response.data;
-  },
-
-  resend: async (id: string): Promise<{ message: string }> => {
-    const response = await api.post(`/team-invitations/${id}/resend`);
-    return response.data;
-  },
-
-  cancel: async (id: string): Promise<{ message: string }> => {
-    const response = await api.delete(`/team-invitations/${id}`);
-    return response.data;
-  },
-
-  accept: async (data: InvitationAcceptInput): Promise<{ message: string; user: any }> => {
-    const response = await api.post('/team-invitations/accept', data);
-    return response.data;
-  },
-
-  decline: async (token: string): Promise<{ message: string }> => {
-    const response = await api.post('/team-invitations/decline', { token });
-    return response.data;
-  },
-
-  validate: async (token: string): Promise<TeamInvitation> => {
-    const response = await api.get(`/team-invitations/validate/${token}`);
-    return response.data;
-  }
-};
-
-export default {
   getInvitations,
-  getInvitation,
   createInvitation,
   resendInvitation,
   cancelInvitation,
+  getInvitationByToken,
   acceptInvitation,
-  declineInvitation,
-  validateInvitation,
+  getStats,
 };
+
+export default teamInvitationsAPI;

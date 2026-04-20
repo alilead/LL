@@ -26,7 +26,7 @@ const tabs: Tab[] = [
   },
   {
     id: 'users',
-    title: 'User Management',
+    title: 'Admin Users',
     description: 'Manage system users and their permissions.',
     icon: Users,
     component: UserManagement,

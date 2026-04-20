@@ -837,7 +837,7 @@ function TeamSettings() {
         </h2>
         <button
           type="button"
-          onClick={() => navigate('/admin')}
+          onClick={() => navigate('/team-management')}
           className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
         >
           Invite / manage users

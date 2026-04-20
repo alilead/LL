@@ -38,12 +38,6 @@ interface TeamInvitation {
   expires_at: string;
 }
 
-interface InvitationTokenData {
-  invitation: TeamInvitation;
-  is_valid: boolean;
-  is_expired: boolean;
-}
-
 // Form schema
 const acceptInvitationSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
@@ -60,7 +54,7 @@ type AcceptInvitationFormData = z.infer<typeof acceptInvitationSchema>;
 const AcceptInvitation: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
-  const [invitationData, setInvitationData] = useState<InvitationTokenData | null>(null);
+  const [invitationData, setInvitationData] = useState<TeamInvitation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAccepting, setIsAccepting] = useState(false);
 
@@ -89,11 +83,11 @@ const AcceptInvitation: React.FC = () => {
         setInvitationData(response.data);
         
         // Pre-fill form with invitation data
-        if (response.data.invitation.first_name) {
-          form.setValue('first_name', response.data.invitation.first_name);
+        if (response.data.first_name) {
+          form.setValue('first_name', response.data.first_name);
         }
-        if (response.data.invitation.last_name) {
-          form.setValue('last_name', response.data.invitation.last_name);
+        if (response.data.last_name) {
+          form.setValue('last_name', response.data.last_name);
         }
       } catch (error: any) {
         toast.error(error.response?.data?.detail || 'Failed to load invitation');
@@ -118,10 +112,8 @@ const AcceptInvitation: React.FC = () => {
         last_name: data.last_name,
       });
 
-      // Store the token and redirect to dashboard
-      localStorage.setItem('token', response.data.access_token);
-      toast.success('Welcome to the team! Your account has been created successfully.');
-      navigate('/dashboard');
+      toast.success('Invitation accepted. You can now sign in.');
+      navigate('/signin');
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'Failed to accept invitation');
     } finally {
@@ -190,7 +182,7 @@ const AcceptInvitation: React.FC = () => {
     );
   }
 
-  if (!invitationData || !invitationData.is_valid) {
+  if (!invitationData) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card className="w-full max-w-md">
@@ -209,7 +201,7 @@ const AcceptInvitation: React.FC = () => {
     );
   }
 
-  if (invitationData.is_expired) {
+  if (new Date(invitationData.expires_at).getTime() < Date.now()) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card className="w-full max-w-md">
@@ -228,7 +220,7 @@ const AcceptInvitation: React.FC = () => {
     );
   }
 
-  const { invitation } = invitationData;
+  const invitation = invitationData;
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">

@@ -118,6 +118,11 @@ const navigation: NavItem[] = [
     path: '/conversations',
   },
   {
+    name: 'Invoice Creation',
+    icon: FileText,
+    path: '/invoices/new',
+  },
+  {
     name: 'Reports',
     icon: BarChart3,
     path: '/reports',
@@ -159,6 +164,9 @@ export function ModernSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, avatarRevision } = useAuthStore();
+  const visibleNavigation = user?.is_admin
+    ? [...navigation, { name: 'Admin Users', icon: Users, path: '/admin' }]
+    : navigation;
 
   useEffect(() => {
     if (!user?.id) {
@@ -257,7 +265,7 @@ export function ModernSidebar({ onNavigate }: { onNavigate?: () => void }) {
 
       {/* Main Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navigation.map((item) => {
+        {visibleNavigation.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.path);
           const isExpanded = expandedItems.includes(item.name);
