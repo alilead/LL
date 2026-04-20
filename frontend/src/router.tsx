@@ -47,6 +47,10 @@ import { ModernWorkflowNew } from './pages/ModernWorkflowNew'
 import { ModernConversationUpload } from './pages/ModernConversationUpload'
 import { SequenceBuilder } from './pages/EmailSequences'
 import { ModernNotifications } from './pages/ModernNotifications'
+import TeamManagement from './pages/TeamManagement'
+import AcceptInvitation from './pages/AcceptInvitation'
+import { InvoiceMaker } from './pages/Admin/InvoiceMaker'
+import RecordingDetail from './pages/ConversationIntelligence/RecordingDetail'
 
 export const router = createBrowserRouter([
   {
@@ -184,6 +188,14 @@ export const router = createBrowserRouter([
             element: <ModernTeam />
           },
           {
+            path: '/team-management',
+            element: <TeamManagement />
+          },
+          {
+            path: '/invoices/new',
+            element: <InvoiceMaker />
+          },
+          {
             path: '/emails',
             element: <ModernEmails />
           },
@@ -256,6 +268,10 @@ export const router = createBrowserRouter([
             element: <ModernConversations />
           },
           {
+            path: '/conversations/recordings/:id',
+            element: <RecordingDetail />
+          },
+          {
             path: '/conversations/upload',
             element: <ModernConversationUpload />
           },
@@ -274,6 +290,10 @@ export const router = createBrowserRouter([
         ]
       }
     ]
+  },
+  {
+    path: '/invite/:token',
+    element: <AcceptInvitation />
   },
   {
     path: '/linkedin/callback',

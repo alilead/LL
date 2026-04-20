@@ -22,6 +22,7 @@ export interface CallRecording {
   call_date: string;
   created_at: string;
   analyzed_at?: string;
+  lead_name?: string;
 }
 
 export interface ConversationInsight {
@@ -56,6 +57,11 @@ export const conversationsAPI = {
 
   getRecording: async (id: number): Promise<CallRecording> => {
     const response = await api.get(`/conversations/recordings/${id}`);
+    return response.data;
+  },
+
+  deleteRecording: async (id: number): Promise<{ message: string }> => {
+    const response = await api.delete(`/conversations/recordings/${id}`);
     return response.data;
   },
 

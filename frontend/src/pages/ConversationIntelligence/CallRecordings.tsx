@@ -1,25 +1,60 @@
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { conversationsAPI, CallRecording } from '@/services/api/conversations';
+import { leadsAPI } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { PageContainer } from '@/components/ui/PageContainer';
 import { Badge } from '@/components/ui/Badge';
 import {
-  Phone, Play, FileText, TrendingUp, MessageSquare, Users,
-  Clock, CheckCircle, Loader2, AlertCircle, Mic
+  Phone, Play, FileText, TrendingUp, Users,
+  Clock, CheckCircle, Loader2, AlertCircle, Mic, Trash2
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
+  const handlePlayRecording = async (recording: CallRecording) => {
+    try {
+      const response = await fetch(recording.recording_url, { method: 'HEAD' });
+      if (!response.ok) {
+        console.error('Recording playback fetch failed', { recordingId: recording.id, status: response.status });
+        toast.error('Recording is unavailable right now.');
+        return;
+      }
+      window.open(recording.recording_url, '_blank');
+    } catch (error) {
+      console.error('Recording playback fetch failed', { recordingId: recording.id, error });
+      toast.error('Could not open recording.');
+    }
+  };
+
 
 export const CallRecordings: React.FC = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // Fetch recordings
   const { data: recordings, isLoading } = useQuery({
     queryKey: ['call-recordings'],
     queryFn: () => conversationsAPI.getRecordings()
   });
+
+  const { data: leadsResponse } = useQuery({
+    queryKey: ['leads-for-recordings'],
+    queryFn: () => leadsAPI.getAll({ limit: 500 }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => conversationsAPI.deleteRecording(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['call-recordings'] });
+    },
+  });
+
+  const leads = leadsResponse?.data?.results || [];
+  const leadNameById = new Map<number, string>(
+    leads.map((lead) => [lead.id, `${lead.first_name} ${lead.last_name}`.trim()])
+  );
 
   // Fetch analytics
   const { data: analytics } = useQuery({
@@ -182,7 +217,7 @@ export const CallRecordings: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-1">
                           <Users className="h-4 w-4" />
-                          <span>Lead #{recording.lead_id}</span>
+                          <span>{recording.lead_name || leadNameById.get(recording.lead_id) || `Lead #${recording.lead_id}`}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Phone className="h-4 w-4" />
@@ -228,16 +263,36 @@ export const CallRecordings: React.FC = () => {
                     </div>
 
                     <div className="flex flex-col gap-2">
-                      <Button variant="outline" size="sm">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePlayRecording(recording);
+                        }}
+                      >
                         <Play className="h-4 w-4 mr-1" />
                         Play
                       </Button>
                       {recording.transcript && (
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={(e) => e.stopPropagation()}>
                           <FileText className="h-4 w-4 mr-1" />
                           Transcript
                         </Button>
                       )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm('Delete this recording?')) {
+                            deleteMutation.mutate(recording.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
