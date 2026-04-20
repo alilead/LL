@@ -29,6 +29,7 @@ import {
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
+import { featureFlags } from '@/config/featureFlags';
 
 interface CommandItem {
   id: string;
@@ -116,27 +117,33 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
       action: () => navigate('/cpq/quotes'),
       category: 'navigation',
     },
-    {
-      id: 'nav-forecasting',
-      title: 'Go to Forecasting',
-      icon: <TrendingUp className="w-4 h-4" />,
-      action: () => navigate('/forecasting'),
-      category: 'navigation',
-    },
-    {
-      id: 'nav-workflows',
-      title: 'Go to Workflows',
-      icon: <Workflow className="w-4 h-4" />,
-      action: () => navigate('/workflows'),
-      category: 'navigation',
-    },
-    {
-      id: 'nav-data-import',
-      title: 'Go to Data Import',
-      icon: <Database className="w-4 h-4" />,
-      action: () => navigate('/data-import/wizard'),
-      category: 'navigation',
-    },
+    ...(featureFlags.navigation.showForecasting
+      ? [{
+          id: 'nav-forecasting',
+          title: 'Go to Forecasting',
+          icon: <TrendingUp className="w-4 h-4" />,
+          action: () => navigate('/forecasting'),
+          category: 'navigation' as const,
+        }]
+      : []),
+    ...(featureFlags.navigation.showMindMapping
+      ? [{
+          id: 'nav-mind-mapping',
+          title: 'Go to Mind Mapping',
+          icon: <Workflow className="w-4 h-4" />,
+          action: () => navigate('/workflows'),
+          category: 'navigation' as const,
+        }]
+      : []),
+    ...(featureFlags.navigation.showDataImport
+      ? [{
+          id: 'nav-data-import',
+          title: 'Go to Data Import',
+          icon: <Database className="w-4 h-4" />,
+          action: () => navigate('/data-import/wizard'),
+          category: 'navigation' as const,
+        }]
+      : []),
     {
       id: 'nav-settings',
       title: 'Go to Settings',
@@ -170,13 +177,15 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
       shortcut: 'CMD+T',
       category: 'actions',
     },
-    {
-      id: 'action-send-email',
-      title: 'Send Email',
-      icon: <Mail className="w-4 h-4" />,
-      action: () => navigate('/emails'),
-      category: 'actions',
-    },
+    ...(featureFlags.navigation.showEmail
+      ? [{
+          id: 'action-send-email',
+          title: 'Send Email',
+          icon: <Mail className="w-4 h-4" />,
+          action: () => navigate('/emails'),
+          category: 'actions' as const,
+        }]
+      : []),
   ];
 
   // Filter commands based on query

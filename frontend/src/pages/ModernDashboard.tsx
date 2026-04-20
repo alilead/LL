@@ -185,7 +185,11 @@ export function ModernDashboard() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {/* Total Leads */}
-        <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 border border-neutral-200 dark:border-neutral-700 shadow-sm">
+        <button
+          type="button"
+          onClick={() => navigate('/leads')}
+          className="text-left bg-white dark:bg-neutral-800 rounded-xl p-6 border border-neutral-200 dark:border-neutral-700 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+        >
           <div className="flex items-center justify-between mb-4">
             <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
               <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -207,10 +211,14 @@ export function ModernDashboard() {
               </span>
             )}
           </p>
-        </div>
+        </button>
 
         {/* Pipeline Value */}
-        <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 border border-neutral-200 dark:border-neutral-700 shadow-sm">
+        <button
+          type="button"
+          onClick={() => navigate('/deals')}
+          className="text-left bg-white dark:bg-neutral-800 rounded-xl p-6 border border-neutral-200 dark:border-neutral-700 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+        >
           <div className="flex items-center justify-between mb-4">
             <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
               <DollarSign className="w-6 h-6 text-green-600 dark:text-green-400" />
@@ -224,29 +232,37 @@ export function ModernDashboard() {
           <h3 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-1">
             {formatPipelineUsd(pipelineValue)}
           </h3>
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">Pipeline Value</p>
-        </div>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">Sales Pipeline</p>
+        </button>
 
-        {/* Conversion Rate */}
-        <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 border border-neutral-200 dark:border-neutral-700 shadow-sm">
+        {/* Tasks */}
+        <button
+          type="button"
+          onClick={() => navigate('/tasks')}
+          className="text-left bg-white dark:bg-neutral-800 rounded-xl p-6 border border-neutral-200 dark:border-neutral-700 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+        >
           <div className="flex items-center justify-between mb-4">
             <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              <CheckSquare className="w-6 h-6 text-purple-600 dark:text-purple-400" />
             </div>
             <KpiWowBadge
-              value={dashboardStats.opportunities?.conversion_rate_wow_pp_change}
-              suffix=" pp"
-              sublabel="Win rate change (last 7d vs prior 7d closed deals), percentage points"
+              value={dashboardStats.tasks?.overdue ? -dashboardStats.tasks.overdue : 0}
+              suffix=""
+              sublabel="Overdue tasks reduce this indicator"
             />
           </div>
           <h3 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-1">
-            {conversionRate.toFixed(1)}%
+            {(dashboardStats.tasks?.open || 0).toLocaleString()}
           </h3>
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">Conversion Rate</p>
-        </div>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">Tasks</p>
+        </button>
 
         {/* Active Deals */}
-        <div className="bg-white dark:bg-neutral-800 rounded-xl p-6 border border-neutral-200 dark:border-neutral-700 shadow-sm">
+        <button
+          type="button"
+          onClick={() => navigate('/deals')}
+          className="text-left bg-white dark:bg-neutral-800 rounded-xl p-6 border border-neutral-200 dark:border-neutral-700 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+        >
           <div className="flex items-center justify-between mb-4">
             <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center">
               <Target className="w-6 h-6 text-orange-600 dark:text-orange-400" />
@@ -270,7 +286,7 @@ export function ModernDashboard() {
             {activeDeals}
           </h3>
           <p className="text-sm text-neutral-600 dark:text-neutral-400">Active Deals</p>
-        </div>
+        </button>
       </div>
 
       {/* Charts Row */}

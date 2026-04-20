@@ -26,7 +26,6 @@ import {
   Workflow,
   MessageSquare,
   FileText,
-  Database,
   CheckSquare,
   Sparkles,
   Coins,
@@ -36,6 +35,7 @@ import {
   Phone,
   Bell
 } from 'lucide-react';
+import { featureFlags } from '@/config/featureFlags';
 
 interface NavItem {
   name: string;
@@ -66,15 +66,19 @@ const navigation: NavItem[] = [
     icon: CheckSquare,
     path: '/tasks',
   },
-  {
-    name: 'Email',
-    icon: Mail,
-    path: '/emails',
-    children: [
-      { name: 'Inbox', icon: Mail, path: '/emails' },
-      { name: 'Sequences', icon: Zap, path: '/email-sequences' },
-    ],
-  },
+  ...(featureFlags.navigation.showEmail
+    ? [{
+        name: 'Email',
+        icon: Mail,
+        path: '/emails',
+        children: [
+          { name: 'Inbox', icon: Mail, path: '/emails' },
+          ...(featureFlags.navigation.showEmailSequences
+            ? [{ name: 'Sequences', icon: Zap, path: '/email-sequences' }]
+            : []),
+        ],
+      } as NavItem]
+    : []),
   {
     name: 'Messages',
     icon: MessageSquare,
@@ -94,16 +98,20 @@ const navigation: NavItem[] = [
       { name: 'Products', icon: ShoppingCart, path: '/cpq/products' },
     ],
   },
-  {
-    name: 'Workflows',
-    icon: Workflow,
-    path: '/workflows',
-  },
-  {
-    name: 'Forecasting',
-    icon: TrendingUp,
-    path: '/forecasting',
-  },
+  ...(featureFlags.navigation.showMindMapping
+    ? [{
+        name: 'Mind Mapping',
+        icon: Workflow,
+        path: '/workflows',
+      } as NavItem]
+    : []),
+  ...(featureFlags.navigation.showForecasting
+    ? [{
+        name: 'Forecasting',
+        icon: TrendingUp,
+        path: '/forecasting',
+      } as NavItem]
+    : []),
   {
     name: 'Conversations',
     icon: Phone,
@@ -126,15 +134,6 @@ const navigation: NavItem[] = [
     children: [
       { name: 'Company', icon: Settings2, path: '/settings/company' },
       { name: 'Territories', icon: Map, path: '/settings/territories' },
-    ],
-  },
-  {
-    name: 'Data',
-    icon: Database,
-    path: '/data-import/wizard', // Fixed: now points to actual route
-    children: [
-      { name: 'Import Wizard', icon: Database, path: '/data-import/wizard' },
-      { name: 'Import History', icon: Database, path: '/data-import/history' },
     ],
   },
 ];

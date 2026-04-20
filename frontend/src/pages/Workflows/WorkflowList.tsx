@@ -32,7 +32,7 @@ export const WorkflowList: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['workflows'] });
       toast({
         title: 'Success',
-        description: 'Workflow status updated'
+        description: 'Mind mapping status updated'
       });
     }
   });
@@ -44,7 +44,7 @@ export const WorkflowList: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['workflows'] });
       toast({
         title: 'Success',
-        description: 'Workflow deleted successfully'
+        description: 'Mind mapping item deleted successfully'
       });
     }
   });
@@ -87,14 +87,14 @@ export const WorkflowList: React.FC = () => {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Workflow Automation</h1>
+            <h1 className="text-3xl font-bold">Mind Mapping</h1>
             <p className="text-gray-600 mt-1">
-              Automate your business processes with visual workflows
+              Map your process visually with connected steps
             </p>
           </div>
           <Button onClick={() => navigate('/workflows/new')}>
             <Plus className="h-4 w-4 mr-2" />
-            Create Workflow
+            Create Map
           </Button>
         </div>
 
@@ -107,7 +107,7 @@ export const WorkflowList: React.FC = () => {
                   <WorkflowIcon className="h-6 w-6 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Total Workflows</p>
+                  <p className="text-sm text-gray-600">Total Maps</p>
                   <p className="text-2xl font-bold">{stats.total}</p>
                 </div>
               </div>
@@ -234,13 +234,13 @@ export const WorkflowList: React.FC = () => {
             <Card>
               <CardContent className="py-12 text-center">
                 <WorkflowIcon className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-                <h3 className="text-lg font-semibold mb-2">No workflows yet</h3>
+                <h3 className="text-lg font-semibold mb-2">No mind maps yet</h3>
                 <p className="text-gray-600 mb-4">
-                  Create your first workflow to automate your processes
+                  Create your first mind map to organize your process
                 </p>
                 <Button onClick={() => navigate('/workflows/new')}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Create Workflow
+                  Create Map
                 </Button>
               </CardContent>
             </Card>
