@@ -407,7 +407,7 @@ export const WorkflowBuilder: React.FC = () => {
   const { toast } = useToast();
 
   const [workflow, setWorkflow] = useState<Partial<Workflow>>({
-    name: 'Untitled Workflow',
+    name: 'Untitled Mind Map',
     description: '',
     trigger_type: 'manual',
     trigger_object: 'lead',
@@ -450,7 +450,7 @@ export const WorkflowBuilder: React.FC = () => {
       const fd = workflow.flow_definition || { nodes: [], edges: [] };
       const flow = normalizeFlowDefinition(fd);
       const trigger_type = deriveTriggerType(flow.nodes as WorkflowNode[]);
-      const baseName = (workflow.name || 'Untitled Workflow').trim() || 'Untitled Workflow';
+      const baseName = (workflow.name || 'Untitled Mind Map').trim() || 'Untitled Mind Map';
 
       if (id && id !== 'new') {
         return workflowsAPI.update(Number(id), {
@@ -477,7 +477,7 @@ export const WorkflowBuilder: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['workflows'] });
       toast({
         title: 'Saved',
-        description: 'Workflow saved successfully.',
+        description: 'Mind map saved successfully.',
       });
       if (id === 'new') {
         navigate(`/workflows/${data.id}`);
@@ -652,7 +652,7 @@ export const WorkflowBuilder: React.FC = () => {
                 value={workflow.name}
                 onChange={(e) => setWorkflow(prev => ({ ...prev, name: e.target.value }))}
                 className="text-xl font-bold border-none focus:ring-0 px-2"
-                placeholder="Workflow Name"
+                placeholder="Mind Map Name"
               />
               <Input
                 value={workflow.description || ''}
@@ -867,7 +867,7 @@ export const WorkflowBuilder: React.FC = () => {
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center max-w-md">
                 <Zap className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">Start Building Your Workflow</h3>
+                <h3 className="text-lg font-semibold text-gray-700 mb-2">Start Building Your Mind Map</h3>
                 <p className="text-gray-500 mb-6">
                   Add steps from the left, then use the blue ports: output (bottom) → input (top or left) on the next
                   step.
