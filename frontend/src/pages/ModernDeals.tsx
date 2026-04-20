@@ -38,6 +38,12 @@ import {
   DialogTitle,
 } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 /** Backend DealStatus string values */
 type DealStatusStr =
@@ -161,10 +167,12 @@ function DraggableDealCard({
   deal,
   disabled,
   onOpen,
+  onEdit,
 }: {
   deal: ApiDeal;
   disabled?: boolean;
   onOpen: (id: number) => void;
+  onEdit: (id: number) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `deal-${deal.id}`,
@@ -183,17 +191,13 @@ function DraggableDealCard({
       className={`bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:shadow-md transition-shadow ${
         isDragging ? 'opacity-50 shadow-lg z-10' : ''
       }`}
+      {...listeners}
+      {...attributes}
     >
       <div className="flex items-start justify-between p-4 gap-2">
-        <button
-          type="button"
-          className="mt-0.5 shrink-0 p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700 cursor-grab active:cursor-grabbing touch-none text-neutral-400"
-          aria-label="Drag to change stage"
-          {...listeners}
-          {...attributes}
-        >
+        <div className="mt-0.5 shrink-0 p-1 rounded text-neutral-400">
           <GripVertical className="w-4 h-4" />
-        </button>
+        </div>
         <button
           type="button"
           className="flex-1 min-w-0 text-left"
@@ -207,13 +211,27 @@ function DraggableDealCard({
             <span className="font-semibold">${formatMoney(value)}</span>
           </div>
         </button>
-        <button
-          type="button"
-          className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded shrink-0"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <MoreVertical className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded shrink-0"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <MoreVertical className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(deal.id);
+              }}
+            >
+              Edit Deal
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="px-4 pb-4 space-y-2">
@@ -361,7 +379,7 @@ export function ModernDeals() {
               {searchQuery.trim() ? ` (${rawDeals.length} total)` : ''}
             </p>
             <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-500">
-              Drag the grip handle (⋮⋮) on a card to move it to another column. Columns highlight when you drag over them.
+              Drag from anywhere on a card to move it to another column. Columns highlight when you drag over them.
             </p>
           </div>
           <button
@@ -427,6 +445,7 @@ export function ModernDeals() {
                     deal={deal}
                     disabled={updateStatus.isPending}
                     onOpen={(id) => navigate(`/deals/${id}`)}
+                    onEdit={(id) => navigate(`/deals/${id}`)}
                   />
                 ))}
                 {stage.deals.length === 0 && (

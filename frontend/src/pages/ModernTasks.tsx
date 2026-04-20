@@ -28,6 +28,7 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react';
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 
 interface Task {
   id: number;
@@ -103,7 +104,9 @@ function TaskActionsMenu({ taskId }: { taskId: number }) {
 
 export function ModernTasks() {
   const navigate = useNavigate();
-  const [view, setView] = useState<'kanban' | 'list'>('list');
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [view, setView] = useState<'kanban' | 'list'>('kanban');
   const [searchQuery, setSearchQuery] = useState('');
 
   const { data: tasksResponse, isLoading } = useQuery({
@@ -132,6 +135,28 @@ export function ModernTasks() {
     ...status,
     tasks: tasks.filter((task) => task.status === status.id),
   }));
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      await tasksAPI.updateTask(id, { status: status as any });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+    onError: () => {
+      toast({ title: 'Could not update task status', variant: 'destructive' });
+    },
+  });
+
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+    const taskId = Number(result.draggableId);
+    const destinationStatus = result.destination.droppableId;
+    if (!taskId || !destinationStatus) return;
+    const draggedTask = tasks.find((t) => t.id === taskId);
+    if (!draggedTask || draggedTask.status === destinationStatus) return;
+    updateStatusMutation.mutate({ id: taskId, status: destinationStatus });
+  };
 
   const getPriorityColor = (priority: string) => {
     const p = (priority || '').toUpperCase();
@@ -232,6 +257,7 @@ export function ModernTasks() {
       </div>
 
       {view === 'kanban' && (
+        <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {tasksByStatus.map((status) => (
             <div key={status.id} className="flex flex-col">
@@ -243,49 +269,66 @@ export function ModernTasks() {
                 </div>
               </div>
 
-              <div className="space-y-3">
-                {status.tasks.map((task) => (
-                  <div
-                    key={task.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => navigate(`/tasks/${task.id}`)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') navigate(`/tasks/${task.id}`);
-                    }}
-                    className="cursor-pointer rounded-lg border border-neutral-200 bg-white p-4 transition-shadow hover:shadow-md dark:border-neutral-700 dark:bg-neutral-800"
-                  >
-                    <div className="mb-2 flex items-start justify-between gap-2">
-                      <h4 className="flex-1 text-sm font-medium text-neutral-900 dark:text-neutral-50">{task.title}</h4>
-                      <TaskActionsMenu taskId={task.id} />
-                    </div>
+              <Droppable droppableId={status.id}>
+                {(provided) => (
+                  <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3 min-h-[12rem]">
+                    {status.tasks.map((task, index) => (
+                      <Draggable key={task.id} draggableId={String(task.id)} index={index}>
+                        {(providedDraggable, snapshot) => (
+                          <div
+                            ref={providedDraggable.innerRef}
+                            {...providedDraggable.draggableProps}
+                            {...providedDraggable.dragHandleProps}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => navigate(`/tasks/${task.id}`)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') navigate(`/tasks/${task.id}`);
+                            }}
+                            className={`cursor-pointer rounded-lg border border-neutral-200 bg-white p-4 transition-all hover:shadow-md dark:border-neutral-700 dark:bg-neutral-800 ${
+                              snapshot.isDragging ? 'shadow-xl rotate-1' : ''
+                            }`}
+                          >
+                            <div className="mb-2 flex items-start justify-between gap-2">
+                              <h4 className="flex-1 text-sm font-medium text-neutral-900 hover:underline dark:text-neutral-50">
+                                {task.title}
+                              </h4>
+                              <TaskActionsMenu taskId={task.id} />
+                            </div>
 
-                    {task.description && (
-                      <p className="mb-3 line-clamp-2 text-xs text-neutral-600 dark:text-neutral-400">
-                        {task.description}
-                      </p>
-                    )}
+                            {task.description && (
+                              <p className="mb-3 line-clamp-2 text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200">
+                                {task.description}
+                              </p>
+                            )}
+                            <p className="mb-3 text-[11px] text-neutral-400">Click title or description to edit</p>
 
-                    <div className="flex items-center justify-between">
-                      <span className={`rounded px-2 py-0.5 text-xs font-medium ${getPriorityColor(task.priority)}`}>
-                        {task.priority}
-                      </span>
-                      {task.due_date && (
-                        <div className="flex items-center text-xs text-neutral-600 dark:text-neutral-400">
-                          <Calendar className="mr-1 h-3 w-3" />
-                          {new Date(task.due_date).toLocaleDateString()}
-                        </div>
-                      )}
-                    </div>
+                            <div className="flex items-center justify-between">
+                              <span className={`rounded px-2 py-0.5 text-xs font-medium ${getPriorityColor(task.priority)}`}>
+                                {task.priority}
+                              </span>
+                              {task.due_date && (
+                                <div className="flex items-center text-xs text-neutral-600 dark:text-neutral-400">
+                                  <Calendar className="mr-1 h-3 w-3" />
+                                  {new Date(task.due_date).toLocaleDateString()}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
                   </div>
-                ))}
+                )}
+              </Droppable>
                 {status.tasks.length === 0 && (
                   <div className="py-8 text-center text-sm text-neutral-500 dark:text-neutral-400">No tasks</div>
                 )}
-              </div>
             </div>
           ))}
         </div>
+        </DragDropContext>
       )}
 
       {view === 'list' && (

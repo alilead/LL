@@ -390,7 +390,13 @@ export function TaskDetailModal({ task, isOpen, onClose }: TaskDetailModalProps)
                 {/* Task Header */}
                 <div className="flex items-start justify-between border-b pb-4">
                   <div>
-                    <h3 className="text-lg font-medium text-gray-900">{currentTask.title}</h3>
+                    <h3
+                      className="text-lg font-medium text-gray-900 cursor-text hover:underline"
+                      onClick={handleEdit}
+                      title="Click to edit"
+                    >
+                      {currentTask.title}
+                    </h3>
                     <p className="text-sm text-gray-500 mt-1">Created on {safeFormatDate(currentTask.created_at)}</p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -416,7 +422,13 @@ export function TaskDetailModal({ task, isOpen, onClose }: TaskDetailModalProps)
                   <div className="space-y-4">
                     <div>
                       <h4 className="text-sm font-medium text-gray-500">Description</h4>
-                      <p className="mt-1 text-sm text-gray-900">{currentTask.description || 'No description provided'}</p>
+                      <p
+                        className="mt-1 text-sm text-gray-900 cursor-text hover:underline"
+                        onClick={handleEdit}
+                        title="Click to edit"
+                      >
+                        {currentTask.description || 'No description provided'}
+                      </p>
                     </div>
 
                     <div>
@@ -477,6 +489,14 @@ export function TaskDetailModal({ task, isOpen, onClose }: TaskDetailModalProps)
                       )}
                     </div>
                   </div>
+                </div>
+
+                <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4">
+                  <h4 className="text-sm font-medium text-gray-700">Attachments</h4>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Attachment upload UI is prepared here. Backend task attachment endpoint is not available yet.
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">TODO: wire file upload when task attachment API is ready.</p>
                 </div>
 
                 {/* Action Buttons */}

@@ -55,6 +55,33 @@ export function ModernDealDetail() {
     enabled: Number.isFinite(dealId) && dealId > 0,
   });
 
+  const { data: leadName } = useQuery({
+    queryKey: ['deal-lead-name', deal?.lead_id],
+    queryFn: async () => {
+      if (!deal?.lead_id) return null;
+      const res = await api.get(`/leads/${deal.lead_id}/`);
+      const payload = res.data?.data ?? res.data;
+      const first = payload?.first_name ?? '';
+      const last = payload?.last_name ?? '';
+      const full = `${first} ${last}`.trim();
+      return full || `Lead #${deal.lead_id}`;
+    },
+    enabled: Boolean(deal?.lead_id),
+  });
+
+  const { data: assigneeName } = useQuery({
+    queryKey: ['deal-assignee-name', deal?.assigned_to_id],
+    queryFn: async () => {
+      if (!deal?.assigned_to_id) return null;
+      const res = await api.get(`/users/${deal.assigned_to_id}/`);
+      const first = res.data?.first_name ?? '';
+      const last = res.data?.last_name ?? '';
+      const full = `${first} ${last}`.trim();
+      return full || `User #${deal.assigned_to_id}`;
+    },
+    enabled: Boolean(deal?.assigned_to_id),
+  });
+
   useEffect(() => {
     if (!deal) return;
     setName(deal.name);
@@ -213,7 +240,7 @@ export function ModernDealDetail() {
               )}
             </Button>
             <Button type="button" variant="outline" onClick={() => navigate(`/leads/${deal.lead_id}`)}>
-              Open lead #{deal.lead_id}
+              Open lead: {leadName || `#${deal.lead_id}`}
             </Button>
           </div>
         </form>
@@ -232,7 +259,7 @@ export function ModernDealDetail() {
           <div className="flex items-center gap-2">
             <User className="w-4 h-4 text-neutral-400" />
             <span>
-              Assigned user #{deal.assigned_to_id} · Created {new Date(deal.created_at).toLocaleString()}
+              Assigned to {assigneeName || `user-${deal.assigned_to_id}`} · Created {new Date(deal.created_at).toLocaleString()}
             </span>
           </div>
         </div>
