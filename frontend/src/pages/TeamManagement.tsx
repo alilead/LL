@@ -202,9 +202,14 @@ const TeamManagement: React.FC = () => {
   });
 
   const addExistingUserMutation = useMutation({
-    mutationFn: async (userId: number) => {
+    mutationFn: async (candidate: User) => {
       if (!currentOrgId) throw new Error('No organization selected');
-      return api.users.update(userId, { organization_id: currentOrgId });
+      return api.users.update(candidate.id, {
+        organization_id: currentOrgId,
+        email: candidate.email,
+        first_name: candidate.first_name,
+        last_name: candidate.last_name,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['team-members'] });
@@ -591,7 +596,14 @@ const TeamManagement: React.FC = () => {
                 <Button
                   onClick={() => {
                     if (!selectedExistingUserId) return;
-                    addExistingUserMutation.mutate(Number(selectedExistingUserId));
+                    const selectedCandidate = addableUsers.find(
+                      (candidate: User) => String(candidate.id) === selectedExistingUserId
+                    );
+                    if (!selectedCandidate) {
+                      toast.error('Selected user not found');
+                      return;
+                    }
+                    addExistingUserMutation.mutate(selectedCandidate);
                   }}
                   disabled={!selectedExistingUserId || addExistingUserMutation.isPending}
                 >
