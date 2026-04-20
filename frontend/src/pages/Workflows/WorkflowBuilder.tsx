@@ -699,11 +699,11 @@ export const WorkflowBuilder: React.FC = () => {
             Press <kbd className="rounded bg-white px-1">Esc</kbd> to cancel. Optional:{' '}
             <kbd className="rounded bg-white px-1">Shift</kbd>+click between two cards.
           </p>
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Actions & Triggers</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-4">Mind Map Blocks</h3>
 
           {/* Triggers */}
           <div className="mb-6">
-            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Triggers</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Starting Points</p>
             <div className="space-y-2">
               {NODE_TEMPLATES.filter(t => t.category === 'trigger').map(template => {
                 const Icon = template.icon;
@@ -738,7 +738,7 @@ export const WorkflowBuilder: React.FC = () => {
 
           {/* Actions */}
           <div className="mb-6">
-            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Actions</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Flow Blocks</p>
             <div className="space-y-2">
               {NODE_TEMPLATES.filter(t => t.category === 'action').map(template => {
                 const Icon = template.icon;

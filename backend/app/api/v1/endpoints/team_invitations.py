@@ -25,6 +25,35 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+def _send_invitation_email_safe(
+    email: str,
+    inviter_name: str,
+    organization_name: str,
+    invitation_link: str,
+    role: str,
+    message: str | None,
+) -> None:
+    """Background email sender wrapper with reliable logging."""
+    try:
+        email_sender.send_team_invitation(
+            email,
+            inviter_name,
+            organization_name,
+            invitation_link,
+            role,
+            message,
+        )
+    except Exception as exc:
+        logger.exception(
+            "Failed to send team invitation email",
+            extra={
+                "invite_email": email,
+                "organization_name": organization_name,
+                "role": role,
+            },
+        )
+
 @router.post("", response_model=TeamInvitation)
 @router.post("/", response_model=TeamInvitation)
 async def create_team_invitation(
@@ -69,13 +98,13 @@ async def create_team_invitation(
         inviter_name = f"{current_user.first_name} {current_user.last_name}".strip()
         
         background_tasks.add_task(
-            email_sender.send_team_invitation,
+            _send_invitation_email_safe,
             invitation.email,
             inviter_name,
             organization.name,
             invitation_link,
             invitation.role,
-            invitation.message
+            invitation.message,
         )
         
         return invitation
@@ -361,13 +390,13 @@ async def resend_team_invitation(
         inviter_name = f"{current_user.first_name} {current_user.last_name}".strip()
         
         background_tasks.add_task(
-            email_sender.send_team_invitation,
+            _send_invitation_email_safe,
             updated_invitation.email,
             inviter_name,
             organization.name,
             invitation_link,
             updated_invitation.role,
-            updated_invitation.message
+            updated_invitation.message,
         )
         
         return {"message": "Invitation resent successfully"}

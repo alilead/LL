@@ -149,6 +149,13 @@ export function InformationRequests() {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => handleStatusChange(request.id, request.status)}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => {
                         setEditingRequestId(null);
                         setNoteText('');

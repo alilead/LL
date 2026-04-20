@@ -32,6 +32,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Separator } from '@/components/ui/Separator';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import api from '@/services/api';
+import { useAuthStore } from '@/store/auth';
 
 // Import User type from api
 interface User {
@@ -80,6 +81,8 @@ const TeamManagement: React.FC = () => {
   const [selectedTab, setSelectedTab] = useState<'members' | 'invitations'>('members');
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const [selectedExistingUserId, setSelectedExistingUserId] = useState<string>('');
 
   // Form setup
   const form = useForm<InviteFormData>({
@@ -125,6 +128,21 @@ const TeamManagement: React.FC = () => {
     },
   });
 
+  const { data: allUsersResponse } = useQuery({
+    queryKey: ['all-users-for-team-management'],
+    queryFn: async () => {
+      const response = await api.users.list();
+      return response.data?.items || [];
+    },
+  });
+
+  const currentOrgId = user?.organization_id ? Number(user.organization_id) : null;
+  const addableUsers = (allUsersResponse || []).filter((candidate: User) => {
+    if (!currentOrgId) return false;
+    if (!candidate.is_active) return false;
+    return Number(candidate.organization_id) !== currentOrgId;
+  });
+
   // Mutations
   const inviteMutation = useMutation({
     mutationFn: (data: InviteFormData) => api.teamInvitations.createInvitation(data),
@@ -160,6 +178,22 @@ const TeamManagement: React.FC = () => {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.detail || 'Failed to resend invitation');
+    },
+  });
+
+  const addExistingUserMutation = useMutation({
+    mutationFn: async (userId: number) => {
+      if (!currentOrgId) throw new Error('No organization selected');
+      return api.users.update(userId, { organization_id: currentOrgId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['team-members'] });
+      queryClient.invalidateQueries({ queryKey: ['all-users-for-team-management'] });
+      setSelectedExistingUserId('');
+      toast.success('Existing user added to your organization');
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.detail || 'Could not add existing user');
     },
   });
 
@@ -516,6 +550,36 @@ const TeamManagement: React.FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-6 rounded-lg border p-4 bg-gray-50">
+              <h4 className="text-sm font-semibold text-gray-900 mb-2">Add Existing Platform User</h4>
+              <p className="text-xs text-gray-600 mb-3">
+                Move an existing active user from another organization into your organization/team.
+              </p>
+              <div className="flex flex-col md:flex-row gap-3">
+                <Select value={selectedExistingUserId} onValueChange={setSelectedExistingUserId}>
+                  <SelectTrigger className="md:w-[420px] bg-white">
+                    <SelectValue placeholder="Select existing user..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {addableUsers.map((candidate: User) => (
+                      <SelectItem key={candidate.id} value={String(candidate.id)}>
+                        {candidate.first_name} {candidate.last_name} - {candidate.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={() => {
+                    if (!selectedExistingUserId) return;
+                    addExistingUserMutation.mutate(Number(selectedExistingUserId));
+                  }}
+                  disabled={!selectedExistingUserId || addExistingUserMutation.isPending}
+                >
+                  {addExistingUserMutation.isPending ? 'Adding...' : 'Add Existing User'}
+                </Button>
+              </div>
+            </div>
+
             {isLoadingMembers ? (
               <div className="flex items-center justify-center py-8">
                 <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />

@@ -7,7 +7,11 @@ export interface EmailAccount {
   provider_type: string;
   is_active: boolean;
   calendar_sync_enabled: boolean;
+  auto_sync_calendar_events?: boolean;
+  calendar_url?: string | null;
   last_sync_at: string;
+  last_calendar_sync_at?: string | null;
+  calendar_sync_error?: string | null;
   created_at: string;
 }
 

@@ -238,17 +238,11 @@ export const CalendarPage = () => {
       emailAPI.syncCalendar(accountId),
     onSuccess: () => {
       refetchEmailAccounts();
-      toast({
-        title: "Calendar sync completed",
-        description: "Email calendar events have been updated.",
-      });
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      toast.success('Calendar sync completed. Email calendar events have been updated.');
     },
     onError: () => {
-      toast({
-        title: "Calendar sync failed",
-        description: "Failed to sync email calendar events.",
-        variant: "destructive",
-      });
+      toast.error('Calendar sync failed. Could not sync email calendar events.');
     },
   });
 
@@ -566,10 +560,10 @@ export const CalendarPage = () => {
                 key={account.id}
                 className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
               >
-                {account.provider} - {account.email}
-                {account.last_calendar_sync && (
+                {(account.provider_type || 'custom').toUpperCase()} - {account.email}
+                {account.last_calendar_sync_at && (
                   <span className="ml-1 text-blue-600">
-                    (synced {new Date(account.last_calendar_sync).toLocaleDateString()})
+                    (synced {new Date(account.last_calendar_sync_at).toLocaleDateString()})
                   </span>
                 )}
                 <button
