@@ -13,6 +13,7 @@ from app.api import deps
 from app.core.config import settings
 from app.models.user import User
 from app.models.calendar_integration import CalendarIntegration
+from app.services.google_calendar_sync_service import GoogleCalendarSyncService
 from app.schemas.calendar_integration import (
     CalendarIntegrationListResponse,
     OAuthInitRequest,
@@ -250,9 +251,14 @@ def trigger_calendar_sync(
     )
     if not integration:
         raise HTTPException(status_code=404, detail="Integration not found")
-    integration.last_synced_at = datetime.utcnow()
-    integration.last_error = None
-    integration.updated_at = datetime.utcnow()
-    db.add(integration)
-    db.commit()
-    return {"success": True, "message": "Sync queued", "integration_id": integration.id}
+    if integration.provider != "google":
+        raise HTTPException(status_code=400, detail="Sync currently implemented for Google only")
+    try:
+        result = GoogleCalendarSyncService(db).sync_integration(integration)
+        return {"success": True, "message": "Sync completed", "integration_id": integration.id, "result": result}
+    except Exception as e:
+        integration.last_error = str(e)
+        integration.updated_at = datetime.utcnow()
+        db.add(integration)
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"Calendar sync failed: {str(e)}")
