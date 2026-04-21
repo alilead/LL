@@ -3,7 +3,7 @@ from app.api.v1.endpoints import (
     auth, leads, admin, deals, activities, notes, users,
     leads_import, dashboard, tasks, events, reports, advanced_reports,
     information_requests, organizations, tags, linkedin,
-    tokens, notifications, contact, lead_stages, health, settings, psychometrics, files, ai_insights, messages, credits, invoices, team_invitations, email, ml,
+    tokens, notifications, contact, lead_stages, health, settings, psychometrics, files, ai_insights, messages, credits, invoices, team_invitations, email, ml, calendar_integrations,
     territories, cpq, email_sequences, workflows, conversations, data_import, forecasting, dashboards,
     marketing_forms, currencies,
 )
@@ -118,6 +118,9 @@ api_router.include_router(team_invitations.router, prefix="/team-invitations", t
 
 # Email routes (Email account management and calendar sync)
 api_router.include_router(email.router, prefix="/email", tags=["email"])
+
+# Calendar integrations (Google OAuth foundation + provider registry)
+api_router.include_router(calendar_integrations.router, prefix="/calendar-integrations", tags=["calendar-integrations"])
 
 # ML routes (Machine Learning predictions and model management)
 api_router.include_router(ml.router, prefix="/ml", tags=["ml"])

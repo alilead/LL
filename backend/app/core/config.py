@@ -114,6 +114,12 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
 
+    # Calendar integrations (Google OAuth first)
+    GOOGLE_CALENDAR_CLIENT_ID: Optional[str] = None
+    GOOGLE_CALENDAR_CLIENT_SECRET: Optional[str] = None
+    GOOGLE_CALENDAR_REDIRECT_URI: Optional[str] = None
+    GOOGLE_CALENDAR_SCOPES: str = "openid email profile https://www.googleapis.com/auth/calendar"
+
     model_config = ConfigDict(
         case_sensitive=True,
         env_file=".env",

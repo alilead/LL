@@ -16,6 +16,7 @@ import {
   Mail,
   Zap,
   Globe,
+  CalendarDays,
   Palette,
   Database,
   Save,
@@ -30,6 +31,7 @@ import { updateProfile, uploadAvatar, changePassword } from '@/services/users';
 import { useAuthStore } from '@/store/auth';
 import api from '@/lib/axios';
 import emailAPI from '@/services/emailAPI';
+import { calendarIntegrationsAPI } from '@/services/calendarIntegrations';
 
 type Tab = 'profile' | 'notifications' | 'company' | 'security' | 'billing' | 'team' | 'integrations';
 
@@ -1119,6 +1121,44 @@ function EmailIntegrationPanel() {
 
 function IntegrationsSettings() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { data: calendarIntegrations = [], isLoading: isLoadingCalendar } = useQuery({
+    queryKey: ['calendar-integrations'],
+    queryFn: calendarIntegrationsAPI.list,
+  });
+
+  const googleIntegration = calendarIntegrations.find((i) => i.provider?.toLowerCase() === 'google');
+
+  const connectGoogleMutation = useMutation({
+    mutationFn: () => calendarIntegrationsAPI.initOAuth('google'),
+    onSuccess: (data) => {
+      window.location.href = data.authorization_url;
+    },
+    onError: (err: unknown) => {
+      const detail =
+        err &&
+        typeof err === 'object' &&
+        'response' in err &&
+        (err as { response?: { data?: { detail?: unknown } } }).response?.data?.detail;
+      const msg = typeof detail === 'string' ? detail : 'Could not start Google Calendar OAuth flow.';
+      toast.error(msg);
+    },
+  });
+
+  const disconnectGoogleMutation = useMutation({
+    mutationFn: (integrationId: number) => calendarIntegrationsAPI.disconnect(integrationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['calendar-integrations'] });
+      toast.success('Google Calendar disconnected');
+    },
+    onError: () => toast.error('Could not disconnect Google Calendar'),
+  });
+
+  const syncGoogleMutation = useMutation({
+    mutationFn: (integrationId: number) => calendarIntegrationsAPI.sync(integrationId),
+    onSuccess: () => toast.success('Calendar sync queued'),
+    onError: () => toast.error('Could not queue calendar sync'),
+  });
 
   const tiles: IntegrationTile[] = [
     {
@@ -1167,6 +1207,77 @@ function IntegrationsSettings() {
       </p>
 
       <EmailIntegrationPanel />
+
+      <h3 className="text-md font-semibold text-neutral-900 dark:text-neutral-50 mb-3">Calendar</h3>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="p-6 border border-neutral-200 dark:border-neutral-700 rounded-lg">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-12 h-12 bg-neutral-100 dark:bg-neutral-700 rounded-lg flex items-center justify-center">
+              <CalendarDays className="w-6 h-6 text-neutral-600 dark:text-neutral-400" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-neutral-900 dark:text-neutral-50">Google Calendar</h4>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                {isLoadingCalendar
+                  ? 'Loading...'
+                  : googleIntegration
+                    ? `Connected${googleIntegration.provider_account_email ? ` as ${googleIntegration.provider_account_email}` : ''}`
+                    : 'Not connected'}
+              </p>
+            </div>
+          </div>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+            Two-way sync foundation is now enabled. OAuth callback + webhook sync is the next milestone.
+          </p>
+          {googleIntegration ? (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={syncGoogleMutation.isPending}
+                className="rounded-lg border border-neutral-300 dark:border-neutral-600 px-3 py-2 text-sm font-medium hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50"
+                onClick={() => syncGoogleMutation.mutate(googleIntegration.id)}
+              >
+                {syncGoogleMutation.isPending ? 'Syncing…' : 'Sync now'}
+              </button>
+              <button
+                type="button"
+                disabled={disconnectGoogleMutation.isPending}
+                className="rounded-lg border border-red-300 text-red-700 px-3 py-2 text-sm font-medium hover:bg-red-50 disabled:opacity-50"
+                onClick={() => disconnectGoogleMutation.mutate(googleIntegration.id)}
+              >
+                Disconnect
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={connectGoogleMutation.isPending}
+              className="rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+              onClick={() => connectGoogleMutation.mutate()}
+            >
+              {connectGoogleMutation.isPending ? 'Redirecting…' : 'Connect Google Calendar'}
+            </button>
+          )}
+        </div>
+
+        <div className="p-6 border border-neutral-200 dark:border-neutral-700 rounded-lg">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-12 h-12 bg-neutral-100 dark:bg-neutral-700 rounded-lg flex items-center justify-center">
+              <Globe className="w-6 h-6 text-neutral-600 dark:text-neutral-400" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-neutral-900 dark:text-neutral-50">Other Calendars</h4>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">Outlook, Apple, CalDAV</p>
+            </div>
+          </div>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+            Provider adapters are planned next. Google is the first production connector.
+          </p>
+          <span className="inline-flex rounded-full bg-neutral-100 dark:bg-neutral-700 px-3 py-1 text-xs font-medium text-neutral-600 dark:text-neutral-300">
+            Coming next
+          </span>
+        </div>
+      </div>
 
       <h3 className="text-md font-semibold text-neutral-900 dark:text-neutral-50 mb-3">CRM &amp; messaging</h3>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

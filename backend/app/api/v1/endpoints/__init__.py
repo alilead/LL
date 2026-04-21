@@ -30,6 +30,7 @@ from . import (
     messages,
     invoices,
     email,
+    calendar_integrations,
 )
 
 __all__ = [
@@ -64,4 +65,5 @@ __all__ = [
     "messages",
     "invoices",
     "email",
+    "calendar_integrations",
 ]

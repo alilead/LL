@@ -39,6 +39,7 @@ from .transaction import Transaction, TransactionType, DataType
 from .team_invitation import TeamInvitation
 from .ai_insights import AIInsight
 from .linkedin_connection import LinkedInConnection
+from .calendar_integration import CalendarIntegration
 
 # Enterprise features
 from .territory import Territory, TerritoryMember, TerritoryRule, TerritoryAssignment, TerritoryQuota, TerritoryType, AssignmentPriority
@@ -97,6 +98,7 @@ __all__ = [
     "TeamInvitation",
     "AIInsight",
     "LinkedInConnection",
+    "CalendarIntegration",
 
     # Enterprise features
     "Territory",
