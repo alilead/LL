@@ -84,6 +84,11 @@ export interface EmailAccountSettings {
 }
 
 const emailAPI = {
+  async initGoogleOAuth(): Promise<{ provider: string; authorization_url: string }> {
+    const response = await api.post('/email/oauth/google/init');
+    return response.data;
+  },
+
   // Email Account Management
   async getAccounts(): Promise<EmailAccount[]> {
     const response = await api.get(`/email/accounts`);

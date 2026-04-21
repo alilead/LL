@@ -2,6 +2,7 @@
 import imaplib
 import smtplib
 import email
+from email.utils import parseaddr, parsedate_to_datetime
 import re
 import socket
 import json
@@ -492,6 +493,10 @@ class EmailService:
             # Refresh again to get updated values
             self.db.refresh(account)
             
+            # Gmail OAuth path (avoids app-password IMAP failures)
+            if account.provider_type == EmailProviderType.GMAIL.value and account.oauth_refresh_token:
+                return self._sync_gmail_api_account(account, days_back)
+
             # Connect to IMAP
             password = decrypt_password(account.password_encrypted)
             imap = _IMAP4_SSL_IPv4(account.imap_host, account.imap_port)
@@ -548,6 +553,182 @@ class EmailService:
                 "success": False,
                 "error": str(e)
             }
+
+    def _get_google_access_token(self, account: EmailAccount) -> str:
+        """Return a valid Google access token, refreshing when needed."""
+        if (
+            account.oauth_access_token
+            and account.oauth_token_expires_at
+            and account.oauth_token_expires_at > (datetime.utcnow() + timedelta(seconds=60))
+        ):
+            return account.oauth_access_token
+
+        if not account.oauth_refresh_token:
+            raise ValueError("Missing Google refresh token")
+
+        token_resp = requests.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "client_id": settings.GOOGLE_CALENDAR_CLIENT_ID,
+                "client_secret": settings.GOOGLE_CALENDAR_CLIENT_SECRET,
+                "refresh_token": account.oauth_refresh_token,
+                "grant_type": "refresh_token",
+            },
+            timeout=20,
+        )
+        if token_resp.status_code >= 400:
+            raise ValueError(f"Google token refresh failed ({token_resp.status_code})")
+        token_data = token_resp.json()
+        access_token = token_data.get("access_token")
+        if not access_token:
+            raise ValueError("Google token refresh did not return access_token")
+        expires_in = int(token_data.get("expires_in") or 3600)
+        account.oauth_access_token = access_token
+        account.oauth_token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+        self.db.add(account)
+        self.db.commit()
+        return access_token
+
+    def _sync_gmail_api_account(self, account: EmailAccount, days_back: int) -> Dict:
+        access_token = self._get_google_access_token(account)
+        total_synced = 0
+        total_errors = 0
+        try:
+            if account.sync_inbox:
+                synced, errors = self._sync_gmail_label(
+                    account=account,
+                    access_token=access_token,
+                    label_query="in:inbox",
+                    days_back=days_back,
+                    direction=EmailDirection.incoming,
+                    status=EmailStatus.unread,
+                )
+                total_synced += synced
+                total_errors += errors
+            if account.sync_sent_items:
+                synced, errors = self._sync_gmail_label(
+                    account=account,
+                    access_token=access_token,
+                    label_query="in:sent",
+                    days_back=days_back,
+                    direction=EmailDirection.outgoing,
+                    status=EmailStatus.read,
+                )
+                total_synced += synced
+                total_errors += errors
+
+            self.db.query(EmailAccount).filter(EmailAccount.id == account.id).update({
+                "sync_status": "active",
+                "sync_error_message": None if total_errors == 0 else f"Failed to sync {total_errors} emails",
+                "last_sync_at": datetime.utcnow(),
+            })
+            self.db.commit()
+            return {"success": True, "synced": total_synced, "errors": total_errors}
+        except Exception as e:
+            self.db.query(EmailAccount).filter(EmailAccount.id == account.id).update({
+                "sync_status": "error",
+                "sync_error_message": str(e),
+                "last_sync_at": datetime.utcnow(),
+            })
+            self.db.commit()
+            return {"success": False, "error": str(e)}
+
+    def _sync_gmail_label(
+        self,
+        *,
+        account: EmailAccount,
+        access_token: str,
+        label_query: str,
+        days_back: int,
+        direction: EmailDirection,
+        status: EmailStatus,
+    ) -> Tuple[int, int]:
+        headers = {"Authorization": f"Bearer {access_token}"}
+        params = {"maxResults": 100, "q": f"{label_query} newer_than:{days_back}d"}
+        list_resp = requests.get(
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages",
+            headers=headers,
+            params=params,
+            timeout=30,
+        )
+        if list_resp.status_code >= 400:
+            raise ValueError(f"Gmail list failed ({list_resp.status_code})")
+        messages = list_resp.json().get("messages", []) or []
+        synced_count = 0
+        error_count = 0
+
+        for item in messages:
+            msg_id = item.get("id")
+            if not msg_id:
+                continue
+            try:
+                detail_resp = requests.get(
+                    f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}",
+                    headers=headers,
+                    params={"format": "metadata", "metadataHeaders": ["Subject", "From", "To", "Date", "Message-ID"]},
+                    timeout=30,
+                )
+                if detail_resp.status_code >= 400:
+                    error_count += 1
+                    continue
+                payload = detail_resp.json()
+                header_map = {}
+                for h in (payload.get("payload", {}).get("headers", []) or []):
+                    name = (h.get("name") or "").strip().lower()
+                    if name:
+                        header_map[name] = h.get("value") or ""
+
+                message_id = header_map.get("message-id") or payload.get("id")
+                existing = self.db.query(Email).filter(
+                    Email.message_id == message_id,
+                    Email.email_account_id == account.id,
+                ).first()
+                if existing:
+                    continue
+
+                from_name, from_email = parseaddr(header_map.get("from", ""))
+                to_raw = header_map.get("to", "")
+                to_list = [addr.strip() for addr in re.split(r"[;,]", to_raw) if addr.strip()]
+                internal_ms = payload.get("internalDate")
+                sent_date = datetime.utcnow()
+                if internal_ms:
+                    try:
+                        sent_date = datetime.utcfromtimestamp(int(internal_ms) / 1000.0)
+                    except Exception:
+                        pass
+                else:
+                    date_header = header_map.get("date")
+                    if date_header:
+                        try:
+                            sent_date = parsedate_to_datetime(date_header).replace(tzinfo=None)
+                        except Exception:
+                            pass
+
+                db_email = Email(
+                    email_account_id=account.id,
+                    organization_id=account.organization_id,
+                    message_id=message_id,
+                    thread_id=payload.get("threadId"),
+                    subject=header_map.get("subject") or "(No Subject)",
+                    from_email=from_email or account.email,
+                    from_name=from_name or from_email or account.display_name,
+                    to_emails=json.dumps(to_list),
+                    cc_emails=json.dumps([]),
+                    bcc_emails=json.dumps([]),
+                    body_text=payload.get("snippet") or "",
+                    body_html=None,
+                    sent_date=sent_date,
+                    direction=direction,
+                    status=status,
+                    has_attachments=False,
+                )
+                self.db.add(db_email)
+                self.db.commit()
+                synced_count += 1
+            except Exception:
+                self.db.rollback()
+                error_count += 1
+        return synced_count, error_count
     
     def _sync_folder(self, imap: imaplib.IMAP4, account: EmailAccount, folder: str, days_back: int) -> Tuple[int, int]:
         """Sync emails from a specific folder"""

@@ -162,6 +162,24 @@ export const EmailIntegration: React.FC = () => {
     }
   };
 
+  const handleConnectGmailOAuth = async () => {
+    try {
+      setLoading(true);
+      const response = await api.post('/email/oauth/google/init');
+      const authUrl = response.data?.authorization_url;
+      if (!authUrl) throw new Error('Missing authorization URL');
+      window.location.href = authUrl;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.response?.data?.detail || "Could not start Gmail OAuth",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRemoveAccount = async (accountId: number) => {
     if (!confirm('Are you sure you want to remove this email account?')) {
       return;
@@ -509,6 +527,16 @@ export const EmailIntegration: React.FC = () => {
                   disabled={loading || !formData.email || !formData.password}
                 >
                   {loading ? 'Connecting...' : 'Connect Account'}
+                </Button>
+              </div>
+              <div className="pt-3">
+                <Button
+                  variant="outline"
+                  onClick={handleConnectGmailOAuth}
+                  className="w-full"
+                  disabled={loading}
+                >
+                  Connect Gmail with Google (OAuth)
                 </Button>
               </div>
             </CardContent>

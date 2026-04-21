@@ -974,6 +974,22 @@ function EmailIntegrationPanel() {
     },
   });
 
+  const connectGoogleOAuthMutation = useMutation({
+    mutationFn: () => emailAPI.initGoogleOAuth(),
+    onSuccess: (data) => {
+      window.location.href = data.authorization_url;
+    },
+    onError: (err: unknown) => {
+      const detail =
+        err &&
+        typeof err === 'object' &&
+        'response' in err &&
+        (err as { response?: { data?: { detail?: unknown } } }).response?.data?.detail;
+      const msg = typeof detail === 'string' ? detail : 'Could not start Gmail OAuth.';
+      toast.error(msg);
+    },
+  });
+
   const canSubmit =
     emailAddr.trim().length > 0 &&
     password.length > 0 &&
@@ -1101,6 +1117,14 @@ function EmailIntegrationPanel() {
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <button
           type="button"
+          disabled={connectGoogleOAuthMutation.isPending}
+          onClick={() => connectGoogleOAuthMutation.mutate()}
+          className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+        >
+          {connectGoogleOAuthMutation.isPending ? 'Redirecting…' : 'Connect Gmail with Google'}
+        </button>
+        <button
+          type="button"
           disabled={!canSubmit || connectMutation.isPending}
           onClick={() => connectMutation.mutate()}
           className="rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
@@ -1122,6 +1146,19 @@ function EmailIntegrationPanel() {
 function IntegrationsSettings() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const emailOauth = params.get('email_oauth');
+    const calendarOauth = params.get('calendar_oauth');
+    if (emailOauth === 'success') toast.success('Gmail connected successfully. Your inbox can now sync.');
+    if (emailOauth === 'error') toast.error(`Gmail connect failed: ${params.get('reason') || 'unknown_error'}`);
+    if (calendarOauth === 'success') toast.success('Google Calendar connected successfully.');
+    if (calendarOauth === 'error') toast.error(`Calendar connect failed: ${params.get('reason') || 'unknown_error'}`);
+    if (emailOauth || calendarOauth) {
+      const cleanUrl = `${window.location.pathname}${window.location.hash || ''}`;
+      window.history.replaceState({}, '', cleanUrl);
+    }
+  }, []);
   const { data: calendarIntegrations = [], isLoading: isLoadingCalendar } = useQuery({
     queryKey: ['calendar-integrations'],
     queryFn: calendarIntegrationsAPI.list,

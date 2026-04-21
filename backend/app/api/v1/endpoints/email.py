@@ -1,7 +1,14 @@
 import logging
 from typing import Any, Optional, List, Dict
-from datetime import datetime
+from datetime import datetime, timedelta
+import base64
+import hashlib
+import hmac
+import json
+from urllib.parse import urlencode
+import requests
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app import crud, models, schemas
@@ -26,10 +33,189 @@ from app.schemas.email_integration import (
     EmailOut, EmailSend, EmailSuggestion
 )
 from app.core.config import settings
+from app.core.security import encrypt_password
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _sign_oauth_state(payload_b64: str) -> str:
+    return hmac.new(
+        settings.SECRET_KEY.encode("utf-8"),
+        payload_b64.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _build_oauth_state(user_id: int, organization_id: int, purpose: str) -> str:
+    payload = {
+        "u": int(user_id),
+        "o": int(organization_id),
+        "p": purpose,
+        "ts": int(datetime.utcnow().timestamp()),
+    }
+    payload_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode("utf-8")).decode("utf-8")
+    return f"{payload_b64}.{_sign_oauth_state(payload_b64)}"
+
+
+def _parse_oauth_state(state: str, expected_purpose: str) -> Dict[str, Any]:
+    try:
+        payload_b64, sig = state.split(".", 1)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid OAuth state")
+    if not hmac.compare_digest(sig, _sign_oauth_state(payload_b64)):
+        raise HTTPException(status_code=400, detail="Invalid OAuth state signature")
+    payload = json.loads(base64.urlsafe_b64decode(payload_b64.encode("utf-8")).decode("utf-8"))
+    if payload.get("p") != expected_purpose:
+        raise HTTPException(status_code=400, detail="Invalid OAuth state purpose")
+    if int(datetime.utcnow().timestamp()) - int(payload.get("ts", 0)) > 1800:
+        raise HTTPException(status_code=400, detail="OAuth state expired")
+    return payload
+
+
+def _google_oauth_redirect_uri_for_email() -> str:
+    return (
+        settings.GOOGLE_EMAIL_REDIRECT_URI
+        or settings.GOOGLE_CALENDAR_REDIRECT_URI
+        or f"{settings.FRONTEND_URL.rstrip('/')}/settings/integrations"
+    )
+
+
+@router.post("/oauth/google/init")
+def init_google_email_oauth(
+    current_user: User = Depends(deps.get_current_active_user),
+):
+    if not settings.GOOGLE_CALENDAR_CLIENT_ID:
+        raise HTTPException(status_code=400, detail="GOOGLE_CALENDAR_CLIENT_ID is not configured")
+    redirect_uri = _google_oauth_redirect_uri_for_email()
+    state = _build_oauth_state(current_user.id, current_user.organization_id, "email_google")
+    params = {
+        "client_id": settings.GOOGLE_CALENDAR_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "access_type": "offline",
+        "prompt": "consent",
+        "scope": settings.GOOGLE_EMAIL_SCOPES,
+        "state": state,
+    }
+    return {
+        "provider": "google",
+        "authorization_url": f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}",
+    }
+
+
+@router.get("/oauth/google/callback")
+def google_email_oauth_callback(
+    *,
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    db: Session = Depends(deps.get_db),
+):
+    redirect_base = f"{settings.FRONTEND_URL.rstrip('/')}/settings/integrations"
+    if error:
+        return RedirectResponse(url=f"{redirect_base}?tab=integrations&email_oauth=error&reason={error}")
+    if not code or not state:
+        return RedirectResponse(url=f"{redirect_base}?tab=integrations&email_oauth=error&reason=missing_code")
+
+    parsed = _parse_oauth_state(state, "email_google")
+    user_id = int(parsed["u"])
+    organization_id = int(parsed["o"])
+
+    token_response = requests.post(
+        "https://oauth2.googleapis.com/token",
+        data={
+            "code": code,
+            "client_id": settings.GOOGLE_CALENDAR_CLIENT_ID,
+            "client_secret": settings.GOOGLE_CALENDAR_CLIENT_SECRET,
+            "redirect_uri": _google_oauth_redirect_uri_for_email(),
+            "grant_type": "authorization_code",
+        },
+        timeout=20,
+    )
+    if token_response.status_code >= 400:
+        return RedirectResponse(url=f"{redirect_base}?tab=integrations&email_oauth=error&reason=token_exchange")
+    token_data = token_response.json()
+    access_token = token_data.get("access_token")
+    refresh_token = token_data.get("refresh_token")
+    expires_in = int(token_data.get("expires_in") or 3600)
+    scopes = token_data.get("scope")
+    if not access_token:
+        return RedirectResponse(url=f"{redirect_base}?tab=integrations&email_oauth=error&reason=no_access_token")
+
+    profile_response = requests.get(
+        "https://www.googleapis.com/oauth2/v2/userinfo",
+        headers={"Authorization": f"Bearer {access_token}"},
+        timeout=20,
+    )
+    if profile_response.status_code >= 400:
+        return RedirectResponse(url=f"{redirect_base}?tab=integrations&email_oauth=error&reason=userinfo")
+    profile = profile_response.json()
+    email_addr = profile.get("email")
+    display_name = profile.get("name") or email_addr
+    if not email_addr:
+        return RedirectResponse(url=f"{redirect_base}?tab=integrations&email_oauth=error&reason=no_email")
+
+    account = db.query(EmailAccount).filter(
+        EmailAccount.email == email_addr,
+        EmailAccount.organization_id == organization_id,
+    ).first()
+    expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+    if account:
+        account.user_id = user_id
+        account.provider_type = EmailProviderType.GMAIL.value
+        account.display_name = display_name
+        account.auth_type = "oauth"
+        account.oauth_access_token = access_token
+        account.oauth_refresh_token = refresh_token or account.oauth_refresh_token
+        account.oauth_token_expires_at = expires_at
+        account.oauth_scopes = scopes
+        account.imap_host = "imap.gmail.com"
+        account.imap_port = 993
+        account.imap_use_ssl = True
+        account.smtp_host = "smtp.gmail.com"
+        account.smtp_port = 465
+        account.smtp_use_tls = False
+        account.sync_enabled = True
+        account.sync_status = EmailSyncStatus.ACTIVE.value
+    else:
+        account = EmailAccount(
+            email=email_addr,
+            display_name=display_name,
+            provider_type=EmailProviderType.GMAIL.value,
+            organization_id=organization_id,
+            user_id=user_id,
+            password_encrypted=encrypt_password("oauth_google_managed"),
+            auth_type="oauth",
+            oauth_access_token=access_token,
+            oauth_refresh_token=refresh_token,
+            oauth_token_expires_at=expires_at,
+            oauth_scopes=scopes,
+            imap_host="imap.gmail.com",
+            imap_port=993,
+            imap_use_ssl=True,
+            smtp_host="smtp.gmail.com",
+            smtp_port=465,
+            smtp_use_tls=False,
+            sync_status=EmailSyncStatus.ACTIVE.value,
+            sync_enabled=True,
+            sync_frequency_minutes=15,
+            sync_sent_items=True,
+            sync_inbox=True,
+            days_to_sync=30,
+            auto_create_contacts=True,
+            auto_create_tasks=True,
+        )
+        db.add(account)
+
+    db.commit()
+    db.refresh(account)
+    try:
+        EmailService(db).sync_account_emails(account.id, days_back=14)
+    except Exception as sync_err:
+        logger.warning("Initial Gmail sync failed after OAuth callback: %s", sync_err)
+    return RedirectResponse(url=f"{redirect_base}?tab=integrations&email_oauth=success")
 
 async def send_email_background(
     db: Session,

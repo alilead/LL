@@ -35,6 +35,11 @@ class EmailAccount(Base, TimestampMixin):
     
     # Auth (encrypted)
     password_encrypted = Column(Text, nullable=False)  # Will encrypt this
+    auth_type = Column(String(20), default="password", nullable=False)  # password | oauth
+    oauth_access_token = Column(Text, nullable=True)
+    oauth_refresh_token = Column(Text, nullable=True)
+    oauth_token_expires_at = Column(DateTime, nullable=True)
+    oauth_scopes = Column(Text, nullable=True)
     
     # Sync Settings
     sync_status = Column(String(50), default=EmailSyncStatus.ACTIVE.value)

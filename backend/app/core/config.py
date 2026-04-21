@@ -119,6 +119,8 @@ class Settings(BaseSettings):
     GOOGLE_CALENDAR_CLIENT_SECRET: Optional[str] = None
     GOOGLE_CALENDAR_REDIRECT_URI: Optional[str] = None
     GOOGLE_CALENDAR_SCOPES: str = "openid email profile https://www.googleapis.com/auth/calendar"
+    GOOGLE_EMAIL_REDIRECT_URI: Optional[str] = None
+    GOOGLE_EMAIL_SCOPES: str = "openid email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send"
 
     model_config = ConfigDict(
         case_sensitive=True,
