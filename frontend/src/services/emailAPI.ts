@@ -46,13 +46,38 @@ export interface SendEmailResult {
 }
 
 const normalizeEmailMessage = (raw: any): EmailMessage => {
+  const decodeMimeHeader = (input?: string): string => {
+    if (!input || typeof input !== 'string' || !input.includes('=?')) return input || '';
+    return input.replace(/=\?([^?]+)\?([bBqQ])\?([^?]*)\?=/g, (_m, charset, encoding, encodedText) => {
+      try {
+        let bytes: Uint8Array;
+        if (String(encoding).toUpperCase() === 'B') {
+          const bin = atob(encodedText);
+          bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+        } else {
+          const qp = encodedText
+            .replace(/_/g, ' ')
+            .replace(/=([A-Fa-f0-9]{2})/g, (_: string, hex: string) =>
+              String.fromCharCode(parseInt(hex, 16))
+            );
+          bytes = Uint8Array.from(qp, (c) => c.charCodeAt(0));
+        }
+        const decoder = new TextDecoder((charset || 'utf-8').toLowerCase());
+        return decoder.decode(bytes);
+      } catch {
+        return encodedText;
+      }
+    });
+  };
+
   const fromAddress = raw.from_address || raw.from_email || '';
-  const fromName = raw.from_name || fromAddress;
-  const toAddress = raw.to_address || (Array.isArray(raw.to_emails) ? raw.to_emails.join(', ') : raw.to_emails || '');
+  const fromName = decodeMimeHeader(raw.from_name || '') || fromAddress;
+  const toAddress = decodeMimeHeader(raw.to_address || (Array.isArray(raw.to_emails) ? raw.to_emails.join(', ') : raw.to_emails || ''));
   const status = String(raw.status || '').toLowerCase();
   const isRead = typeof raw.is_read === 'boolean' ? raw.is_read : status === 'read';
   return {
     ...raw,
+    subject: decodeMimeHeader(raw.subject || ''),
     from_address: fromAddress,
     from_name: fromName,
     to_address: toAddress,

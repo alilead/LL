@@ -192,7 +192,7 @@ export const EmailsPage: React.FC = () => {
 
   const formatEmailDate = (dateString: string) => {
     const date = new Date(dateString);
-    return format(date, 'dd MMM HH:mm');
+    return format(date, 'dd MMM yyyy, HH:mm');
   };
 
   const getSenderInitials = (name: string, email: string) => {
