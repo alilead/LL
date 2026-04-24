@@ -11,7 +11,7 @@ from app.models.user import User as UserModel
 from app.schemas.user import User, UserCreate, UserUpdate, UserInDB, UserList, UserResponse
 from app.core.security import get_password_hash
 from app.core.config import settings
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
@@ -421,6 +421,51 @@ def delete_user(
             status_code=404,
             detail="User not found"
         )
+
+    if (user.email or "").strip().lower() == "ali@the-leadlab.com":
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete protected admin account"
+        )
     
     user = crud_user.user.remove(db=db, id=user_id)
     return user
+
+
+@router.post("/deactivate-all-except-ali", response_model=dict)
+def deactivate_all_except_ali(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Deactivate every user except ali@the-leadlab.com.
+    Also strips admin/superuser from deactivated users.
+    """
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Not enough permissions to delete users"
+        )
+
+    protected_email = "ali@the-leadlab.com"
+    rows = (
+        db.query(UserModel)
+        .filter(func.lower(UserModel.email) != protected_email)
+        .all()
+    )
+
+    affected = 0
+    for row in rows:
+        row.is_active = False
+        row.is_superuser = False
+        row.role = "user"
+        row.updated_at = db.query(func.now()).scalar()
+        affected += 1
+
+    db.commit()
+    return {
+        "success": True,
+        "message": f"Deactivated {affected} users. Kept {protected_email} active.",
+        "affected": affected,
+    }

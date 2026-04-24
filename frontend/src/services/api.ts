@@ -264,6 +264,10 @@ export const usersAPI = {
     return api.delete(`/users/${id}`);
   },
 
+  deactivateAllExceptAli: async (): Promise<AxiosResponse<{ success: boolean; message: string; affected: number }>> => {
+    return api.post('/users/deactivate-all-except-ali');
+  },
+
   me: async (): Promise<AxiosResponse<User>> => {
     return api.get('/users/me');
   },

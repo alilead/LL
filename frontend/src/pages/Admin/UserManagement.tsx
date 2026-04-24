@@ -106,6 +106,17 @@ export function UserManagement() {
     },
   });
 
+  const deactivateAllExceptAliMutation = useMutation({
+    mutationFn: () => usersAPI.deactivateAllExceptAli(),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success(res.data?.message || 'All non-Ali users were deactivated');
+    },
+    onError: () => {
+      toast.error('Failed to deactivate non-Ali users');
+    },
+  });
+
   const onSubmit = async (data: UserFormData) => {
     try {
       if (editingUser) {
@@ -157,13 +168,23 @@ export function UserManagement() {
     }
   };
 
+  const handleDeactivateAllExceptAli = () => {
+    if (
+      window.confirm(
+        'This will deactivate all users except ali@the-leadlab.com. Continue?'
+      )
+    ) {
+      deactivateAllExceptAliMutation.mutate();
+    }
+  };
+
   if (isUsersLoading || isOrgsLoading) {
     return <div className="p-6">Loading...</div>;
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center gap-3">
         <div className="flex-1 max-w-sm">
           <Input
             placeholder="Search users..."
@@ -172,17 +193,26 @@ export function UserManagement() {
             className="w-full"
           />
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={(open) => {
-          if (!open) {
-            setIsDialogOpen(false);
-            setEditingUser(null);
-            form.reset();
-          }
-        }}>
-          <DialogTrigger asChild>
-            <Button onClick={handleAddUser}>Add User</Button>
-          </DialogTrigger>
-          <DialogContent className="bg-white sm:max-w-[425px]">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="text-red-600 border-red-300 hover:bg-red-50"
+            onClick={handleDeactivateAllExceptAli}
+            disabled={deactivateAllExceptAliMutation.isPending}
+          >
+            {deactivateAllExceptAliMutation.isPending ? 'Deleting...' : 'Delete all except Ali'}
+          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            if (!open) {
+              setIsDialogOpen(false);
+              setEditingUser(null);
+              form.reset();
+            }
+          }}>
+            <DialogTrigger asChild>
+              <Button onClick={handleAddUser}>Add User</Button>
+            </DialogTrigger>
+            <DialogContent className="bg-white sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>{editingUser ? 'Edit User' : 'Add New User'}</DialogTitle>
             </DialogHeader>
@@ -335,8 +365,9 @@ export function UserManagement() {
                 </div>
               </form>
             </Form>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="rounded-md border">
