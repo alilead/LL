@@ -212,7 +212,7 @@ def google_email_oauth_callback(
     db.commit()
     db.refresh(account)
     try:
-        EmailService(db).sync_account_emails(account.id, days_back=14)
+        EmailService(db).sync_account_emails(account.id, days_back=365)
     except Exception as sync_err:
         logger.warning("Initial Gmail sync failed after OAuth callback: %s", sync_err)
     return RedirectResponse(url=f"{redirect_base}?tab=integrations&email_oauth=success")
@@ -428,33 +428,42 @@ async def send_email(
     if not account:
         raise HTTPException(status_code=404, detail="Email account not found")
     
-    success = email_service.send_email(
-        account_id=email_data.account_id,
-        to_emails=email_data.to_emails,
-        subject=email_data.subject,
-        body_text=email_data.body_text,
-        body_html=email_data.body_html,
-        cc_emails=email_data.cc_emails,
-        bcc_emails=email_data.bcc_emails,
-        reply_to=email_data.reply_to
-    )
-    
-    if success:
-        provider_mode = getattr(settings, "EMAIL_PROVIDER", "auto").lower()
+    try:
+        send_result = email_service.send_email(
+            account_id=email_data.account_id,
+            to_emails=email_data.to_emails,
+            subject=email_data.subject,
+            body_text=email_data.body_text,
+            body_html=email_data.body_html,
+            cc_emails=email_data.cc_emails,
+            bcc_emails=email_data.bcc_emails,
+            reply_to=email_data.reply_to
+        )
+    except Exception as e:
+        logger.error("Unexpected send_email error for account %s: %s", email_data.account_id, str(e), exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"code": "SEND_INTERNAL_ERROR", "message": "Unexpected email send failure", "retryable": True},
+        )
+
+    if send_result.get("sent"):
         return {
             "message": "Email sent successfully",
-            "transport": provider_mode,
+            "transport": send_result.get("transport") or getattr(settings, "EMAIL_PROVIDER", "auto").lower(),
+            "sent": True,
+            "persisted": bool(send_result.get("persisted", True)),
+            "warning": send_result.get("warning"),
         }
-    else:
-        detail = {
-            "code": email_service.last_send_error_code or "DELIVERY_FAILED",
-            "message": email_service.last_send_error or "Email delivery failed",
-            "retryable": email_service.last_send_retryable,
-        }
-        raise HTTPException(
-            status_code=email_service.last_send_status_code or status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=detail
-        )
+
+    detail = {
+        "code": email_service.last_send_error_code or "DELIVERY_FAILED",
+        "message": email_service.last_send_error or "Email delivery failed",
+        "retryable": email_service.last_send_retryable,
+    }
+    raise HTTPException(
+        status_code=email_service.last_send_status_code or status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=detail
+    )
 
 
 @router.post("/send-template", response_model=schemas.email.SendEmailResponse)

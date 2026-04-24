@@ -18,11 +18,14 @@ export interface EmailAccount {
 export interface EmailMessage {
   id: number;
   subject: string;
+  from_email?: string;
   from_address: string;
   from_name: string;
+  to_emails?: string[] | string;
   to_address: string;
   body_text: string;
   body_html: string;
+  status?: string;
   received_date: string;
   sent_date: string;
   is_read: boolean;
@@ -33,6 +36,37 @@ export interface EmailMessage {
   email_account_id: number;
   organization_id: number;
 }
+
+export interface SendEmailResult {
+  message: string;
+  transport?: string;
+  sent?: boolean;
+  persisted?: boolean;
+  warning?: string | null;
+}
+
+const normalizeEmailMessage = (raw: any): EmailMessage => {
+  const fromAddress = raw.from_address || raw.from_email || '';
+  const fromName = raw.from_name || fromAddress;
+  const toAddress = raw.to_address || (Array.isArray(raw.to_emails) ? raw.to_emails.join(', ') : raw.to_emails || '');
+  const status = String(raw.status || '').toLowerCase();
+  const isRead = typeof raw.is_read === 'boolean' ? raw.is_read : status === 'read';
+  return {
+    ...raw,
+    from_address: fromAddress,
+    from_name: fromName,
+    to_address: toAddress,
+    body_text: raw.body_text || '',
+    body_html: raw.body_html || '',
+    received_date: raw.received_date || raw.sent_date || new Date().toISOString(),
+    sent_date: raw.sent_date || raw.received_date || new Date().toISOString(),
+    is_read: isRead,
+    is_important: Boolean(raw.is_important),
+    is_starred: Boolean(raw.is_starred),
+    has_attachments: Boolean(raw.has_attachments),
+    folder_name: raw.folder_name || (raw.direction === 'outgoing' ? 'SENT' : 'INBOX'),
+  };
+};
 
 export interface EmailFolder {
   name: string;
@@ -178,7 +212,7 @@ const emailAPI = {
     const response = await api.get(`/email/emails`, {
       params
     });
-    const list = Array.isArray(response.data) ? response.data : [];
+    const list = Array.isArray(response.data) ? response.data.map(normalizeEmailMessage) : [];
     return {
       emails: list,
       total: list.length,
@@ -192,7 +226,7 @@ const emailAPI = {
     return response.data;
   },
 
-  async sendEmail(data: SendEmailData): Promise<EmailMessage> {
+  async sendEmail(data: SendEmailData): Promise<SendEmailResult> {
     const payload = {
       account_id: data.account_id,
       to_emails: parseRecipients(data.to),

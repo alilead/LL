@@ -11,7 +11,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 import logging
@@ -96,6 +96,7 @@ class EmailService:
         self.last_send_error_code: Optional[str] = None
         self.last_send_retryable: bool = False
         self.last_send_status_code: int = 503
+        self.last_send_warning: Optional[str] = None
 
     def _set_send_error(
         self,
@@ -479,6 +480,13 @@ class EmailService:
             account = self.db.query(EmailAccount).filter(EmailAccount.id == account_id).first()
             if not account:
                 raise ValueError("Email account not found")
+
+            previous_last_sync = account.last_sync_at
+            configured_days = int(account.days_to_sync or days_back or 30)
+            effective_days_back = max(int(days_back or 0), configured_days)
+            if account.provider_type == EmailProviderType.GMAIL.value and not previous_last_sync:
+                # First Gmail sync should import sufficient history.
+                effective_days_back = max(effective_days_back, 365)
             
             # Refresh to get current values
             self.db.refresh(account)
@@ -495,7 +503,7 @@ class EmailService:
             
             # Gmail OAuth path (avoids app-password IMAP failures)
             if account.provider_type == EmailProviderType.GMAIL.value and account.oauth_refresh_token:
-                return self._sync_gmail_api_account(account, days_back)
+                return self._sync_gmail_api_account(account, effective_days_back)
 
             # Connect to IMAP
             password = decrypt_password(account.password_encrypted)
@@ -507,7 +515,7 @@ class EmailService:
             
             # Sync INBOX
             if account.sync_inbox:
-                inbox_synced, inbox_errors = self._sync_folder(imap, account, "INBOX", days_back)
+                inbox_synced, inbox_errors = self._sync_folder(imap, account, "INBOX", effective_days_back)
                 total_synced += inbox_synced
                 total_errors += inbox_errors
             
@@ -515,7 +523,7 @@ class EmailService:
             # Gmail değil custom provider olduğu için standard "Sent" klasörünü kullan
             try:
                 sent_folder = "Sent"  # Custom provider için standard folder
-                sent_synced, sent_errors = self._sync_folder(imap, account, sent_folder, days_back)
+                sent_synced, sent_errors = self._sync_folder(imap, account, sent_folder, effective_days_back)
                 total_synced += sent_synced
                 total_errors += sent_errors
             except Exception as sent_error:
@@ -644,90 +652,114 @@ class EmailService:
         status: EmailStatus,
     ) -> Tuple[int, int]:
         headers = {"Authorization": f"Bearer {access_token}"}
-        params = {"maxResults": 100, "q": f"{label_query} newer_than:{days_back}d"}
-        list_resp = requests.get(
-            "https://gmail.googleapis.com/gmail/v1/users/me/messages",
-            headers=headers,
-            params=params,
-            timeout=30,
-        )
-        if list_resp.status_code >= 400:
-            raise ValueError(f"Gmail list failed ({list_resp.status_code})")
-        messages = list_resp.json().get("messages", []) or []
+        query = label_query if days_back <= 0 else f"{label_query} newer_than:{days_back}d"
         synced_count = 0
         error_count = 0
+        page_token: Optional[str] = None
+        pages = 0
 
-        for item in messages:
-            msg_id = item.get("id")
-            if not msg_id:
-                continue
-            try:
-                detail_resp = requests.get(
-                    f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}",
-                    headers=headers,
-                    params={"format": "metadata", "metadataHeaders": ["Subject", "From", "To", "Date", "Message-ID"]},
-                    timeout=30,
-                )
-                if detail_resp.status_code >= 400:
-                    error_count += 1
+        while True:
+            params: Dict[str, Any] = {"maxResults": 100, "q": query}
+            if page_token:
+                params["pageToken"] = page_token
+            list_resp = requests.get(
+                "https://gmail.googleapis.com/gmail/v1/users/me/messages",
+                headers=headers,
+                params=params,
+                timeout=30,
+            )
+            if list_resp.status_code >= 400:
+                raise ValueError(f"Gmail list failed ({list_resp.status_code})")
+            data = list_resp.json()
+            messages = data.get("messages", []) or []
+            pages += 1
+
+            for item in messages:
+                msg_id = item.get("id")
+                if not msg_id:
                     continue
-                payload = detail_resp.json()
-                header_map = {}
-                for h in (payload.get("payload", {}).get("headers", []) or []):
-                    name = (h.get("name") or "").strip().lower()
-                    if name:
-                        header_map[name] = h.get("value") or ""
+                try:
+                    detail_resp = requests.get(
+                        f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}",
+                        headers=headers,
+                        params={"format": "metadata", "metadataHeaders": ["Subject", "From", "To", "Date", "Message-ID"]},
+                        timeout=30,
+                    )
+                    if detail_resp.status_code >= 400:
+                        error_count += 1
+                        continue
+                    payload = detail_resp.json()
+                    header_map = {}
+                    for h in (payload.get("payload", {}).get("headers", []) or []):
+                        name = (h.get("name") or "").strip().lower()
+                        if name:
+                            header_map[name] = h.get("value") or ""
 
-                message_id = header_map.get("message-id") or payload.get("id")
-                existing = self.db.query(Email).filter(
-                    Email.message_id == message_id,
-                    Email.email_account_id == account.id,
-                ).first()
-                if existing:
-                    continue
+                    message_id = header_map.get("message-id") or payload.get("id")
+                    existing = self.db.query(Email).filter(
+                        Email.message_id == message_id,
+                        Email.email_account_id == account.id,
+                    ).first()
+                    if existing:
+                        continue
 
-                from_name, from_email = parseaddr(header_map.get("from", ""))
-                to_raw = header_map.get("to", "")
-                to_list = [addr.strip() for addr in re.split(r"[;,]", to_raw) if addr.strip()]
-                internal_ms = payload.get("internalDate")
-                sent_date = datetime.utcnow()
-                if internal_ms:
-                    try:
-                        sent_date = datetime.utcfromtimestamp(int(internal_ms) / 1000.0)
-                    except Exception:
-                        pass
-                else:
-                    date_header = header_map.get("date")
-                    if date_header:
+                    from_name, from_email = parseaddr(header_map.get("from", ""))
+                    to_raw = header_map.get("to", "")
+                    to_list = [addr.strip() for addr in re.split(r"[;,]", to_raw) if addr.strip()]
+                    internal_ms = payload.get("internalDate")
+                    sent_date = datetime.utcnow()
+                    if internal_ms:
                         try:
-                            sent_date = parsedate_to_datetime(date_header).replace(tzinfo=None)
+                            sent_date = datetime.utcfromtimestamp(int(internal_ms) / 1000.0)
                         except Exception:
                             pass
+                    else:
+                        date_header = header_map.get("date")
+                        if date_header:
+                            try:
+                                sent_date = parsedate_to_datetime(date_header).replace(tzinfo=None)
+                            except Exception:
+                                pass
 
-                db_email = Email(
-                    email_account_id=account.id,
-                    organization_id=account.organization_id,
-                    message_id=message_id,
-                    thread_id=payload.get("threadId"),
-                    subject=header_map.get("subject") or "(No Subject)",
-                    from_email=from_email or account.email,
-                    from_name=from_name or from_email or account.display_name,
-                    to_emails=json.dumps(to_list),
-                    cc_emails=json.dumps([]),
-                    bcc_emails=json.dumps([]),
-                    body_text=payload.get("snippet") or "",
-                    body_html=None,
-                    sent_date=sent_date,
-                    direction=direction,
-                    status=status,
-                    has_attachments=False,
-                )
-                self.db.add(db_email)
-                self.db.commit()
-                synced_count += 1
-            except Exception:
-                self.db.rollback()
-                error_count += 1
+                    db_email = Email(
+                        email_account_id=account.id,
+                        organization_id=account.organization_id,
+                        message_id=message_id,
+                        thread_id=payload.get("threadId"),
+                        subject=header_map.get("subject") or "(No Subject)",
+                        from_email=from_email or account.email,
+                        from_name=from_name or from_email or account.display_name,
+                        to_emails=json.dumps(to_list),
+                        cc_emails=json.dumps([]),
+                        bcc_emails=json.dumps([]),
+                        body_text=payload.get("snippet") or "",
+                        body_html=None,
+                        sent_date=sent_date,
+                        received_date=sent_date,
+                        direction=direction,
+                        status=status,
+                        folder_name="INBOX" if direction == EmailDirection.incoming else "SENT",
+                        has_attachments=False,
+                    )
+                    self.db.add(db_email)
+                    self.db.commit()
+                    synced_count += 1
+                except Exception:
+                    self.db.rollback()
+                    error_count += 1
+
+            page_token = data.get("nextPageToken")
+            if not page_token:
+                break
+
+        logger.info(
+            "Gmail sync label=%s account=%s pages=%s synced=%s errors=%s",
+            label_query,
+            account.id,
+            pages,
+            synced_count,
+            error_count,
+        )
         return synced_count, error_count
     
     def _sync_folder(self, imap: imaplib.IMAP4, account: EmailAccount, folder: str, days_back: int) -> Tuple[int, int]:
@@ -1109,12 +1141,13 @@ class EmailService:
         cc_emails: Optional[List[str]] = None,
         bcc_emails: Optional[List[str]] = None,
         reply_to: Optional[str] = None
-    ) -> bool:
+    ) -> Dict[str, Any]:
         """Send email via SMTP, API provider, or auto fallback."""
         self.last_send_error = None
         self.last_send_error_code = None
         self.last_send_retryable = False
         self.last_send_status_code = 503
+        self.last_send_warning = None
 
         account = self.db.query(EmailAccount).filter(EmailAccount.id == account_id).first()
         if not account:
@@ -1152,20 +1185,34 @@ class EmailService:
                     transport_used = "api"
 
             if not sent:
-                return False
+                return {"sent": False, "persisted": False, "transport": transport_used}
 
-            self._persist_sent_email(
-                account=account,
-                subject=subject,
-                body_text=body_text,
-                body_html=body_html,
-                to_emails=to_emails,
-                cc_emails=cc_emails,
-                bcc_emails=bcc_emails,
-                message_id=msg.get("Message-ID"),
-            )
+            persisted = True
+            warning: Optional[str] = None
+            try:
+                self._persist_sent_email(
+                    account=account,
+                    subject=subject,
+                    body_text=body_text,
+                    body_html=body_html,
+                    to_emails=to_emails,
+                    cc_emails=cc_emails,
+                    bcc_emails=bcc_emails,
+                    message_id=msg.get("Message-ID"),
+                )
+            except Exception as persist_err:
+                self.db.rollback()
+                persisted = False
+                warning = "Email was sent, but saving it locally failed. Please refresh or run sync."
+                self.last_send_warning = warning
+                logger.error(
+                    "Email delivered but persistence failed for account %s: %s",
+                    account.id,
+                    str(persist_err),
+                    exc_info=True,
+                )
             logger.info("Email delivered successfully via %s transport for account %s", transport_used, account.id)
-            return True
+            return {"sent": True, "persisted": persisted, "transport": transport_used, "warning": warning}
 
         except Exception as e:
             self._set_send_error(
@@ -1175,7 +1222,7 @@ class EmailService:
                 status_code=503,
             )
             logger.error("Failed to send email for %s: %s: %s", account.email, type(e).__name__, str(e))
-            return False
+            return {"sent": False, "persisted": False, "transport": None}
 
     def _build_message(
         self,

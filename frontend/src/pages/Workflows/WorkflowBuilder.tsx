@@ -1,932 +1,934 @@
-/**
- * 🎨 WORKFLOW VISUAL BUILDER
- *
- * A drag-and-drop workflow canvas that makes automation feel like art.
- * Inspired by: Zapier, n8n, but infinitely better integrated.
- *
- * Features:
- * - Visual node-based workflow design
- * - Drag-and-drop action blocks
- * - Live connection drawing
- * - Real-time collaboration (coming soon)
- * - Undo/redo support
- * - Auto-save
- */
-
-import React, { useState, useCallback, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { workflowsAPI, Workflow, WorkflowNode, WorkflowEdge } from '@/services/api/workflows';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { workflowsAPI, Workflow, WorkflowEdge, WorkflowNode } from '@/services/api/workflows';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
 import { Card, CardContent } from '@/components/ui/Card';
-import { Textarea } from '@/components/ui/Textarea';
-import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/Badge';
+import { useToast } from '@/hooks/use-toast';
 import {
-  Save, Play, ArrowLeft, Settings, Plus, Trash2, GitBranch,
-  Mail, Database, Webhook, Clock, User, CheckCircle, Zap,
-  MessageSquare, Calendar, FileText, Bell, Copy, Edit3,
-  Loader2, ChevronRight
+  ArrowLeft,
+  Plus,
+  Save,
+  Loader2,
+  Trash2,
+  Copy,
+  PenSquare,
+  GitBranch,
+  Unlink,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { bezierPath, deriveTriggerType, migrateLegacyFlow } from './mindMapUtils';
 
-// ============================================================================
-// NODE TYPES & TEMPLATES
-// ============================================================================
+type MindNodeKind = 'central' | 'standard' | 'free_text';
+type TemplateCategory = 'starting' | 'flow' | 'logic';
+type HistorySnapshot = { nodes: WorkflowNode[]; edges: WorkflowEdge[] };
+type ReconnectEnd = 'source' | 'target';
 
 interface NodeTemplate {
   type: string;
   label: string;
-  icon: any;
-  color: string;
   description: string;
-  category: 'trigger' | 'action' | 'condition' | 'end';
+  category: TemplateCategory;
+  kind: MindNodeKind;
+  color: string;
 }
+
+interface MapTemplate {
+  id: string;
+  label: string;
+  nodes: WorkflowNode[];
+  edges: WorkflowEdge[];
+}
+
+const NODE_WIDTH = 240;
+const NODE_HEIGHT = 84;
+const TEMPLATE_STORAGE_KEY = 'mind-map-custom-templates-v1';
 
 const NODE_TEMPLATES: NodeTemplate[] = [
-  // Triggers
-  { type: 'record_created', label: 'Record Created', icon: Plus, color: 'bg-green-100 text-green-600', description: 'When a record is created', category: 'trigger' },
-  { type: 'record_updated', label: 'Record Updated', icon: Edit3, color: 'bg-blue-100 text-blue-600', description: 'When a record is updated', category: 'trigger' },
-  { type: 'field_changed', label: 'Field Changed', icon: GitBranch, color: 'bg-purple-100 text-purple-600', description: 'When a specific field changes', category: 'trigger' },
-  { type: 'time_based', label: 'Time-Based', icon: Clock, color: 'bg-orange-100 text-orange-600', description: 'On a schedule', category: 'trigger' },
-
-  // Actions
-  { type: 'send_email', label: 'Send Email', icon: Mail, color: 'bg-blue-100 text-blue-600', description: 'Send an email to someone', category: 'action' },
-  { type: 'update_field', label: 'Update Field', icon: Database, color: 'bg-indigo-100 text-indigo-600', description: 'Update a field value', category: 'action' },
-  { type: 'create_task', label: 'Create Task', icon: CheckCircle, color: 'bg-green-100 text-green-600', description: 'Create a new task', category: 'action' },
-  { type: 'send_notification', label: 'Send Notification', icon: Bell, color: 'bg-yellow-100 text-yellow-600', description: 'Send in-app notification', category: 'action' },
-  { type: 'webhook', label: 'Call Webhook', icon: Webhook, color: 'bg-purple-100 text-purple-600', description: 'Call external API', category: 'action' },
-  { type: 'assign_user', label: 'Assign User', icon: User, color: 'bg-pink-100 text-pink-600', description: 'Assign to a user', category: 'action' },
-
-  // Conditions
-  { type: 'condition', label: 'If/Then/Else', icon: GitBranch, color: 'bg-orange-100 text-orange-600', description: 'Conditional logic', category: 'condition' },
-  { type: 'wait', label: 'Wait', icon: Clock, color: 'bg-gray-100 text-gray-600', description: 'Wait for a duration', category: 'condition' },
+  { type: 'central_topic', label: 'Central Topic', description: 'Main idea', category: 'starting', kind: 'central', color: 'bg-indigo-100 text-indigo-700' },
+  { type: 'record_created', label: 'Record Created', description: 'When a record is created', category: 'starting', kind: 'standard', color: 'bg-green-100 text-green-700' },
+  { type: 'record_updated', label: 'Record Updated', description: 'When a record is updated', category: 'starting', kind: 'standard', color: 'bg-blue-100 text-blue-700' },
+  { type: 'field_changed', label: 'Field Changed', description: 'When a field changes', category: 'starting', kind: 'standard', color: 'bg-purple-100 text-purple-700' },
+  { type: 'send_email', label: 'Send Email', description: 'Send message', category: 'flow', kind: 'standard', color: 'bg-sky-100 text-sky-700' },
+  { type: 'create_task', label: 'Create Task', description: 'Add follow-up', category: 'flow', kind: 'standard', color: 'bg-emerald-100 text-emerald-700' },
+  { type: 'update_field', label: 'Update Field', description: 'Change data', category: 'flow', kind: 'standard', color: 'bg-amber-100 text-amber-700' },
+  { type: 'condition', label: 'Decision', description: 'Branch logic', category: 'logic', kind: 'standard', color: 'bg-orange-100 text-orange-700' },
+  { type: 'wait', label: 'Wait', description: 'Delay node', category: 'logic', kind: 'standard', color: 'bg-gray-100 text-gray-700' },
+  { type: 'free_text', label: 'Text Note', description: 'Standalone text', category: 'flow', kind: 'free_text', color: 'bg-white text-neutral-800' },
 ];
 
-const NODE_W = 256;
-const NODE_BODY_H = 96;
-
-function templateCategory(type: string) {
-  return NODE_TEMPLATES.find((t) => t.type === type)?.category;
-}
-
-/** Maps first trigger node to API WorkflowTriggerType */
-function deriveTriggerType(nodes: WorkflowNode[]): string {
-  const trigger = nodes.find((n) => templateCategory(n.type) === 'trigger');
-  if (!trigger) return 'manual';
-  const allowed = new Set([
-    'record_created',
-    'record_updated',
-    'record_deleted',
-    'field_changed',
-    'time_based',
-    'webhook',
-    'manual',
-  ]);
-  return allowed.has(trigger.type) ? trigger.type : 'manual';
-}
-
-function normalizeFlowDefinition(flow: { nodes?: WorkflowNode[]; edges?: WorkflowEdge[] }) {
-  const nodes = (flow.nodes || []).map((n) => ({
-    id: String(n.id),
-    type: String(n.type),
-    label: String(n.label || 'Step'),
-    position: {
-      x: Number(n.position?.x ?? 0),
-      y: Number(n.position?.y ?? 0),
-    },
-    data: typeof n.data === 'object' && n.data !== null ? { ...(n.data as object) } : {},
-  }));
-  const edges = (flow.edges || []).map((e) => {
-    const edge: WorkflowEdge = {
-      id: String(e.id),
-      source: String(e.source),
-      target: String(e.target),
-    };
-    if (e.label) edge.label = e.label;
-    if (e.data && typeof e.data === 'object') edge.data = e.data;
-    return edge;
-  });
-  return { nodes, edges };
-}
+const DEFAULT_TEMPLATES: MapTemplate[] = [
+  {
+    id: 'brainstorm',
+    label: 'Brainstorm',
+    nodes: [
+      { id: 'n1', type: 'central_topic', label: 'Brainstorm Topic', position: { x: 380, y: 220 }, data: { kind: 'central' } },
+      { id: 'n2', type: 'free_text', label: 'Idea A', position: { x: 150, y: 120 }, data: { kind: 'free_text' } },
+      { id: 'n3', type: 'free_text', label: 'Idea B', position: { x: 650, y: 140 }, data: { kind: 'free_text' } },
+      { id: 'n4', type: 'free_text', label: 'Idea C', position: { x: 640, y: 360 }, data: { kind: 'free_text' } },
+    ],
+    edges: [
+      { id: 'e1', source: 'n1', target: 'n2' },
+      { id: 'e2', source: 'n1', target: 'n3' },
+      { id: 'e3', source: 'n1', target: 'n4' },
+    ],
+  },
+  {
+    id: 'project-plan',
+    label: 'Project Plan',
+    nodes: [
+      { id: 'p1', type: 'central_topic', label: 'Project', position: { x: 360, y: 220 }, data: { kind: 'central' } },
+      { id: 'p2', type: 'create_task', label: 'Milestone 1', position: { x: 120, y: 100 }, data: { kind: 'standard' } },
+      { id: 'p3', type: 'create_task', label: 'Milestone 2', position: { x: 620, y: 100 }, data: { kind: 'standard' } },
+      { id: 'p4', type: 'condition', label: 'Risks', position: { x: 360, y: 380 }, data: { kind: 'standard' } },
+    ],
+    edges: [
+      { id: 'ep1', source: 'p1', target: 'p2' },
+      { id: 'ep2', source: 'p1', target: 'p3' },
+      { id: 'ep3', source: 'p1', target: 'p4' },
+    ],
+  },
+];
 
 function parseApiError(err: unknown): string {
   if (err && typeof err === 'object' && 'response' in err) {
     const data = (err as { response?: { data?: { detail?: unknown } } }).response?.data;
-    const d = data?.detail;
-    if (typeof d === 'string') return d;
-    if (Array.isArray(d)) return d.map((x) => JSON.stringify(x)).join('; ');
+    if (typeof data?.detail === 'string') return data.detail;
   }
   if (err instanceof Error) return err.message;
-  return 'Could not save workflow';
+  return 'Request failed';
 }
 
-// ============================================================================
-// WORKFLOW NODE COMPONENT (Make-style ports: in top+left, out bottom)
-// ============================================================================
-
-interface WorkflowNodeComponentProps {
-  node: WorkflowNode;
-  isSelected: boolean;
-  connectionFromId: string | null;
-  onCardClick: (event: React.MouseEvent, nodeId: string) => void;
-  onInputPort: (targetNodeId: string) => void;
-  onOutputPort: (sourceNodeId: string) => void;
-  onDelete: () => void;
-  onDragStart: (event: React.MouseEvent, nodeId: string) => void;
-}
-
-const WorkflowNodeComponent: React.FC<WorkflowNodeComponentProps> = ({
-  node,
-  isSelected,
-  connectionFromId,
-  onCardClick,
-  onInputPort,
-  onOutputPort,
-  onDelete,
-  onDragStart,
-}) => {
-  const template = NODE_TEMPLATES.find((t) => t.type === node.type);
-  const Icon = template?.icon || Zap;
-  const highlightIn =
-    connectionFromId && connectionFromId !== node.id ? 'ring-2 ring-amber-400 ring-offset-1' : '';
-  const highlightOut = connectionFromId === node.id ? 'ring-2 ring-green-500 ring-offset-1' : '';
-
-  return (
-    <motion.div
-      initial={{ scale: 0.9, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      exit={{ scale: 0.9, opacity: 0 }}
-      className={`absolute cursor-default ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 rounded-xl' : ''}`}
-      style={{
-        left: node.position.x,
-        top: node.position.y,
-        width: NODE_W,
-      }}
-      onClick={(e) => onCardClick(e, node.id)}
-      onMouseDown={(e) => onDragStart(e, node.id)}
-    >
-      <Card className="relative w-64 shadow-lg hover:shadow-xl transition-all pointer-events-auto">
-        <CardContent className="p-4 relative">
-          {/* Input — top (incoming) */}
-          <button
-            type="button"
-            data-workflow-port="in-top"
-            title="Input: connect to this step"
-            className={`absolute -top-2 left-1/2 z-20 h-5 w-5 -translate-x-1/2 rounded-full border-2 border-white bg-blue-500 shadow transition hover:scale-110 ${highlightIn}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onInputPort(node.id);
-            }}
-          />
-          {/* Input — left (merge / branch in) */}
-          <button
-            type="button"
-            data-workflow-port="in-left"
-            title="Input: alternate entry"
-            className={`absolute left-[-10px] top-1/2 z-20 h-5 w-5 -translate-y-1/2 rounded-full border-2 border-white bg-blue-500 shadow transition hover:scale-110 ${highlightIn}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onInputPort(node.id);
-            }}
-          />
-          {/* Output — bottom (outgoing) */}
-          <button
-            type="button"
-            data-workflow-port="out"
-            title="Output: click then click another step’s top or left input"
-            className={`absolute -bottom-2 left-1/2 z-20 h-5 w-5 -translate-x-1/2 rounded-full border-2 border-white bg-blue-600 shadow transition hover:scale-110 ${highlightOut}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onOutputPort(node.id);
-            }}
-          />
-
-          <div className="flex items-start gap-3">
-            <div className={`p-2 rounded-lg ${template?.color || 'bg-gray-100'}`}>
-              <Icon className="h-5 w-5" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h4 className="font-semibold text-sm truncate">{node.label}</h4>
-              <p className="text-xs text-gray-500 mt-1">{template?.description}</p>
-              {node.data && Object.keys(node.data).length > 0 && (
-                <div className="mt-2 text-xs text-gray-600">
-                  {Object.keys(node.data).filter((k) => node.data[k] !== '' && node.data[k] != null).length}{' '}
-                  field(s) set
-                </div>
-              )}
-            </div>
-            {isSelected && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete();
-                }}
-                className="h-6 w-6 p-0"
-              >
-                <Trash2 className="h-3 w-3 text-red-600" />
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
-};
-
-// ============================================================================
-// MAIN WORKFLOW BUILDER COMPONENT
-// ============================================================================
-
-function NodeConfigEditor({
-  node,
-  onChange,
-}: {
-  node: WorkflowNode;
-  onChange: (patch: Record<string, unknown>) => void;
-}) {
-  const d = (node.data || {}) as Record<string, unknown>;
-  const val = (k: string) => (d[k] != null ? String(d[k]) : '');
-  const setField = (key: string, value: unknown) => onChange({ ...d, [key]: value });
-
-  const commonObject = (
-    <div>
-      <Label className="text-xs">Record type</Label>
-      <select
-        className="mt-1 w-full rounded-md border border-gray-300 bg-white px-2 py-2 text-sm dark:bg-neutral-900 dark:border-neutral-600"
-        value={val('object_type') || 'lead'}
-        onChange={(e) => setField('object_type', e.target.value)}
-      >
-        <option value="lead">Lead</option>
-        <option value="deal">Deal</option>
-        <option value="contact">Contact</option>
-        <option value="account">Account</option>
-      </select>
-    </div>
-  );
-
-  switch (node.type) {
-    case 'record_created':
-    case 'record_updated':
-    case 'field_changed':
-      return (
-        <div className="space-y-3">
-          {commonObject}
-          {node.type === 'field_changed' && (
-            <div>
-              <Label className="text-xs">Field name</Label>
-              <Input
-                className="mt-1"
-                placeholder="e.g. status"
-                value={val('field_name')}
-                onChange={(e) => setField('field_name', e.target.value)}
-              />
-            </div>
-          )}
-        </div>
-      );
-    case 'send_email':
-      return (
-        <div className="space-y-3">
-          <div>
-            <Label className="text-xs">To (email or merge field)</Label>
-            <Input
-              className="mt-1"
-              value={val('to')}
-              onChange={(e) => setField('to', e.target.value)}
-              placeholder="{{lead.email}}"
-            />
-          </div>
-          <div>
-            <Label className="text-xs">Subject</Label>
-            <Input className="mt-1" value={val('subject')} onChange={(e) => setField('subject', e.target.value)} />
-          </div>
-          <div>
-            <Label className="text-xs">Body</Label>
-            <Textarea
-              className="mt-1 min-h-[100px]"
-              value={val('body')}
-              onChange={(e) => setField('body', e.target.value)}
-            />
-          </div>
-        </div>
-      );
-    case 'webhook':
-      return (
-        <div className="space-y-3">
-          <div>
-            <Label className="text-xs">URL</Label>
-            <Input className="mt-1" type="url" value={val('url')} onChange={(e) => setField('url', e.target.value)} />
-          </div>
-          <div>
-            <Label className="text-xs">Method</Label>
-            <select
-              className="mt-1 w-full rounded-md border border-gray-300 bg-white px-2 py-2 text-sm"
-              value={val('method') || 'POST'}
-              onChange={(e) => setField('method', e.target.value)}
-            >
-              <option value="POST">POST</option>
-              <option value="GET">GET</option>
-              <option value="PUT">PUT</option>
-            </select>
-          </div>
-        </div>
-      );
-    case 'update_field':
-      return (
-        <div className="space-y-3">
-          <div>
-            <Label className="text-xs">Field</Label>
-            <Input className="mt-1" value={val('field')} onChange={(e) => setField('field', e.target.value)} />
-          </div>
-          <div>
-            <Label className="text-xs">Value</Label>
-            <Input className="mt-1" value={val('value')} onChange={(e) => setField('value', e.target.value)} />
-          </div>
-        </div>
-      );
-    case 'condition':
-      return (
-        <div>
-          <Label className="text-xs">Condition (expression)</Label>
-          <Textarea
-            className="mt-1 min-h-[88px] font-mono text-xs"
-            value={val('expression')}
-            onChange={(e) => setField('expression', e.target.value)}
-            placeholder="e.g. lead.stage == 'qualified'"
-          />
-        </div>
-      );
-    case 'wait':
-      return (
-        <div>
-          <Label className="text-xs">Wait (minutes)</Label>
-          <Input
-            type="number"
-            min={1}
-            className="mt-1"
-            value={val('minutes') || '5'}
-            onChange={(e) => setField('minutes', Number(e.target.value))}
-          />
-        </div>
-      );
-    case 'time_based':
-      return (
-        <div>
-          <Label className="text-xs">Cron / schedule (human-readable)</Label>
-          <Input
-            className="mt-1"
-            value={val('schedule')}
-            onChange={(e) => setField('schedule', e.target.value)}
-            placeholder="0 9 * * MON"
-          />
-        </div>
-      );
-    default:
-      return (
-        <div>
-          <Label className="text-xs">Notes (stored on this step)</Label>
-          <Textarea
-            className="mt-1 min-h-[80px] text-sm"
-            value={val('notes')}
-            onChange={(e) => setField('notes', e.target.value)}
-          />
-        </div>
-      );
-  }
-}
-
-export const WorkflowBuilder: React.FC = () => {
+const WorkflowBuilder: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const canvasRef = useRef<HTMLDivElement | null>(null);
 
-  const [workflow, setWorkflow] = useState<Partial<Workflow>>({
-    name: 'Untitled Mind Map',
-    description: '',
-    trigger_type: 'manual',
-    trigger_object: 'lead',
-    flow_definition: {
-      nodes: [],
-      edges: []
-    },
-    is_active: false
-  });
-
+  const [name, setName] = useState('Untitled Mind Map');
+  const [description, setDescription] = useState('');
+  const [nodes, setNodes] = useState<WorkflowNode[]>([]);
+  const [edges, setEdges] = useState<WorkflowEdge[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [connectionFromId, setConnectionFromId] = useState<string | null>(null);
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [snapGrid, setSnapGrid] = useState(true);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [panning, setPanning] = useState(false);
+  const [panOrigin, setPanOrigin] = useState({ x: 0, y: 0 });
+  const [linkFrom, setLinkFrom] = useState<string | null>(null);
+  const [linkCursor, setLinkCursor] = useState({ x: 0, y: 0 });
+  const [clipboardNode, setClipboardNode] = useState<WorkflowNode | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string | null } | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [reconnectingEdge, setReconnectingEdge] = useState<{ edgeId: string; end: ReconnectEnd } | null>(null);
+  const [dragGuides, setDragGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
+  const [history, setHistory] = useState<HistorySnapshot[]>([]);
+  const [future, setFuture] = useState<HistorySnapshot[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('brainstorm');
+  const [customTemplates, setCustomTemplates] = useState<MapTemplate[]>([]);
 
-  // Fetch existing workflow if editing
+  const allTemplates = useMemo(() => [...DEFAULT_TEMPLATES, ...customTemplates], [customTemplates]);
+  const selectedNode = useMemo(() => nodes.find((n) => n.id === selectedNodeId) || null, [nodes, selectedNodeId]);
+  const selectedEdge = useMemo(() => edges.find((e) => e.id === selectedEdgeId) || null, [edges, selectedEdgeId]);
+  const mapBounds = useMemo(() => {
+    if (!nodes.length) return { minX: 0, maxX: 1000, minY: 0, maxY: 700 };
+    const xs = nodes.map((n) => n.position.x);
+    const ys = nodes.map((n) => n.position.y);
+    return {
+      minX: Math.min(...xs) - 80,
+      maxX: Math.max(...xs) + NODE_WIDTH + 80,
+      minY: Math.min(...ys) - 80,
+      maxY: Math.max(...ys) + NODE_HEIGHT + 80,
+    };
+  }, [nodes]);
+
+  const pushHistory = useCallback(() => {
+    setHistory((prev) => [...prev.slice(-49), { nodes: structuredClone(nodes), edges: structuredClone(edges) }]);
+    setFuture([]);
+  }, [nodes, edges]);
+
+  useEffect(() => {
+    const raw = localStorage.getItem(TEMPLATE_STORAGE_KEY);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as MapTemplate[];
+      if (Array.isArray(parsed)) setCustomTemplates(parsed);
+    } catch {
+      // noop
+    }
+  }, []);
+
   const { data: existingWorkflow, isLoading } = useQuery({
     queryKey: ['workflow', id],
     queryFn: () => workflowsAPI.getById(Number(id)),
-    enabled: !!id && id !== 'new'
+    enabled: !!id && id !== 'new',
   });
 
   useEffect(() => {
-    if (existingWorkflow) {
-      setWorkflow(existingWorkflow);
-    }
+    if (!existingWorkflow) return;
+    const migrated = migrateLegacyFlow(existingWorkflow.flow_definition);
+    setName(existingWorkflow.name || 'Untitled Mind Map');
+    setDescription(existingWorkflow.description || '');
+    setNodes(migrated.nodes);
+    setEdges(migrated.edges);
   }, [existingWorkflow]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setConnectionFromId(null);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+    if (!id || id === 'new') return;
+    const timer = window.setTimeout(() => {
+      localStorage.setItem(
+        `mind-map-draft-${id}`,
+        JSON.stringify({ nodes, edges, name, description, updatedAt: new Date().toISOString() }),
+      );
+    }, 600);
+    return () => window.clearTimeout(timer);
+  }, [id, nodes, edges, name, description]);
 
-  // Save mutation — payload matches FastAPI WorkflowCreate / WorkflowUpdate
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const fd = workflow.flow_definition || { nodes: [], edges: [] };
-      const flow = normalizeFlowDefinition(fd);
-      const trigger_type = deriveTriggerType(flow.nodes as WorkflowNode[]);
-      const baseName = (workflow.name || 'Untitled Mind Map').trim() || 'Untitled Mind Map';
-
-      if (id && id !== 'new') {
-        return workflowsAPI.update(Number(id), {
-          name: baseName,
-          description: workflow.description || undefined,
-          trigger_type: trigger_type as Workflow['trigger_type'],
-          trigger_object: workflow.trigger_object || 'lead',
-          flow_definition: flow as Workflow['flow_definition'],
-          is_active: !!workflow.is_active,
-        });
-      }
-
-      return workflowsAPI.create({
-        name: baseName,
-        description: workflow.description || undefined,
-        trigger_type,
-        trigger_object: workflow.trigger_object || 'lead',
-        flow_definition: flow as Workflow['flow_definition'],
+      const payload = {
+        name: name.trim() || 'Untitled Mind Map',
+        description: description || undefined,
+        trigger_type: deriveTriggerType(nodes),
+        trigger_object: 'lead',
+        flow_definition: {
+          version: 2,
+          mode: 'mind_map',
+          nodes,
+          edges,
+        } as any,
         is_active: false,
         status: 'draft',
-      });
+      };
+      if (id && id !== 'new') return workflowsAPI.update(Number(id), payload as Partial<Workflow>);
+      return workflowsAPI.create(payload);
     },
-    onSuccess: (data) => {
+    onSuccess: (wf) => {
       queryClient.invalidateQueries({ queryKey: ['workflows'] });
-      toast({
-        title: 'Saved',
-        description: 'Mind map saved successfully.',
-      });
-      if (id === 'new') {
-        navigate(`/workflows/${data.id}`);
-      }
+      toast({ title: 'Saved', description: 'Mind map saved successfully.' });
+      if (id === 'new') navigate(`/workflows/${wf.id}`);
     },
-    onError: (error: unknown) => {
-      toast({
-        title: 'Could not save',
-        description: parseApiError(error),
-        variant: 'destructive',
-      });
-    },
+    onError: (err) => toast({ title: 'Save failed', description: parseApiError(err), variant: 'destructive' }),
   });
 
-  // ============================================================================
-  // NODE OPERATIONS
-  // ============================================================================
-
-  const addNode = useCallback((template: NodeTemplate) => {
+  const addNodeAt = useCallback((template: NodeTemplate, x: number, y: number) => {
+    pushHistory();
+    const p = snapGrid ? { x: Math.round(x / 20) * 20, y: Math.round(y / 20) * 20 } : { x, y };
     const newNode: WorkflowNode = {
-      id: `node-${Date.now()}`,
+      id: `node-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       type: template.type,
       label: template.label,
-      position: {
-        x: 400 + Math.random() * 100,
-        y: 200 + Math.random() * 100
-      },
-      data: {}
+      position: p,
+      data: { kind: template.kind },
     };
-
-    setWorkflow(prev => ({
-      ...prev,
-      flow_definition: {
-        nodes: [...(prev.flow_definition?.nodes || []), newNode],
-        edges: prev.flow_definition?.edges || []
-      }
-    }));
-  }, []);
+    setNodes((prev) => [...prev, newNode]);
+    setSelectedNodeId(newNode.id);
+    setEditingNodeId(newNode.id);
+  }, [pushHistory, snapGrid]);
 
   const deleteNode = useCallback((nodeId: string) => {
-    setWorkflow(prev => ({
-      ...prev,
-      flow_definition: {
-        nodes: (prev.flow_definition?.nodes || []).filter(n => n.id !== nodeId),
-        edges: (prev.flow_definition?.edges || []).filter(e => e.source !== nodeId && e.target !== nodeId)
-      }
-    }));
+    pushHistory();
+    setNodes((prev) => prev.filter((n) => n.id !== nodeId));
+    setEdges((prev) => prev.filter((e) => e.source !== nodeId && e.target !== nodeId));
     setSelectedNodeId(null);
-  }, []);
+    setEditingNodeId(null);
+  }, [pushHistory]);
 
-  const updateNode = useCallback((nodeId: string, patch: { label?: string; data?: Record<string, unknown> }) => {
-    setWorkflow(prev => ({
-      ...prev,
-      flow_definition: {
-        nodes: (prev.flow_definition?.nodes || []).map((n) => {
-          if (n.id !== nodeId) return n;
-          return {
-            ...n,
-            ...(patch.label !== undefined ? { label: patch.label } : {}),
-            data:
-              patch.data !== undefined
-                ? { ...n.data, ...patch.data }
-                : n.data,
-          };
-        }),
-        edges: prev.flow_definition?.edges || [],
-      },
-    }));
-  }, []);
-
-  const selectedNode = workflow.flow_definition?.nodes?.find(n => n.id === selectedNodeId);
-
-  const updateNodePosition = useCallback((nodeId: string, x: number, y: number) => {
-    setWorkflow(prev => ({
-      ...prev,
-      flow_definition: {
-        nodes: (prev.flow_definition?.nodes || []).map(n => n.id === nodeId ? { ...n, position: { x, y } } : n),
-        edges: prev.flow_definition?.edges || []
-      }
-    }));
-  }, []);
-
-  const addEdge = useCallback((from: string, to: string) => {
-    if (from === to) return;
-    const edgeId = `edge-${from}-${to}`;
-    setWorkflow((prev) => {
-      const edges = prev.flow_definition?.edges || [];
-      if (edges.some((e) => e.id === edgeId || (e.source === from && e.target === to))) return prev;
-      return {
-        ...prev,
-        flow_definition: {
-          nodes: prev.flow_definition?.nodes || [],
-          edges: [...edges, { id: edgeId, source: from, target: to }],
-        },
-      };
+  const addEdge = useCallback((source: string, target: string) => {
+    if (source === target) return;
+    const idEdge = `edge-${source}-${target}`;
+    setEdges((prev) => {
+      if (prev.some((e) => e.id === idEdge || (e.source === source && e.target === target))) return prev;
+      return [...prev, { id: idEdge, source, target }];
     });
   }, []);
 
-  const handleOutputPort = useCallback(
-    (nodeId: string) => {
-      setConnectionFromId(nodeId);
-      setSelectedNodeId(nodeId);
-      toast({
-        title: 'Connection started',
-        description: 'Click the top or left blue input on another step to complete the link.',
-      });
-    },
-    [toast],
-  );
+  const updateNodeLabel = useCallback((nodeId: string, label: string) => {
+    setNodes((prev) => prev.map((n) => (n.id === nodeId ? { ...n, label } : n)));
+  }, []);
 
-  const handleInputPort = useCallback(
-    (targetId: string) => {
-      if (connectionFromId && connectionFromId !== targetId) {
-        addEdge(connectionFromId, targetId);
-        setConnectionFromId(null);
-        toast({ title: 'Connected', description: 'Steps are linked.' });
-        setSelectedNodeId(targetId);
+  const addChildNode = useCallback(() => {
+    if (!selectedNode) return;
+    pushHistory();
+    const template = NODE_TEMPLATES.find((t) => t.kind !== 'free_text') || NODE_TEMPLATES[0];
+    const p = {
+      x: snapGrid ? Math.round((selectedNode.position.x + 280) / 20) * 20 : selectedNode.position.x + 280,
+      y: snapGrid ? Math.round((selectedNode.position.y + 120) / 20) * 20 : selectedNode.position.y + 120,
+    };
+    const newNode: WorkflowNode = {
+      id: `node-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      type: template.type,
+      label: template.label,
+      position: p,
+      data: { kind: template.kind },
+    };
+    setNodes((prev) => [...prev, newNode]);
+    setEdges((prev) => [...prev, { id: `edge-${selectedNode.id}-${newNode.id}`, source: selectedNode.id, target: newNode.id }]);
+    setSelectedNodeId(newNode.id);
+    setEditingNodeId(newNode.id);
+  }, [selectedNode, pushHistory, snapGrid]);
+
+  const addSiblingNode = useCallback(() => {
+    if (!selectedNode) return;
+    addNodeAt(NODE_TEMPLATES.find((t) => t.kind !== 'free_text') || NODE_TEMPLATES[0], selectedNode.position.x, selectedNode.position.y + 160);
+  }, [selectedNode, addNodeAt]);
+
+  const deleteEdge = useCallback((edgeId: string) => {
+    pushHistory();
+    setEdges((prev) => prev.filter((e) => e.id !== edgeId));
+    setSelectedEdgeId(null);
+  }, [pushHistory]);
+
+  const addFreeText = useCallback(() => {
+    const p = selectedNode ? { x: selectedNode.position.x + 40, y: selectedNode.position.y - 110 } : { x: 380, y: 180 };
+    addNodeAt(NODE_TEMPLATES.find((t) => t.type === 'free_text') || NODE_TEMPLATES[0], p.x, p.y);
+  }, [selectedNode, addNodeAt]);
+
+  const applyTemplate = useCallback((templateId: string) => {
+    const tpl = allTemplates.find((t) => t.id === templateId);
+    if (!tpl) return;
+    pushHistory();
+    setNodes(structuredClone(tpl.nodes));
+    setEdges(structuredClone(tpl.edges));
+    setSelectedNodeId(null);
+    setEditingNodeId(null);
+  }, [allTemplates, pushHistory]);
+
+  const saveCurrentAsTemplate = useCallback(() => {
+    const tpl: MapTemplate = {
+      id: `custom-${Date.now()}`,
+      label: `${name || 'Mind map'} Template`,
+      nodes: structuredClone(nodes),
+      edges: structuredClone(edges),
+    };
+    const next = [...customTemplates, tpl];
+    setCustomTemplates(next);
+    localStorage.setItem(TEMPLATE_STORAGE_KEY, JSON.stringify(next));
+    toast({ title: 'Template created', description: 'This mind map is now reusable from templates.' });
+  }, [customTemplates, name, nodes, edges, toast]);
+
+  const worldFromClient = useCallback((clientX: number, clientY: number) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return {
+      x: (clientX - rect.left - pan.x) / zoom,
+      y: (clientY - rect.top - pan.y) / zoom,
+    };
+  }, [pan, zoom]);
+
+  const nearestNodeIdAtPoint = useCallback((x: number, y: number, excludeId?: string): string | null => {
+    for (let i = nodes.length - 1; i >= 0; i -= 1) {
+      const n = nodes[i];
+      if (n.id === excludeId) continue;
+      const withinX = x >= n.position.x && x <= n.position.x + NODE_WIDTH;
+      const withinY = y >= n.position.y && y <= n.position.y + NODE_HEIGHT;
+      if (withinX && withinY) return n.id;
+    }
+    return null;
+  }, [nodes]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const typing = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+      if (typing) return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        setHistory((prev) => {
+          if (!prev.length) return prev;
+          const latest = prev[prev.length - 1];
+          setFuture((f) => [{ nodes: structuredClone(nodes), edges: structuredClone(edges) }, ...f.slice(0, 49)]);
+          setNodes(latest.nodes);
+          setEdges(latest.edges);
+          return prev.slice(0, -1);
+        });
         return;
       }
-      setSelectedNodeId(targetId);
-    },
-    [connectionFromId, addEdge, toast],
-  );
-
-  const handleDragStart = useCallback((event: React.MouseEvent, nodeId: string) => {
-    if ((event.target as HTMLElement).closest('[data-workflow-port]')) return;
-    const node = workflow.flow_definition?.nodes?.find(n => n.id === nodeId);
-    if (!node) return;
-    event.preventDefault();
-    event.stopPropagation();
-    setDraggingNodeId(nodeId);
-    setDragOffset({ x: event.clientX - node.position.x, y: event.clientY - node.position.y });
-  }, [workflow.flow_definition?.nodes]);
-
-  const handleCanvasMove = useCallback((event: React.MouseEvent) => {
-    if (!draggingNodeId) return;
-    updateNodePosition(draggingNodeId, Math.max(0, event.clientX - dragOffset.x), Math.max(0, event.clientY - dragOffset.y));
-  }, [draggingNodeId, dragOffset, updateNodePosition]);
-
-  const handleNodeClick = useCallback((event: React.MouseEvent, nodeId: string) => {
-    if ((event.target as HTMLElement).closest('[data-workflow-port]')) return;
-    if (event.shiftKey && selectedNodeId && selectedNodeId !== nodeId) {
-      event.preventDefault();
-      event.stopPropagation();
-      addEdge(selectedNodeId, nodeId);
-      toast({ title: 'Linked (Shift)', description: 'Shortcut: Shift+click between cards.' });
-      return;
-    }
-    setSelectedNodeId(nodeId);
-  }, [selectedNodeId, addEdge, toast]);
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        setFuture((prev) => {
+          if (!prev.length) return prev;
+          const latest = prev[0];
+          setHistory((h) => [...h.slice(-49), { nodes: structuredClone(nodes), edges: structuredClone(edges) }]);
+          setNodes(latest.nodes);
+          setEdges(latest.edges);
+          return prev.slice(1);
+        });
+        return;
+      }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedNodeId) {
+          e.preventDefault();
+          deleteNode(selectedNodeId);
+        } else if (selectedEdgeId) {
+          e.preventDefault();
+          deleteEdge(selectedEdgeId);
+        }
+      }
+      if (!selectedNodeId) return;
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        addChildNode();
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addSiblingNode();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        const n = nodes.find((x) => x.id === selectedNodeId);
+        if (!n) return;
+        e.preventDefault();
+        setClipboardNode(structuredClone(n));
+        toast({ title: 'Copied', description: 'Node copied.' });
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+        if (!clipboardNode) return;
+        e.preventDefault();
+        addNodeAt(
+          NODE_TEMPLATES.find((t) => t.type === clipboardNode.type) || NODE_TEMPLATES[0],
+          clipboardNode.position.x + 30,
+          clipboardNode.position.y + 30,
+        );
+      }
+      if (e.key === 'Escape') {
+        setLinkFrom(null);
+        setReconnectingEdge(null);
+        setContextMenu(null);
+        setSelectedEdgeId(null);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedNodeId, selectedEdgeId, nodes, edges, deleteNode, deleteEdge, addChildNode, addSiblingNode, clipboardNode, addNodeAt, toast]);
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
     );
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+    <div className="h-screen flex flex-col bg-neutral-50">
+      <div className="bg-white border-b border-neutral-200 px-5 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <Button variant="ghost" onClick={() => navigate('/workflows')}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <div className="flex-1">
-              <Input
-                value={workflow.name}
-                onChange={(e) => setWorkflow(prev => ({ ...prev, name: e.target.value }))}
-                className="text-xl font-bold border-none focus:ring-0 px-2"
-                placeholder="Mind Map Name"
-              />
-              <Input
-                value={workflow.description || ''}
-                onChange={(e) => setWorkflow(prev => ({ ...prev, description: e.target.value }))}
-                className="text-sm text-gray-600 border-none focus:ring-0 px-2 mt-1"
-                placeholder="Add a description..."
-              />
-            </div>
+            <Input value={name} onChange={(e) => setName(e.target.value)} className="text-xl font-semibold border-none shadow-none min-w-[260px]" />
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} className="border-none shadow-none text-sm text-neutral-500 min-w-[280px]" placeholder="Describe this map..." />
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant={workflow.is_active ? 'default' : 'secondary'}>
-              {workflow.is_active ? 'Active' : 'Draft'}
-            </Badge>
-            <Button
-              onClick={() => saveMutation.mutate()}
-              disabled={saveMutation.isPending}
-            >
-              {saveMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save
-                </>
-              )}
+            <Badge variant="secondary">Mind Map Mode</Badge>
+            <Button variant="outline" onClick={saveCurrentAsTemplate}>
+              <Copy className="h-4 w-4 mr-2" />
+              Save as Template
             </Button>
-            <Button variant="outline">
-              <Play className="h-4 w-4 mr-2" />
-              Test
+            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+              {saveMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              Save
             </Button>
           </div>
         </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar - Action Palette */}
-        <div className="w-80 bg-white border-r border-gray-200 overflow-y-auto p-4">
-          <p className="text-xs text-gray-600 mb-3 rounded-md bg-blue-50 border border-blue-100 px-3 py-2">
-            <strong>Connect:</strong> click the <span className="font-medium text-blue-700">bottom</span> blue port on a
-            step, then click the <span className="font-medium text-blue-700">top or left</span> input on the next step.
-            Press <kbd className="rounded bg-white px-1">Esc</kbd> to cancel. Optional:{' '}
-            <kbd className="rounded bg-white px-1">Shift</kbd>+click between two cards.
-          </p>
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Mind Map Blocks</h3>
-
-          {/* Triggers */}
-          <div className="mb-6">
-            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Starting Points</p>
-            <div className="space-y-2">
-              {NODE_TEMPLATES.filter(t => t.category === 'trigger').map(template => {
-                const Icon = template.icon;
-                return (
-                  <motion.div
-                    key={template.type}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <Card
-                      className="cursor-pointer hover:shadow-md transition-shadow"
-                      onClick={() => addNode(template)}
-                    >
-                      <CardContent className="p-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${template.color}`}>
-                            <Icon className="h-4 w-4" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm">{template.label}</p>
-                            <p className="text-xs text-gray-500">{template.description}</p>
-                          </div>
-                          <Plus className="h-4 w-4 text-gray-400" />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                );
-              })}
-            </div>
+        <aside className="w-80 border-r border-neutral-200 bg-white p-4 overflow-y-auto space-y-4">
+          <h3 className="text-sm font-semibold text-neutral-700">Mind Map Blocks</h3>
+          <div className="rounded-md bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-800">
+            Drag maps freely, double-click text to edit, drag from bottom handle to another node to connect.
           </div>
-
-          {/* Actions */}
-          <div className="mb-6">
-            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Flow Blocks</p>
-            <div className="space-y-2">
-              {NODE_TEMPLATES.filter(t => t.category === 'action').map(template => {
-                const Icon = template.icon;
-                return (
-                  <motion.div
-                    key={template.type}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <Card
-                      className="cursor-pointer hover:shadow-md transition-shadow"
-                      onClick={() => addNode(template)}
-                    >
-                      <CardContent className="p-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${template.color}`}>
-                            <Icon className="h-4 w-4" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm">{template.label}</p>
-                            <p className="text-xs text-gray-500">{template.description}</p>
-                          </div>
-                          <Plus className="h-4 w-4 text-gray-400" />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Conditions */}
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Logic</p>
-            <div className="space-y-2">
-              {NODE_TEMPLATES.filter(t => t.category === 'condition').map(template => {
-                const Icon = template.icon;
+            <label className="text-xs font-medium text-neutral-500">Template</label>
+            <div className="flex gap-2 mt-1">
+              <select
+                className="w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm"
+                value={selectedTemplateId}
+                onChange={(e) => setSelectedTemplateId(e.target.value)}
+              >
+                {allTemplates.map((tpl) => (
+                  <option key={tpl.id} value={tpl.id}>
+                    {tpl.label}
+                  </option>
+                ))}
+              </select>
+              <Button variant="outline" onClick={() => applyTemplate(selectedTemplateId)}>
+                Load
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between text-xs text-neutral-600">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={snapGrid} onChange={(e) => setSnapGrid(e.target.checked)} />
+              Snap to grid
+            </label>
+            <span>{Math.round(zoom * 100)}%</span>
+          </div>
+
+          {(['starting', 'flow', 'logic'] as TemplateCategory[]).map((cat) => (
+            <div key={cat} className="space-y-2">
+              <p className="text-xs uppercase font-semibold text-neutral-500">{cat === 'starting' ? 'Starting points' : cat === 'flow' ? 'Flow blocks' : 'Logic'}</p>
+              {NODE_TEMPLATES.filter((t) => t.category === cat).map((t) => (
+                <Card key={t.type} className="cursor-pointer hover:shadow-md" onClick={() => addNodeAt(t, 420 + Math.random() * 120, 180 + Math.random() * 120)}>
+                  <CardContent className="p-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">{t.label}</p>
+                      <p className="text-xs text-neutral-500">{t.description}</p>
+                    </div>
+                    <Plus className="h-4 w-4 text-neutral-500" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ))}
+        </aside>
+
+        <div
+          ref={canvasRef}
+          className="flex-1 relative overflow-hidden bg-[linear-gradient(rgba(0,0,0,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.04)_1px,transparent_1px)] bg-[size:20px_20px]"
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setContextMenu({ x: e.clientX, y: e.clientY, nodeId: null });
+          }}
+          onMouseDown={(e) => {
+            if ((e.target as HTMLElement).dataset.canvasNode === 'true') return;
+            setPanning(true);
+            setPanOrigin({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+            setSelectedNodeId(null);
+            setSelectedEdgeId(null);
+            setContextMenu(null);
+          }}
+          onMouseMove={(e) => {
+            if (panning) setPan({ x: e.clientX - panOrigin.x, y: e.clientY - panOrigin.y });
+            const world = worldFromClient(e.clientX, e.clientY);
+            if (draggingNodeId) {
+              const x = world.x - dragOffset.x;
+              const y = world.y - dragOffset.y;
+              const cx = x + NODE_WIDTH / 2;
+              const cy = y + NODE_HEIGHT / 2;
+              const others = nodes.filter((n) => n.id !== draggingNodeId);
+              const threshold = 10;
+              const alignedX = others.find((n) => Math.abs((n.position.x + NODE_WIDTH / 2) - cx) <= threshold);
+              const alignedY = others.find((n) => Math.abs((n.position.y + NODE_HEIGHT / 2) - cy) <= threshold);
+              setDragGuides({
+                x: alignedX ? alignedX.position.x + NODE_WIDTH / 2 : null,
+                y: alignedY ? alignedY.position.y + NODE_HEIGHT / 2 : null,
+              });
+              setNodes((prev) =>
+                prev.map((n) => (n.id === draggingNodeId ? { ...n, position: { x: snapGrid ? Math.round(x / 20) * 20 : x, y: snapGrid ? Math.round(y / 20) * 20 : y } } : n)),
+              );
+            }
+            if (linkFrom || reconnectingEdge) setLinkCursor(world);
+          }}
+          onMouseUp={() => {
+            if (reconnectingEdge) {
+              const edge = edges.find((e) => e.id === reconnectingEdge.edgeId);
+              if (edge) {
+                const staticNodeId = reconnectingEdge.end === 'source' ? edge.target : edge.source;
+                const dropNodeId = nearestNodeIdAtPoint(linkCursor.x, linkCursor.y, staticNodeId);
+                if (dropNodeId && dropNodeId !== staticNodeId) {
+                  pushHistory();
+                  setEdges((prev) => {
+                    const current = prev.find((e) => e.id === edge.id);
+                    if (!current) return prev;
+                    const nextSource = reconnectingEdge.end === 'source' ? dropNodeId : current.source;
+                    const nextTarget = reconnectingEdge.end === 'target' ? dropNodeId : current.target;
+                    if (nextSource === nextTarget) return prev;
+                    const duplicate = prev.some((e) => e.id !== edge.id && e.source === nextSource && e.target === nextTarget);
+                    if (duplicate) return prev;
+                    return prev.map((e) => (e.id === edge.id ? { ...e, source: nextSource, target: nextTarget } : e));
+                  });
+                }
+              }
+              setReconnectingEdge(null);
+            }
+            setPanning(false);
+            setDraggingNodeId(null);
+            setDragGuides({ x: null, y: null });
+          }}
+          onWheel={(e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.08 : 0.08;
+            setZoom((z) => Math.min(2.3, Math.max(0.35, z + delta)));
+          }}
+        >
+          <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0' }} className="absolute inset-0">
+            <svg className="absolute inset-0 w-full h-full pointer-events-none">
+              <defs>
+                <marker id="mind-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M0,0 L10,5 L0,10 z" fill="#5b6ef5" />
+                </marker>
+              </defs>
+              {edges.map((edge) => {
+                const src = nodes.find((n) => n.id === edge.source);
+                const tgt = nodes.find((n) => n.id === edge.target);
+                if (!src || !tgt) return null;
+                const x1 = src.position.x + NODE_WIDTH / 2;
+                const y1 = src.position.y + NODE_HEIGHT;
+                const x2 = tgt.position.x + NODE_WIDTH / 2;
+                const y2 = tgt.position.y;
+                const d = bezierPath(x1, y1, x2, y2);
                 return (
-                  <motion.div
-                    key={template.type}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <Card
-                      className="cursor-pointer hover:shadow-md transition-shadow"
-                      onClick={() => addNode(template)}
-                    >
-                      <CardContent className="p-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${template.color}`}>
-                            <Icon className="h-4 w-4" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm">{template.label}</p>
-                            <p className="text-xs text-gray-500">{template.description}</p>
-                          </div>
-                          <Plus className="h-4 w-4 text-gray-400" />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
+                  <g key={edge.id}>
+                    <path
+                      d={d}
+                      stroke={selectedEdgeId === edge.id ? '#ef4444' : '#5b6ef5'}
+                      strokeWidth={selectedEdgeId === edge.id ? 3 : 2.2}
+                      fill="none"
+                      markerEnd="url(#mind-arrow)"
+                      style={{ pointerEvents: 'none' }}
+                    />
+                    <path
+                      d={d}
+                      stroke="transparent"
+                      strokeWidth={16}
+                      fill="none"
+                      style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+                      onMouseDown={(ev) => {
+                        ev.stopPropagation();
+                        setSelectedEdgeId(edge.id);
+                        setSelectedNodeId(null);
+                      }}
+                    />
+                    {selectedEdgeId === edge.id && (
+                      <>
+                        <circle
+                          cx={x1}
+                          cy={y1}
+                          r={6}
+                          fill="#ffffff"
+                          stroke="#2563eb"
+                          strokeWidth={2}
+                          style={{ cursor: 'grab', pointerEvents: 'auto' }}
+                          onMouseDown={(ev) => {
+                            ev.stopPropagation();
+                            setReconnectingEdge({ edgeId: edge.id, end: 'source' });
+                            setLinkCursor({ x: x1, y: y1 });
+                          }}
+                        />
+                        <circle
+                          cx={x2}
+                          cy={y2}
+                          r={6}
+                          fill="#ffffff"
+                          stroke="#2563eb"
+                          strokeWidth={2}
+                          style={{ cursor: 'grab', pointerEvents: 'auto' }}
+                          onMouseDown={(ev) => {
+                            ev.stopPropagation();
+                            setReconnectingEdge({ edgeId: edge.id, end: 'target' });
+                            setLinkCursor({ x: x2, y: y2 });
+                          }}
+                        />
+                      </>
+                    )}
+                  </g>
                 );
               })}
+              {linkFrom ? (() => {
+                const src = nodes.find((n) => n.id === linkFrom);
+                if (!src) return null;
+                return (
+                  <path
+                    d={bezierPath(src.position.x + NODE_WIDTH / 2, src.position.y + NODE_HEIGHT, linkCursor.x, linkCursor.y)}
+                    stroke="#8b5cf6"
+                    strokeDasharray="6 4"
+                    strokeWidth={2}
+                    fill="none"
+                  />
+                );
+              })() : null}
+              {reconnectingEdge ? (() => {
+                const edge = edges.find((e) => e.id === reconnectingEdge.edgeId);
+                if (!edge) return null;
+                const fixedNode = nodes.find((n) => n.id === (reconnectingEdge.end === 'source' ? edge.target : edge.source));
+                if (!fixedNode) return null;
+                const fromX = fixedNode.position.x + NODE_WIDTH / 2;
+                const fromY = reconnectingEdge.end === 'source' ? fixedNode.position.y : fixedNode.position.y + NODE_HEIGHT;
+                return (
+                  <path
+                    d={bezierPath(fromX, fromY, linkCursor.x, linkCursor.y)}
+                    stroke="#ef4444"
+                    strokeDasharray="7 4"
+                    strokeWidth={2.2}
+                    fill="none"
+                  />
+                );
+              })() : null}
+              {dragGuides.x !== null && (
+                <line
+                  x1={dragGuides.x}
+                  y1={mapBounds.minY - 200}
+                  x2={dragGuides.x}
+                  y2={mapBounds.maxY + 200}
+                  stroke="#22c55e"
+                  strokeDasharray="6 5"
+                  strokeWidth={1.5}
+                />
+              )}
+              {dragGuides.y !== null && (
+                <line
+                  x1={mapBounds.minX - 200}
+                  y1={dragGuides.y}
+                  x2={mapBounds.maxX + 200}
+                  y2={dragGuides.y}
+                  stroke="#22c55e"
+                  strokeDasharray="6 5"
+                  strokeWidth={1.5}
+                />
+              )}
+            </svg>
+
+            {nodes.map((node) => {
+              const template = NODE_TEMPLATES.find((t) => t.type === node.type);
+              const kind = (node.data as any)?.kind as MindNodeKind | undefined;
+              const isText = kind === 'free_text' || node.type === 'free_text';
+              const isCentral = kind === 'central' || node.type === 'central_topic';
+              return (
+                <div
+                  key={node.id}
+                  data-canvas-node="true"
+                  className={`absolute rounded-xl border transition-all ${selectedNodeId === node.id ? 'ring-2 ring-indigo-500 border-indigo-300' : 'border-neutral-200'} ${isText ? 'bg-transparent border-dashed border-neutral-300 shadow-none' : 'bg-white shadow-sm'}`}
+                  style={{ left: node.position.x, top: node.position.y, width: NODE_WIDTH, minHeight: NODE_HEIGHT }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    const world = worldFromClient(e.clientX, e.clientY);
+                    setDraggingNodeId(node.id);
+                    setDragOffset({ x: world.x - node.position.x, y: world.y - node.position.y });
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedNodeId(node.id);
+                    setSelectedEdgeId(null);
+                    setContextMenu(null);
+                  }}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setEditingNodeId(node.id);
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setSelectedNodeId(node.id);
+                    setSelectedEdgeId(null);
+                    setContextMenu({ x: e.clientX, y: e.clientY, nodeId: node.id });
+                  }}
+                >
+                  {!isText && (
+                    <button
+                      type="button"
+                      className="absolute -top-2 left-1/2 -translate-x-1/2 h-4 w-4 rounded-full bg-sky-500 border-2 border-white"
+                      onMouseUp={(e) => {
+                        e.stopPropagation();
+                        if (linkFrom && linkFrom !== node.id) {
+                          pushHistory();
+                          addEdge(linkFrom, node.id);
+                          setLinkFrom(null);
+                        }
+                      }}
+                      title="Drop connection here"
+                    />
+                  )}
+                  <div className="p-3">
+                    {!isText && (
+                      <div className="flex items-center justify-between mb-2">
+                        <Badge className={`${template?.color || 'bg-neutral-100 text-neutral-700'} border-none`}>{isCentral ? 'Central' : 'Node'}</Badge>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            className="h-6 w-6 rounded-md hover:bg-neutral-100 inline-flex items-center justify-center"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addNodeAt(NODE_TEMPLATES[4], node.position.x + 280, node.position.y + 110);
+                            }}
+                            title="Add box"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            className="h-6 w-6 rounded-md hover:bg-red-50 text-red-600 inline-flex items-center justify-center"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteNode(node.id);
+                            }}
+                            title="Remove box"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {editingNodeId === node.id ? (
+                      <textarea
+                        autoFocus
+                        value={node.label}
+                        onChange={(e) => updateNodeLabel(node.id, e.target.value)}
+                        onBlur={() => setEditingNodeId(null)}
+                        className={`w-full resize-none border rounded-md px-2 py-1 text-sm ${isText ? 'min-h-[100px] bg-transparent border-neutral-300' : 'min-h-[64px] border-neutral-200'}`}
+                      />
+                    ) : (
+                      <div className={`${isText ? 'text-base font-medium text-neutral-700 whitespace-pre-wrap' : 'text-sm font-medium text-neutral-900'} min-h-[40px]`}>
+                        {node.label}
+                      </div>
+                    )}
+                  </div>
+                  {!isText && (
+                    <button
+                      type="button"
+                      className="absolute -bottom-2 left-1/2 -translate-x-1/2 h-4 w-4 rounded-full bg-indigo-500 border-2 border-white"
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        setLinkFrom(node.id);
+                      }}
+                      title="Drag to connect"
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {contextMenu && (
+            <div
+              className="fixed z-50 bg-white border border-neutral-200 rounded-lg shadow-lg min-w-[180px] p-1"
+              style={{ left: contextMenu.x, top: contextMenu.y }}
+            >
+              <button className="w-full text-left px-3 py-2 rounded hover:bg-neutral-100 text-sm" onClick={() => { addChildNode(); setContextMenu(null); }}>
+                Add child
+              </button>
+              <button className="w-full text-left px-3 py-2 rounded hover:bg-neutral-100 text-sm" onClick={() => { addSiblingNode(); setContextMenu(null); }}>
+                Add sibling
+              </button>
+              <button className="w-full text-left px-3 py-2 rounded hover:bg-neutral-100 text-sm" onClick={() => { addFreeText(); setContextMenu(null); }}>
+                Add text
+              </button>
+              {contextMenu.nodeId && (
+                <button
+                  className="w-full text-left px-3 py-2 rounded hover:bg-red-50 text-sm text-red-600"
+                  onClick={() => {
+                    deleteNode(contextMenu.nodeId!);
+                    setContextMenu(null);
+                  }}
+                >
+                  Delete box
+                </button>
+              )}
             </div>
+          )}
+          {/* Minimap */}
+          <div className="absolute right-4 bottom-4 w-52 h-36 rounded-lg border border-neutral-300 bg-white/95 backdrop-blur p-2">
+            <div className="text-[10px] text-neutral-500 mb-1">Minimap</div>
+            <svg viewBox={`0 0 ${Math.max(1, mapBounds.maxX - mapBounds.minX)} ${Math.max(1, mapBounds.maxY - mapBounds.minY)}`} className="w-full h-[112px] rounded bg-neutral-50">
+              {edges.map((edge) => {
+                const src = nodes.find((n) => n.id === edge.source);
+                const tgt = nodes.find((n) => n.id === edge.target);
+                if (!src || !tgt) return null;
+                const x1 = src.position.x + NODE_WIDTH / 2 - mapBounds.minX;
+                const y1 = src.position.y + NODE_HEIGHT / 2 - mapBounds.minY;
+                const x2 = tgt.position.x + NODE_WIDTH / 2 - mapBounds.minX;
+                const y2 = tgt.position.y + NODE_HEIGHT / 2 - mapBounds.minY;
+                return <line key={`mini-${edge.id}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#9ca3af" strokeWidth="2" />;
+              })}
+              {nodes.map((n) => (
+                <rect
+                  key={`mini-node-${n.id}`}
+                  x={n.position.x - mapBounds.minX}
+                  y={n.position.y - mapBounds.minY}
+                  width={Math.max(18, NODE_WIDTH * 0.28)}
+                  height={Math.max(10, NODE_HEIGHT * 0.25)}
+                  fill={selectedNodeId === n.id ? '#4f46e5' : '#cbd5e1'}
+                  rx="3"
+                />
+              ))}
+            </svg>
           </div>
         </div>
 
-        {/* Canvas */}
-        <div
-          role="presentation"
-          className="flex-1 relative overflow-hidden bg-[linear-gradient(rgba(0,0,0,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.05)_1px,transparent_1px)] bg-[size:20px_20px]"
-          onMouseMove={handleCanvasMove}
-          onMouseUp={() => setDraggingNodeId(null)}
-          onMouseLeave={() => setDraggingNodeId(null)}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setConnectionFromId(null);
-          }}
-        >
-          <svg className="absolute inset-0 pointer-events-none h-full w-full" aria-hidden>
-            {(workflow.flow_definition?.edges || []).map((edge) => {
-              const source = workflow.flow_definition?.nodes?.find((n) => n.id === edge.source);
-              const target = workflow.flow_definition?.nodes?.find((n) => n.id === edge.target);
-              if (!source || !target) return null;
-              const x1 = source.position.x + NODE_W / 2;
-              const y1 = source.position.y + NODE_BODY_H;
-              const x2 = target.position.x + NODE_W / 2;
-              const y2 = target.position.y;
-              return (
-                <line
-                  key={edge.id}
-                  x1={x1}
-                  y1={y1}
-                  x2={x2}
-                  y2={y2}
-                  stroke="#2563eb"
-                  strokeWidth="2"
-                  markerEnd="url(#workflow-arrow)"
-                />
-              );
-            })}
-            <defs>
-              <marker id="workflow-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
-                <path d="M0,0 L8,4 L0,8 z" fill="#2563eb" />
-              </marker>
-            </defs>
-          </svg>
-          <AnimatePresence>
-            {workflow.flow_definition?.nodes?.map(node => (
-              <WorkflowNodeComponent
-                key={node.id}
-                node={node}
-                isSelected={node.id === selectedNodeId}
-                connectionFromId={connectionFromId}
-                onCardClick={handleNodeClick}
-                onInputPort={handleInputPort}
-                onOutputPort={handleOutputPort}
-                onDelete={() => deleteNode(node.id)}
-                onDragStart={handleDragStart}
-              />
-            ))}
-          </AnimatePresence>
-
-          {/* Empty state */}
-          {(!workflow.flow_definition?.nodes || workflow.flow_definition.nodes.length === 0) && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center max-w-md">
-                <Zap className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">Start Building Your Mind Map</h3>
-                <p className="text-gray-500 mb-6">
-                  Add steps from the left, then use the blue ports: output (bottom) → input (top or left) on the next
-                  step.
-                </p>
-                <Button onClick={() => addNode(NODE_TEMPLATES[0])}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Your First Action
+        <aside className="w-72 border-l border-neutral-200 bg-white p-4 overflow-y-auto">
+          <h3 className="text-sm font-semibold mb-3">Map Controls</h3>
+          <div className="space-y-2">
+            <Button variant="outline" className="w-full justify-start" onClick={addChildNode} disabled={!selectedNode}>
+              <GitBranch className="h-4 w-4 mr-2" />
+              Add Child (Tab)
+            </Button>
+            <Button variant="outline" className="w-full justify-start" onClick={addSiblingNode} disabled={!selectedNode}>
+              <Copy className="h-4 w-4 mr-2" />
+              Add Sibling (Enter)
+            </Button>
+            <Button variant="outline" className="w-full justify-start" onClick={addFreeText}>
+              <PenSquare className="h-4 w-4 mr-2" />
+              Add Text
+            </Button>
+            <Button variant="outline" className="w-full justify-start" onClick={() => selectedNodeId && deleteNode(selectedNodeId)} disabled={!selectedNodeId}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Selected
+            </Button>
+            <Button variant="outline" className="w-full justify-start" onClick={() => selectedEdgeId && deleteEdge(selectedEdgeId)} disabled={!selectedEdgeId}>
+              <Unlink className="h-4 w-4 mr-2" />
+              Delete Selected Link
+            </Button>
+          </div>
+          <div className="mt-5 space-y-1 text-xs text-neutral-500">
+            <p>Shortcuts:</p>
+            <p>`Tab`: child, `Enter`: sibling</p>
+            <p>`Del`: remove, `Ctrl/Cmd+C/V`: copy/paste</p>
+            <p>`Ctrl/Cmd+Z/Y`: undo/redo</p>
+              <p>Click a link, drag blue dots to reconnect.</p>
+            <p>Double-click node text to edit inline.</p>
+          </div>
+          {selectedNode && (
+            <div className="mt-4 rounded-lg border border-neutral-200 p-3">
+              <p className="text-xs uppercase text-neutral-500 mb-1">Selected</p>
+              <p className="text-sm font-medium">{selectedNode.label}</p>
+              <p className="text-xs text-neutral-500">{selectedNode.type}</p>
+            </div>
+          )}
+          {selectedNode && ((selectedNode.data as any)?.kind === 'free_text' || selectedNode.type === 'free_text') && (
+            <div className="mt-3 rounded-lg border border-neutral-200 p-3 space-y-2">
+              <p className="text-xs uppercase text-neutral-500">Text tools</p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => updateNodeLabel(selectedNode.id, `**${selectedNode.label}**`)}
+                >
+                  Bold
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => updateNodeLabel(selectedNode.id, `*${selectedNode.label}*`)}
+                >
+                  Italic
                 </Button>
               </div>
             </div>
           )}
-        </div>
-
-        {/* Properties Panel */}
-        {selectedNode && (
-          <motion.div
-            initial={{ x: 400 }}
-            animate={{ x: 0 }}
-            exit={{ x: 400 }}
-            className="w-96 bg-white border-l border-gray-200 overflow-y-auto p-6"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold">Node Properties</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedNodeId(null)}
-              >
-                ✕
-              </Button>
+          {selectedEdge && (
+            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3">
+              <p className="text-xs text-red-700">Selected link: {selectedEdge.source} → {selectedEdge.target}</p>
             </div>
-
-            <div className="space-y-4">
-              <div>
-                <Label>Node Type</Label>
-                <div className="mt-1 text-sm text-gray-600">{selectedNode.type}</div>
-              </div>
-
-              <div>
-                <Label>Label</Label>
-                <Input
-                  value={selectedNode.label}
-                  onChange={(e) => updateNode(selectedNode.id, { label: e.target.value })}
-                  className="mt-1"
-                />
-              </div>
-
-              <div>
-                <Label>Configuration</Label>
-                <div className="mt-2">
-                  <NodeConfigEditor
-                    node={selectedNode}
-                    onChange={(data) => updateNode(selectedNode.id, { data })}
-                  />
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
+          )}
+          <div className="mt-4 flex gap-2">
+            <Button variant="outline" onClick={() => setZoom((z) => Math.max(0.35, z - 0.1))} className="w-full">
+              -
+            </Button>
+            <Button variant="outline" onClick={() => setZoom((z) => Math.min(2.3, z + 0.1))} className="w-full">
+              +
+            </Button>
+          </div>
+        </aside>
       </div>
     </div>
   );

@@ -52,10 +52,14 @@ export default function EmailComposeModal({
 
   const sendEmailMutation = useMutation({
     mutationFn: emailAPI.sendEmail,
-    onSuccess: () => {
+    onSuccess: (result) => {
+      const wasPersisted = result?.persisted !== false;
       toast({
-        title: 'Email sent successfully',
-        description: 'Your email has been sent.',
+        title: wasPersisted ? 'Email sent successfully' : 'Email sent with warning',
+        description: wasPersisted
+          ? 'Your email has been sent.'
+          : (result?.warning || 'Email was sent but local mailbox sync needs refresh.'),
+        variant: wasPersisted ? 'default' : 'destructive',
       });
       queryClient.invalidateQueries({ queryKey: ['emails', accountId] });
       handleClose();
