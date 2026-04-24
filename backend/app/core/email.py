@@ -458,7 +458,7 @@ This email was sent from an automated system. Please do not reply to this email.
         message: str = None
     ) -> bool:
         """Send team invitation email"""
-        subject = f"You've been invited to join {organization_name} on LeadLab"
+        subject = f"Sign up invitation: join {organization_name} on LeadLab"
         
         # Role display mapping
         role_display = {
@@ -516,12 +516,12 @@ This email was sent from an automated system. Please do not reply to this email.
                     </ul>
                     
                     <div style="text-align: center;">
-                        <a href="{invitation_link}" class="btn">Accept Invitation</a>
+                        <a href="{invitation_link}" class="btn">Sign up and join team</a>
                     </div>
                     
                     <p><strong>⏰ Important:</strong> This invitation will expire in 72 hours.</p>
                     
-                    <p>Don't have a LeadLab account yet? No problem! Accepting this invitation will help you create one.</p>
+                    <p>Don't have a LeadLab account yet? No problem. This invitation link opens signup so you can create your account and join the team.</p>
                     
                     <p>Questions? Contact our support team at info@the-leadlab.com</p>
                 </div>
@@ -553,12 +553,12 @@ LeadLab helps teams manage leads, track opportunities, and grow their business t
 • Collaborate with your team
 {'• Create and manage campaigns' if role in ["admin", "member"] else ''}
 
-To accept this invitation, click the link below:
+To sign up and join this team, click the link below:
 {invitation_link}
 
 ⏰ Important: This invitation will expire in 72 hours.
 
-Don't have a LeadLab account yet? No problem! Accepting this invitation will help you create one.
+Don't have a LeadLab account yet? No problem. This invitation link opens signup so you can create one and join the team.
 
 Questions? Contact our support team at info@the-leadlab.com
 

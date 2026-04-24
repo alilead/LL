@@ -7,10 +7,12 @@ from typing import Any
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, func
 
 from app.api import deps
 from app.core.email import EmailSender
 from app.models.marketing_form_submission import MarketingFormSubmission
+from app.models.user import User
 from app.schemas.marketing_forms import MarketingFormSubmissionCreate
 
 router = APIRouter()
@@ -37,8 +39,26 @@ async def submit_marketing_form(
     db.commit()
     db.refresh(row)
 
-    # Notify admin inbox with the full submission payload.
-    admin_email = str(body.to_email) if body.to_email else "ali@the-leadlab.com"
+    # Notify all active admins/superusers with the full submission payload.
+    admin_rows = (
+        db.query(User)
+        .filter(
+            User.is_active == True,
+            or_(User.is_superuser == True, func.lower(User.role) == "admin"),
+        )
+        .all()
+    )
+    recipient_set = {
+        str(u.email).strip().lower()
+        for u in admin_rows
+        if getattr(u, "email", None)
+    }
+    # Backward-compatible explicit recipient (e.g. ali override) remains included.
+    if body.to_email:
+        recipient_set.add(str(body.to_email).strip().lower())
+    if not recipient_set:
+        recipient_set.add("ali@the-leadlab.com")
+
     payload_pretty = json.dumps(body.payload or {}, ensure_ascii=False, indent=2, default=str)
     subject = body.subject or f"New {body.form_type.replace('_', ' ')} submission"
     html_content = f"""
@@ -63,12 +83,14 @@ async def submit_marketing_form(
         f"Payload:\n{payload_pretty}"
     )
     try:
-        await EmailSender().send_email(
-            to_email=admin_email,
-            subject=subject,
-            html_content=html_content,
-            text_content=text_content,
-        )
+        sender = EmailSender()
+        for recipient in sorted(recipient_set):
+            await sender.send_email(
+                to_email=recipient,
+                subject=subject,
+                html_content=html_content,
+                text_content=text_content,
+            )
     except Exception:
         # Submission persistence is primary; notification failures must not block users.
         pass
