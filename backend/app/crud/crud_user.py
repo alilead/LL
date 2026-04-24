@@ -150,15 +150,25 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
 
     def remove(self, db: Session, *, id: int) -> Optional[User]:
         """
-        Deactivate user instead of deleting.
+        Purge user identity while keeping row integrity for FK-linked records.
+        This frees the original email so the same address can be reused.
         """
         user = db.query(User).filter(User.id == id).first()
         if not user:
             return None
 
         try:
-            # Set user as inactive
+            # Tombstone email to release unique constraint on original address.
+            tombstone_email = f"deleted+user-{id}-{int(time.time())}@deleted.local"
+            user.email = tombstone_email
+            if hasattr(user, "username"):
+                user.username = None
+            user.first_name = "Deleted"
+            user.last_name = f"User {id}"
             user.is_active = False
+            user.is_superuser = False
+            user.role = "user"
+            user.updated_at = datetime.utcnow()
             db.add(user)
             db.commit()
             db.refresh(user)

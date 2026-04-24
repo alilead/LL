@@ -2,6 +2,8 @@ from typing import List, Optional, Any
 from pathlib import Path
 import mimetypes
 import base64
+from datetime import datetime
+import time
 from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
@@ -439,8 +441,8 @@ def deactivate_all_except_ali(
     current_user: UserModel = Depends(deps.get_current_user),
 ) -> Any:
     """
-    Deactivate every user except ali@the-leadlab.com.
-    Also strips admin/superuser from deactivated users.
+    Purge every user except ali@the-leadlab.com.
+    Keeps DB row integrity while freeing original emails for reuse.
     """
     if not current_user.is_admin:
         raise HTTPException(
@@ -457,15 +459,20 @@ def deactivate_all_except_ali(
 
     affected = 0
     for row in rows:
+        row.email = f"deleted+user-{row.id}-{int(time.time())}@deleted.local"
+        if hasattr(row, "username"):
+            row.username = None
+        row.first_name = "Deleted"
+        row.last_name = f"User {row.id}"
         row.is_active = False
         row.is_superuser = False
         row.role = "user"
-        row.updated_at = db.query(func.now()).scalar()
+        row.updated_at = datetime.utcnow()
         affected += 1
 
     db.commit()
     return {
         "success": True,
-        "message": f"Deactivated {affected} users. Kept {protected_email} active.",
+        "message": f"Deleted {affected} users (emails released). Kept {protected_email} active.",
         "affected": affected,
     }
