@@ -5,7 +5,6 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Avatar, AvatarFallback } from '../../components/ui/avatar';
 import { format } from 'date-fns';
-import { tr } from 'date-fns/locale';
 import EmailComposeModal from './EmailComposeModal';
 
 interface EmailMessage {
@@ -57,16 +56,34 @@ const EmailDetailModal: React.FC<EmailDetailModalProps> = ({
   const handleReply = () => {
     setReplyType('reply');
     setIsReplyOpen(true);
+    onReply(email);
   };
 
   const handleReplyAll = () => {
     setReplyType('reply-all');
     setIsReplyOpen(true);
+    onReply(email);
   };
 
   const handleForward = () => {
     setReplyType('forward');
     setIsReplyOpen(true);
+    onReply(email);
+  };
+
+  const handleMarkUnread = () => {
+    onMarkUnread?.(email.id);
+    onClose();
+  };
+
+  const handleArchive = () => {
+    onArchive?.(email.id);
+    onClose();
+  };
+
+  const handleDelete = () => {
+    onDelete(email.id);
+    onClose();
   };
 
   const getReplyData = () => {
@@ -132,6 +149,42 @@ const EmailDetailModal: React.FC<EmailDetailModalProps> = ({
               </div>
             </div>
 
+            {/* Actions (Gmail-style top action row) */}
+            <div className="border-b pb-4 flex flex-wrap items-center gap-2">
+              <Button onClick={handleReply} size="sm">
+                <Reply className="h-4 w-4 mr-2" />
+                Reply
+              </Button>
+              <Button onClick={handleReplyAll} size="sm" variant="outline">
+                <ReplyAll className="h-4 w-4 mr-2" />
+                Reply All
+              </Button>
+              <Button onClick={handleForward} size="sm" variant="outline">
+                <Forward className="h-4 w-4 mr-2" />
+                Forward
+              </Button>
+              {onMarkUnread && (
+                <Button onClick={handleMarkUnread} size="sm" variant="outline">
+                  Mark unread
+                </Button>
+              )}
+              {onArchive && (
+                <Button onClick={handleArchive} size="sm" variant="outline">
+                  <Archive className="h-4 w-4 mr-2" />
+                  Archive
+                </Button>
+              )}
+              <Button
+                onClick={handleDelete}
+                size="sm"
+                variant="destructive"
+                className="ml-auto"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
+            </div>
+
             {/* Sender Info */}
             <div className="flex items-start space-x-3">
               <Avatar className="h-10 w-10">
@@ -186,41 +239,6 @@ const EmailDetailModal: React.FC<EmailDetailModalProps> = ({
               </div>
             )}
 
-            {/* Actions */}
-            <div className="border-t pt-4 flex space-x-2">
-              <Button onClick={handleReply} size="sm">
-                <Reply className="h-4 w-4 mr-2" />
-                Reply
-              </Button>
-              <Button onClick={handleReplyAll} size="sm" variant="outline">
-                <ReplyAll className="h-4 w-4 mr-2" />
-                Reply All
-              </Button>
-              <Button onClick={handleForward} size="sm" variant="outline">
-                <Forward className="h-4 w-4 mr-2" />
-                Forward
-              </Button>
-              {onMarkUnread && (
-                <Button onClick={() => onMarkUnread(email.id)} size="sm" variant="outline">
-                  Mark unread
-                </Button>
-              )}
-              {onArchive && (
-                <Button onClick={() => onArchive(email.id)} size="sm" variant="outline">
-                  <Archive className="h-4 w-4 mr-2" />
-                  Archive
-                </Button>
-              )}
-              <Button 
-                onClick={() => onDelete(email.id)} 
-                size="sm" 
-                variant="destructive"
-                className="ml-auto"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </Button>
-            </div>
           </div>
         </DialogContent>
       </Dialog>
