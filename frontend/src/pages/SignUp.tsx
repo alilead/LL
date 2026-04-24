@@ -4,7 +4,7 @@ import { toast } from 'react-hot-toast'
 import { PublicHeader } from '../components/layout/PublicHeader'
 import api from '../services/axios'
 import { motion } from 'framer-motion'
-import { Mail, User, Briefcase, Lock, Building } from 'lucide-react'
+import { Mail, User, Briefcase, Lock, Building, Eye, EyeOff } from 'lucide-react'
 
 interface SignUpForm {
   email: string
@@ -20,6 +20,9 @@ interface SignUpForm {
 export function SignUp() {
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [formData, setFormData] = useState<SignUpForm>({
     email: '',
     password: '',
@@ -33,6 +36,10 @@ export function SignUp() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (formData.password !== confirmPassword) {
+      toast.error('Passwords do not match')
+      return
+    }
     setIsLoading(true)
 
     try {
@@ -206,17 +213,57 @@ export function SignUp() {
                       <Lock className="h-5 w-5 text-gray-400" />
                     </div>
                     <input
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       id="password"
                       name="password"
                       value={formData.password}
                       onChange={handleChange}
                       placeholder="••••••••"
-                      className="w-full pl-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
+                      className="w-full pl-10 pr-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
                       required
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 bg-transparent"
+                    >
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
                   </div>
                   <p className="mt-1 text-xs text-gray-500">Password must be at least 8 characters</p>
+                </div>
+                <div>
+                  <label
+                    htmlFor="confirm_password"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Confirm Password
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      id="confirm_password"
+                      name="confirm_password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full pl-10 pr-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword((v) => !v)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 bg-transparent"
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                  {confirmPassword && formData.password !== confirmPassword && (
+                    <p className="mt-1 text-xs text-red-600">Passwords do not match</p>
+                  )}
                 </div>
               </div>
 

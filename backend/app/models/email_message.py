@@ -19,6 +19,26 @@ class EmailStatus(str, Enum):
     archived = "archived"
 
 
+def normalize_email_status(value: object, default: EmailStatus = EmailStatus.unread) -> EmailStatus:
+    """Map legacy/unknown status strings to canonical EmailStatus values."""
+    if isinstance(value, EmailStatus):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        aliases = {
+            "new": EmailStatus.unread,
+            "opened": EmailStatus.read,
+            "sent": EmailStatus.read,
+        }
+        if normalized in aliases:
+            return aliases[normalized]
+        try:
+            return EmailStatus(normalized)
+        except ValueError:
+            return default
+    return default
+
+
 class Email(Base, TimestampMixin):
     __tablename__ = "emails"
 
@@ -40,8 +60,25 @@ class Email(Base, TimestampMixin):
     body_html = Column(Text, nullable=True)
     
     # Status and direction
-    direction = Column(SQLEnum(EmailDirection), nullable=False)
-    status = Column(SQLEnum(EmailStatus), nullable=False, default=EmailStatus.unread)
+    direction = Column(
+        SQLEnum(
+            EmailDirection,
+            name="emaildirection",
+            values_callable=lambda enum_cls: [e.value for e in enum_cls],
+            validate_strings=True,
+        ),
+        nullable=False,
+    )
+    status = Column(
+        SQLEnum(
+            EmailStatus,
+            name="emailstatus",
+            values_callable=lambda enum_cls: [e.value for e in enum_cls],
+            validate_strings=True,
+        ),
+        nullable=False,
+        default=EmailStatus.unread,
+    )
     priority = Column(String(20), default='normal')
     
     # Timestamps

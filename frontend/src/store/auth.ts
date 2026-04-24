@@ -23,12 +23,13 @@ interface AuthState {
   isAuthenticated: boolean
   isLoading: boolean
   error: string | null
+  rememberMe: boolean
   /** Bumped when profile photo changes so layout can refetch /users/me/avatar */
   avatarRevision: number
   setUser: (user: User | null) => void
   setToken: (token: string | null) => void
   bumpAvatarRevision: () => void
-  login: (credentials: LoginCredentials) => Promise<void>
+  login: (credentials: LoginCredentials, rememberMe?: boolean) => Promise<void>
   register: (data: RegisterData) => Promise<void>
   logout: () => Promise<void>
   fetchUser: () => Promise<void>
@@ -44,6 +45,7 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: false,
       error: null,
+      rememberMe: false,
       avatarRevision: 0,
 
       setUser: (user) => set({ user }),
@@ -52,7 +54,7 @@ export const useAuthStore = create<AuthState>()(
 
       bumpAvatarRevision: () => set((s) => ({ avatarRevision: (s.avatarRevision ?? 0) + 1 })),
       
-      login: async (credentials: LoginCredentials) => {
+      login: async (credentials: LoginCredentials, rememberMe = false) => {
         set({ isLoading: true, error: null })
         
         try {
@@ -60,10 +62,14 @@ export const useAuthStore = create<AuthState>()(
           const { access_token, user } = response
           
           api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
-          localStorage.setItem('token', access_token)
-          set({ token: access_token, user, isAuthenticated: true, error: null })
+          sessionStorage.removeItem('token')
+          localStorage.removeItem('token')
+          if (rememberMe) localStorage.setItem('token', access_token)
+          else sessionStorage.setItem('token', access_token)
+          set({ token: access_token, user, isAuthenticated: true, error: null, rememberMe })
         } catch (error: any) {
           localStorage.removeItem('token')
+          sessionStorage.removeItem('token')
           delete api.defaults.headers.common['Authorization']
           set({ 
             token: null, 
@@ -101,6 +107,7 @@ export const useAuthStore = create<AuthState>()(
           console.warn('Logout API call failed:', error)
         } finally {
           localStorage.removeItem('token')
+          sessionStorage.removeItem('token')
           delete api.defaults.headers.common['Authorization']
           set({ user: null, token: null, isAuthenticated: false })
         }
@@ -114,6 +121,7 @@ export const useAuthStore = create<AuthState>()(
           set({ user, isAuthenticated: true, error: null })
         } catch (error: any) {
           localStorage.removeItem('token')
+          sessionStorage.removeItem('token')
           delete api.defaults.headers.common['Authorization']
           set({ 
             token: null, 
@@ -135,10 +143,17 @@ export const useAuthStore = create<AuthState>()(
           const { access_token } = response
           
           api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
-          localStorage.setItem('token', access_token)
+          if (useAuthStore.getState().rememberMe) {
+            localStorage.setItem('token', access_token)
+            sessionStorage.removeItem('token')
+          } else {
+            sessionStorage.setItem('token', access_token)
+            localStorage.removeItem('token')
+          }
           set({ token: access_token, error: null })
         } catch (error: any) {
           localStorage.removeItem('token')
+          sessionStorage.removeItem('token')
           delete api.defaults.headers.common['Authorization']
           set({ 
             token: null, 
@@ -156,15 +171,19 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
+      partialize: (state) => ({ rememberMe: state.rememberMe, avatarRevision: state.avatarRevision }),
     }
   )
 )
 
 // Auto-login if token exists
-const token = localStorage.getItem('token')
+const token = localStorage.getItem('token') || sessionStorage.getItem('token')
 if (token) {
   api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+  useAuthStore.setState({ token, isAuthenticated: true })
   useAuthStore.getState().fetchUser().catch(() => {
     delete api.defaults.headers.common['Authorization']
+    localStorage.removeItem('token')
+    sessionStorage.removeItem('token')
   })
 }

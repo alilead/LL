@@ -1,8 +1,9 @@
 import React from 'react';
-import { X, Reply, ReplyAll, Forward, Trash2, Archive, Star, Paperclip, Clock, User, Building } from 'lucide-react';
+import { X, Reply, ReplyAll, Forward, Trash2, Archive, Star, Paperclip, Clock } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/Dialog';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Avatar, AvatarFallback } from '../../components/ui/avatar';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import EmailComposeModal from './EmailComposeModal';
@@ -31,6 +32,8 @@ interface EmailDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   onDelete: (emailId: number) => void;
+  onArchive?: (emailId: number) => void;
+  onMarkUnread?: (emailId: number) => void;
   onReply: (email: EmailMessage) => void;
 }
 
@@ -39,6 +42,8 @@ const EmailDetailModal: React.FC<EmailDetailModalProps> = ({
   isOpen,
   onClose,
   onDelete,
+  onArchive,
+  onMarkUnread,
   onReply
 }) => {
   const [isReplyOpen, setIsReplyOpen] = React.useState(false);
@@ -195,6 +200,17 @@ const EmailDetailModal: React.FC<EmailDetailModalProps> = ({
                 <Forward className="h-4 w-4 mr-2" />
                 Forward
               </Button>
+              {onMarkUnread && (
+                <Button onClick={() => onMarkUnread(email.id)} size="sm" variant="outline">
+                  Mark unread
+                </Button>
+              )}
+              {onArchive && (
+                <Button onClick={() => onArchive(email.id)} size="sm" variant="outline">
+                  <Archive className="h-4 w-4 mr-2" />
+                  Archive
+                </Button>
+              )}
               <Button 
                 onClick={() => onDelete(email.id)} 
                 size="sm" 
@@ -214,9 +230,9 @@ const EmailDetailModal: React.FC<EmailDetailModalProps> = ({
         <EmailComposeModal
           isOpen={isReplyOpen}
           onClose={() => setIsReplyOpen(false)}
-          accounts={[{ id: email.email_account_id, email: '', display_name: '', provider_type: '' }]}
-          selectedAccount={email.email_account_id}
-          replyTo={getReplyData()}
+          accountId={String(email.email_account_id)}
+          replyTo={{ to: getReplyData().to || '', subject: getReplyData().subject || '', messageId: String(email.id) }}
+          forward={replyType === 'forward' ? { from: email.from_address, subject: email.subject, body: email.body_text || '' } : undefined}
         />
       )}
     </>

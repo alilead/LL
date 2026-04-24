@@ -15,7 +15,7 @@ interface SignInForm {
 export function SignIn() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { login, isAuthenticated, user } = useAuthStore()
+  const { login, isAuthenticated, user, rememberMe: savedRememberMe } = useAuthStore()
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState<SignInForm>({
@@ -24,7 +24,7 @@ export function SignIn() {
     password: '',
   })
   const [loginType, setLoginType] = useState<'email' | 'username'>('email')
-  const [rememberMe, setRememberMe] = useState(false)
+  const [rememberMe, setRememberMe] = useState(savedRememberMe)
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -52,7 +52,7 @@ export function SignIn() {
         return
       }
       
-      await login(loginPayload)
+      await login(loginPayload, rememberMe)
       toast.success('Login successful!')
     } catch (err: any) {
       console.error('Login error:', err)

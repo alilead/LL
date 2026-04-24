@@ -29,6 +29,7 @@ export const EmailsPage: React.FC = () => {
   const [selectedEmail, setSelectedEmail] = useState<EmailMessage | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [customLabels, setCustomLabels] = useState<string[]>([]);
 
   // Fetch email accounts
   const { data: accounts, isLoading: accountsLoading } = useQuery({
@@ -55,6 +56,21 @@ export const EmailsPage: React.FC = () => {
   const deleteEmailMutation = useMutation({
     mutationFn: ({ emailId }: { accountId: number; emailId: number }) =>
       emailAPI.deleteEmail(emailId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['emails', selectedAccount, selectedFolder] });
+      setSelectedEmail(null);
+    },
+  });
+
+  const markAsUnreadMutation = useMutation({
+    mutationFn: (emailId: number) => emailAPI.markAsUnread(emailId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['emails', selectedAccount, selectedFolder] });
+    },
+  });
+
+  const archiveEmailMutation = useMutation({
+    mutationFn: (emailId: number) => emailAPI.archiveEmail(emailId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['emails', selectedAccount, selectedFolder] });
       setSelectedEmail(null);
@@ -89,6 +105,28 @@ export const EmailsPage: React.FC = () => {
       setSelectedAccount(accounts[0].id);
     }
   }, [accounts, selectedAccount]);
+
+  useEffect(() => {
+    const raw = localStorage.getItem('email-custom-labels');
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) setCustomLabels(parsed.filter((x) => typeof x === 'string'));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const addLabel = () => {
+    const label = window.prompt('Create new label');
+    if (!label) return;
+    const normalized = label.trim().toUpperCase();
+    if (!normalized) return;
+    if (FOLDERS.some((f) => f.name.toUpperCase() === normalized) || customLabels.includes(normalized)) return;
+    const next = [...customLabels, normalized];
+    setCustomLabels(next);
+    localStorage.setItem('email-custom-labels', JSON.stringify(next));
+  };
 
   const handleEmailClick = (email: EmailMessage) => {
     setSelectedEmail(email);
@@ -219,15 +257,28 @@ export const EmailsPage: React.FC = () => {
               <h2 className="text-xl font-semibold text-gray-900">
                 {FOLDERS.find(f => f.name === selectedFolder)?.label}
               </h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleRefresh}
-                disabled={emailsLoading}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <RefreshCw className={`h-4 w-4 ${emailsLoading ? 'animate-spin' : ''}`} />
-              </Button>
+              <div className="flex items-center gap-2">
+                {selectedEmail && (
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => markAsUnreadMutation.mutate(selectedEmail.id)}>
+                      Mark unread
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => archiveEmailMutation.mutate(selectedEmail.id)}>
+                      <Archive className="h-4 w-4 mr-1" />
+                      Archive
+                    </Button>
+                  </>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRefresh}
+                  disabled={emailsLoading}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <RefreshCw className={`h-4 w-4 ${emailsLoading ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 12rem)' }}>
@@ -279,7 +330,27 @@ export const EmailsPage: React.FC = () => {
                         <p className="text-sm text-gray-600 line-clamp-2">
                           {email.body_text?.substring(0, 150)}...
                         </p>
-                      </div>
+            </div>
+            <div className="mt-4">
+              <Button variant="outline" size="sm" className="w-full" onClick={addLabel}>
+                Create label
+              </Button>
+              {customLabels.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {customLabels.map((label) => (
+                    <button
+                      key={label}
+                      onClick={() => setSelectedFolder(label.toLowerCase())}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm border ${
+                        selectedFolder === label.toLowerCase() ? 'bg-blue-50 text-blue-700 border-blue-200' : 'hover:bg-gray-100 border-transparent'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
                     </div>
                   </div>
                 ))}
@@ -307,6 +378,8 @@ export const EmailsPage: React.FC = () => {
           email={selectedEmail}
           isOpen={!!selectedEmail}
           onClose={() => setSelectedEmail(null)}
+          onArchive={(emailId) => archiveEmailMutation.mutate(emailId)}
+          onMarkUnread={(emailId) => markAsUnreadMutation.mutate(emailId)}
           onDelete={(emailId) => {
             deleteEmailMutation.mutate({ accountId: selectedAccount, emailId });
           }}

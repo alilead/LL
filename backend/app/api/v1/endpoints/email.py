@@ -16,7 +16,7 @@ from app.api import deps
 from app.core.security import check_permission
 from app.core.email import EmailSender
 from app.models.email_account import EmailAccount, EmailProviderType, EmailSyncStatus
-from app.models.email_message import Email, EmailDirection, EmailStatus
+from app.models.email_message import Email, EmailDirection, EmailStatus, normalize_email_status
 from app.models.user import User
 from app.models.organization import Organization
 from app.services.email_service import EmailService
@@ -898,6 +898,7 @@ def get_emails(
     account_id: Optional[int] = None,
     unread_only: bool = False,
     direction: Optional[str] = None,  # "incoming", "outgoing", or None for all
+    folder: Optional[str] = None,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_user)
 ):
@@ -908,6 +909,23 @@ def get_emails(
     
     if account_id:
         query = query.filter(Email.email_account_id == account_id)
+
+    if folder:
+        f = folder.strip().upper()
+        if f == "SPAM":
+            query = query.filter(Email.folder_name.in_(["SPAM", "JUNK", "[GMAIL]/SPAM"]))
+        elif f == "TRASH":
+            query = query.filter(Email.folder_name.in_(["TRASH", "BIN", "[GMAIL]/TRASH"]))
+        elif f == "DRAFTS":
+            query = query.filter(Email.folder_name.in_(["DRAFTS", "DRAFT", "[GMAIL]/DRAFTS"]))
+        elif f == "SENT":
+            query = query.filter(Email.direction == EmailDirection.outgoing)
+        elif f == "INBOX":
+            query = query.filter(Email.direction == EmailDirection.incoming).filter(
+                (Email.folder_name.is_(None)) | (~Email.folder_name.in_(["SPAM", "JUNK", "[GMAIL]/SPAM", "TRASH", "BIN", "[GMAIL]/TRASH"]))
+            )
+        else:
+            query = query.filter(Email.folder_name == f)
     
     # For sent emails (outgoing), we don't filter by unread status
     # since sent emails are not typically marked as unread
@@ -964,10 +982,70 @@ def mark_email_read(
     if not email:
         raise HTTPException(status_code=404, detail="Email not found")
     
-    email.status = EmailStatus.read
+    email.status = normalize_email_status(EmailStatus.read, default=EmailStatus.read)
     db.commit()
     
     return {"message": "Email marked as read"}
+
+
+@router.post("/emails/{email_id}/mark-unread")
+def mark_email_unread(
+    email_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user)
+):
+    email = db.query(Email).filter(
+        Email.id == email_id,
+        Email.organization_id == current_user.organization_id
+    ).first()
+    if not email:
+        raise HTTPException(status_code=404, detail="Email not found")
+    email.status = normalize_email_status(EmailStatus.unread, default=EmailStatus.unread)
+    db.commit()
+    return {"message": "Email marked as unread"}
+
+
+@router.patch("/emails/{email_id}/archive")
+def archive_email(
+    email_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user)
+):
+    email = db.query(Email).filter(
+        Email.id == email_id,
+        Email.organization_id == current_user.organization_id
+    ).first()
+    if not email:
+        raise HTTPException(status_code=404, detail="Email not found")
+    email.status = normalize_email_status(EmailStatus.archived, default=EmailStatus.archived)
+    email.folder_name = "ARCHIVE"
+    db.commit()
+    return {"message": "Email archived"}
+
+
+@router.patch("/emails/{email_id}/move")
+def move_email_to_folder(
+    email_id: int,
+    payload: Dict[str, Any],
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user)
+):
+    email = db.query(Email).filter(
+        Email.id == email_id,
+        Email.organization_id == current_user.organization_id
+    ).first()
+    if not email:
+        raise HTTPException(status_code=404, detail="Email not found")
+    folder = str(payload.get("folder") or "").strip().upper()
+    if not folder:
+        raise HTTPException(status_code=400, detail="Folder is required")
+    email.folder_name = folder
+    if folder in {"INBOX", "SPAM", "JUNK"}:
+        email.direction = EmailDirection.incoming
+    elif folder in {"SENT", "DRAFTS"}:
+        email.direction = EmailDirection.outgoing
+    db.commit()
+    return {"message": "Email moved", "folder": folder}
 
 
 @router.get("/emails/{email_id}/suggestions", response_model=List[EmailSuggestion])

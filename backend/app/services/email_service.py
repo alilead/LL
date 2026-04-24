@@ -19,7 +19,7 @@ import base64
 from sqlalchemy import and_
 
 from app.models.email_account import EmailAccount, EmailSyncStatus, EmailProviderType
-from app.models.email_message import Email, EmailDirection, EmailStatus
+from app.models.email_message import Email, EmailDirection, EmailStatus, normalize_email_status
 from app.models.email_attachment import EmailAttachment
 from app.core.security import decrypt_password, encrypt_password
 from app.core.config import settings
@@ -109,6 +109,9 @@ class EmailService:
         self.last_send_error = message
         self.last_send_retryable = retryable
         self.last_send_status_code = status_code
+
+    def _status(self, value: object, default: EmailStatus = EmailStatus.unread) -> EmailStatus:
+        return normalize_email_status(value, default=default)
     
     def add_email_account(
         self,
@@ -519,16 +522,35 @@ class EmailService:
                 total_synced += inbox_synced
                 total_errors += inbox_errors
             
-            # Sync Sent Items - custom mail için sadece "Sent" klasörü kullan
-            # Gmail değil custom provider olduğu için standard "Sent" klasörünü kullan
-            try:
-                sent_folder = "Sent"  # Custom provider için standard folder
-                sent_synced, sent_errors = self._sync_folder(imap, account, sent_folder, effective_days_back)
-                total_synced += sent_synced
-                total_errors += sent_errors
-            except Exception as sent_error:
-                logger.error(f"Error syncing Sent folder: {sent_error}")
-                total_errors += 1
+            # Sync sent items using detected folder aliases.
+            if account.sync_sent_items:
+                try:
+                    sent_folder = self._select_first_existing_folder(
+                        imap,
+                        ["Sent", "Sent Items", "[Gmail]/Sent Mail", "INBOX.Sent"],
+                    )
+                    if sent_folder:
+                        sent_synced, sent_errors = self._sync_folder(imap, account, sent_folder, effective_days_back)
+                        total_synced += sent_synced
+                        total_errors += sent_errors
+                except Exception as sent_error:
+                    logger.error(f"Error syncing Sent folder: {sent_error}")
+                    total_errors += 1
+
+            # Sync spam as incoming so Spam tab can match Gmail behavior.
+            if account.sync_inbox:
+                try:
+                    spam_folder = self._select_first_existing_folder(
+                        imap,
+                        ["Spam", "Junk", "[Gmail]/Spam", "INBOX.Spam"],
+                    )
+                    if spam_folder:
+                        spam_synced, spam_errors = self._sync_folder(imap, account, spam_folder, effective_days_back)
+                        total_synced += spam_synced
+                        total_errors += spam_errors
+                except Exception as spam_error:
+                    logger.error(f"Error syncing Spam folder: {spam_error}")
+                    total_errors += 1
             
             # Update sync status in database using raw query  
             self.db.query(EmailAccount).filter(EmailAccount.id == account_id).update({
@@ -609,7 +631,8 @@ class EmailService:
                     label_query="in:inbox",
                     days_back=days_back,
                     direction=EmailDirection.incoming,
-                    status=EmailStatus.unread,
+                    status=self._status(EmailStatus.unread),
+                    folder_name="INBOX",
                 )
                 total_synced += synced
                 total_errors += errors
@@ -620,7 +643,20 @@ class EmailService:
                     label_query="in:sent",
                     days_back=days_back,
                     direction=EmailDirection.outgoing,
-                    status=EmailStatus.read,
+                    status=self._status(EmailStatus.read, default=EmailStatus.read),
+                    folder_name="SENT",
+                )
+                total_synced += synced
+                total_errors += errors
+            if account.sync_inbox:
+                synced, errors = self._sync_gmail_label(
+                    account=account,
+                    access_token=access_token,
+                    label_query="in:spam",
+                    days_back=days_back,
+                    direction=EmailDirection.incoming,
+                    status=self._status(EmailStatus.unread),
+                    folder_name="SPAM",
                 )
                 total_synced += synced
                 total_errors += errors
@@ -650,6 +686,7 @@ class EmailService:
         days_back: int,
         direction: EmailDirection,
         status: EmailStatus,
+        folder_name: Optional[str] = None,
     ) -> Tuple[int, int]:
         headers = {"Authorization": f"Bearer {access_token}"}
         query = label_query if days_back <= 0 else f"{label_query} newer_than:{days_back}d"
@@ -737,8 +774,8 @@ class EmailService:
                         sent_date=sent_date,
                         received_date=sent_date,
                         direction=direction,
-                        status=status,
-                        folder_name="INBOX" if direction == EmailDirection.incoming else "SENT",
+                        status=self._status(status),
+                        folder_name=folder_name or ("INBOX" if direction == EmailDirection.incoming else "SENT"),
                         has_attachments=False,
                     )
                     self.db.add(db_email)
@@ -761,6 +798,16 @@ class EmailService:
             error_count,
         )
         return synced_count, error_count
+
+    def _select_first_existing_folder(self, imap: imaplib.IMAP4, candidates: List[str]) -> Optional[str]:
+        for folder in candidates:
+            try:
+                typ, _ = imap.select(folder, readonly=True)
+                if typ == "OK":
+                    return folder
+            except Exception:
+                continue
+        return None
     
     def _sync_folder(self, imap: imaplib.IMAP4, account: EmailAccount, folder: str, days_back: int) -> Tuple[int, int]:
         """Sync emails from a specific folder"""
@@ -859,8 +906,9 @@ class EmailService:
                 body_text=parsed_data.get('body_text'),
                 body_html=parsed_data.get('body_html'),
                 sent_date=parsed_data['sent_date'],
-                direction=EmailDirection.incoming if folder.upper() == 'INBOX' else EmailDirection.outgoing,
-                status=EmailStatus.unread if folder.upper() == 'INBOX' else EmailStatus.read
+                direction=EmailDirection.incoming if folder.upper() in {'INBOX', 'SPAM', 'JUNK', '[GMAIL]/SPAM'} else EmailDirection.outgoing,
+                status=self._status(EmailStatus.unread if folder.upper() in {'INBOX', 'SPAM', 'JUNK', '[GMAIL]/SPAM'} else EmailStatus.read),
+                folder_name=folder.upper(),
             )
             
             self.db.add(db_email)
@@ -1443,7 +1491,7 @@ class EmailService:
             body_text=body_text,
             body_html=body_html,
             direction=EmailDirection.outgoing,
-            status=EmailStatus.read,
+            status=self._status(EmailStatus.read, default=EmailStatus.read),
             sent_date=datetime.utcnow(),
             received_date=datetime.utcnow(),
             folder_name='SENT',

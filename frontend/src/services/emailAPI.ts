@@ -202,7 +202,7 @@ const emailAPI = {
     page: number;
     total_pages: number;
   }> {
-    const params: Record<string, unknown> = { account_id: accountId, page, limit };
+    const params: Record<string, unknown> = { account_id: accountId, page, limit, folder: folder.toUpperCase() };
     // Backend expects unread_only + direction, not arbitrary folder names.
     if (folder === 'sent') params.direction = 'outgoing';
     else if (folder === 'inbox') params.direction = 'incoming';
@@ -246,8 +246,7 @@ const emailAPI = {
   },
 
   async markAsUnread(emailId: number): Promise<void> {
-    // Backend'te unread endpoint'i yoksa mark-read'i false ile çağırmalıyız
-    await api.post(`/email/emails/${emailId}/mark-read`, { is_read: false });
+    await api.post(`/email/emails/${emailId}/mark-unread`);
   },
 
   async toggleStar(emailId: number): Promise<void> {
@@ -256,14 +255,17 @@ const emailAPI = {
   },
 
   async deleteEmail(_emailId: number): Promise<void> {
-    // No backend delete endpoint yet; noop so UI can continue.
-    return;
+    await api.patch(`/email/emails/${_emailId}/move`, { folder: 'TRASH' });
   },
 
   async moveToFolder(emailId: number, folder: string): Promise<void> {
     await api.patch(`/email/emails/${emailId}/move`, {
       folder
     });
+  },
+
+  async archiveEmail(emailId: number): Promise<void> {
+    await api.patch(`/email/emails/${emailId}/archive`);
   },
 
   // Folders - Backend'te bu endpoint'ler yok, geçici olarak boş array döndür
