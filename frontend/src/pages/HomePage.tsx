@@ -106,7 +106,7 @@ export function HomePage() {
   ]
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 font-sans">
       <MarketingNav />
 
       <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-0 pt-32">
@@ -158,13 +158,13 @@ export function HomePage() {
                   ))}
                 </div>
 
-                {!isAuthenticated && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8, delay: 0.8 }}
-                    className="w-full max-w-lg space-y-4"
-                  >
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8, delay: 0.8 }}
+                  className="w-full max-w-2xl space-y-4"
+                >
+                  {!isAuthenticated && (
                     <form onSubmit={handleGetStarted} className="flex flex-col space-y-4">
                       <input
                         className="w-full px-6 py-4 text-lg border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
@@ -174,40 +174,34 @@ export function HomePage() {
                         onChange={(e) => setEmail(e.target.value)}
                         required
                       />
-                      <button
-                        type="submit"
-                        className="w-full px-8 py-4 text-lg font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl"
-                        onClick={() => navigate('/signup')}
-                      >
-                        Start Your Growth Journey
-                      </button>
                     </form>
-                    <p className="text-sm text-gray-500">
-                      Join 1000+ businesses already transforming their lead generation
-                    </p>
-                  </motion.div>
-                )}
+                  )}
 
-                {isAuthenticated && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8, delay: 0.8 }}
-                    className="w-full max-w-lg space-y-4"
-                  >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <a
                       href="https://calendly.com/the-leadlab"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="w-full flex items-center justify-center px-8 py-4 text-lg font-medium text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl hover:from-green-600 hover:to-emerald-700 hover:text-white transition-all duration-300 shadow-lg hover:shadow-xl"
+                      className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all duration-300 shadow-lg hover:shadow-xl"
                     >
                       <Calendar className="w-6 h-6 mr-2" />
-                      BOOK A CONSULTATION NOW
+                      Book a meeting
                     </a>
-                    <p className="text-sm text-gray-500 text-center">
-                      Schedule a call with our lead generation experts
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+                    <Link
+                      to="/intake"
+                      className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+                    >
+                      Pitch idea or sign up
+                      <ArrowRight className="w-5 h-5 ml-2" />
+                    </Link>
+                  </div>
+
+                  <p className="text-sm text-gray-500">
+                    Tell us your goals through our forms, or create your account to get started immediately.
+                  </p>
+
+                  {isAuthenticated && (
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center pt-1">
                       <Link
                         to="/dashboard"
                         className="text-center text-sm font-medium text-primary-600 hover:text-primary-700 underline-offset-4 hover:underline"
@@ -221,24 +215,7 @@ export function HomePage() {
                         Organization &amp; settings
                       </Link>
                     </div>
-                  </motion.div>
-                )}
-
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, delay: 1.0 }}
-                  className="mt-8"
-                >
-                  <a
-                    href="https://calendly.com/the-leadlab"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl hover:from-green-600 hover:to-emerald-700 hover:text-white transition-all duration-300 shadow-lg hover:shadow-xl"
-                  >
-                    <Calendar className="w-6 h-6 mr-2" />
-                    BOOK A FREE CONSULTATION
-                  </a>
+                  )}
                 </motion.div>
               </div>
             </div>

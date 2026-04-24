@@ -1,6 +1,6 @@
 export const featureFlags = {
   navigation: {
-    showEmail: false,
+    showEmail: true,
     showEmailSequences: false,
     showForecasting: false,
     showDataImport: false,

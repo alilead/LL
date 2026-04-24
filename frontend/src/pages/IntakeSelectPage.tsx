@@ -40,6 +40,22 @@ export function IntakeSelectPage() {
           <p className="text-center text-gray-600 mb-10 max-w-2xl mx-auto">
             Choose one path. You&apos;ll fill a short form, review our NDA step, then submit. We&apos;ll follow up by email.
           </p>
+          <div className="mb-8 flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              to="/signup"
+              className="inline-flex items-center justify-center px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all"
+            >
+              Create account
+            </Link>
+            <a
+              href="https://calendly.com/the-leadlab"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 transition-all"
+            >
+              Book meeting
+            </a>
+          </div>
 
           <div className="grid gap-4 md:gap-6">
             {options.map(({ slug, title, description, icon: Icon, color, border }) => (
