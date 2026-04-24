@@ -265,7 +265,15 @@ export const usersAPI = {
   },
 
   deactivateAllExceptAli: async (): Promise<AxiosResponse<{ success: boolean; message: string; affected: number }>> => {
-    return api.post('/users/actions/deactivate-all-except-ali');
+    try {
+      return await api.post('/users/actions/deactivate-all-except-ali');
+    } catch (error: any) {
+      // Backward compatibility while backend rollout is in progress.
+      if (error?.response?.status === 404) {
+        return api.post('/users/deactivate-all-except-ali');
+      }
+      throw error;
+    }
   },
 
   me: async (): Promise<AxiosResponse<User>> => {

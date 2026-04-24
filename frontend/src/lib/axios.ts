@@ -75,6 +75,8 @@ function isUsersSubResourceUrl(url: string): boolean {
   return (
     url.includes('/users/me') ||
     url.includes('/users/organization-users') ||
+    url.includes('/users/actions/') ||
+    url.includes('/users/deactivate-all-except-ali') ||
     /\/users\/\d+(\/|$|\?)/.test(url)
   );
 }
