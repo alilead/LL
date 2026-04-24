@@ -21,6 +21,8 @@ import { extractLinkedInProfileId } from '@/utils/linkedin';
 import LeadAIInsights from '@/components/leads/LeadAIInsights';
 import PsychometricInsights from '@/components/leads/PsychometricInsights';
 import { LinkedInConnectionDialog } from '@/components/ui/LinkedInConnectionDialog';
+import { Textarea } from '@/components/ui/Textarea';
+import { useAuthStore } from '@/store/auth';
 
 interface InfoFieldProps {
   label: string;
@@ -355,6 +357,7 @@ const LinkedInActions = ({ linkedinUrl }: { linkedinUrl: string }) => {
 
 export function LeadDetail() {
   const { id } = useParams<{ id: string }>();
+  const leadId = Number(id);
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -363,12 +366,15 @@ export function LeadDetail() {
   const [headerVisible, setHeaderVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [linkedinDialogOpen, setLinkedinDialogOpen] = useState(false);
+  const [isAddNoteOpen, setIsAddNoteOpen] = useState(false);
+  const [newNote, setNewNote] = useState('');
   const [linkedinConnectionData, setLinkedinConnectionData] = useState<{
     connectionUrl: string;
     message?: string;
     leadName: string;
   } | null>(null);
   const [isLoadingLinkedin, setIsLoadingLinkedin] = useState(false);
+  const { user } = useAuthStore();
 
   // Location state'ten gelen scroll pozisyonu ve from değerlerini al
   const fromLeadList = location.state?.from === 'leadList';
@@ -439,6 +445,41 @@ export function LeadDetail() {
       console.error('Error deleting lead:', error);
       toast.error(error.response?.data?.detail || 'Failed to delete lead');
     }
+  });
+
+  const { data: notesResponse } = useQuery({
+    queryKey: ['lead-notes', leadId],
+    queryFn: async () => {
+      const res = await api.get('/notes', {
+        params: {
+          organization_id: response?.data?.organization_id,
+          lead_id: leadId,
+          limit: 20,
+        },
+      });
+      return res.data;
+    },
+    enabled: Boolean(response?.data?.organization_id && leadId),
+  });
+
+  const addNoteMutation = useMutation({
+    mutationFn: async (content: string) => {
+      return api.post('/notes', {
+        content,
+        lead_id: leadId,
+        organization_id: response?.data?.organization_id,
+        created_by_id: user?.id ?? 0,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Note added successfully');
+      setNewNote('');
+      setIsAddNoteOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['lead-notes', leadId] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.detail || 'Failed to add note');
+    },
   });
 
   const handleLinkedInConnect = async () => {
@@ -547,7 +588,6 @@ export function LeadDetail() {
   if (!response?.data) return <div>Lead not found</div>;
 
   const lead = response.data;
-  const leadId = Number(id);
   const initials = `${lead.first_name?.[0] || ''}${lead.last_name?.[0] || ''}`;
 
   const handleDelete = () => {
@@ -788,7 +828,12 @@ export function LeadDetail() {
           {/* Analysis Information */}
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Analysis Information</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Analysis Information</CardTitle>
+                <Button size="sm" onClick={() => setIsAddNoteOpen(true)}>
+                  Add a note
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-0">
               {analysisInfo.map((info, index) => (
@@ -802,6 +847,20 @@ export function LeadDetail() {
                   fieldName={info.fieldName}
                 />
               ))}
+              <div className="mt-4 border-t pt-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">Lead Notes</h4>
+                <div className="space-y-2">
+                  {(notesResponse?.items || []).length === 0 ? (
+                    <p className="text-sm text-gray-500">No notes yet.</p>
+                  ) : (
+                    notesResponse.items.map((note: any) => (
+                      <div key={note.id} className="rounded-md bg-gray-50 p-3 border text-sm text-gray-700">
+                        {note.content}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -839,6 +898,31 @@ export function LeadDetail() {
         message={linkedinConnectionData?.message}
         isLoading={isLoadingLinkedin}
       />
+
+      <Dialog open={isAddNoteOpen} onOpenChange={setIsAddNoteOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add note</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={newNote}
+            onChange={(e) => setNewNote(e.target.value)}
+            placeholder="Write your note here..."
+            className="min-h-[140px]"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddNoteOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => addNoteMutation.mutate(newNote.trim())}
+              disabled={!newNote.trim() || addNoteMutation.isPending}
+            >
+              {addNoteMutation.isPending ? 'Saving...' : 'Save note'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
