@@ -228,11 +228,10 @@ const emailAPI = {
     total_pages: number;
   }> {
     const params: Record<string, unknown> = { account_id: accountId, page, limit, folder: folder.toUpperCase() };
-    // Backend expects unread_only + direction, not arbitrary folder names.
+    // Keep direction only where it cannot conflict with explicit folder filters.
     if (folder === 'sent') params.direction = 'outgoing';
     else if (folder === 'inbox') params.direction = 'incoming';
     else if (folder === 'drafts') params.direction = 'outgoing';
-    else if (folder === 'spam' || folder === 'trash') params.direction = 'incoming';
 
     const response = await api.get(`/email/emails`, {
       params

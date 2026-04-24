@@ -79,7 +79,10 @@ export default function EmailComposeModal({
           : (result?.warning || 'Email was sent but local mailbox sync needs refresh.'),
         variant: wasPersisted ? 'default' : 'destructive',
       });
-      queryClient.invalidateQueries({ queryKey: ['emails', accountId] });
+      queryClient.invalidateQueries({ queryKey: ['emails'] });
+      void emailAPI.syncAccount(parseInt(accountId, 10)).catch(() => {
+        // Best-effort provider sync after sending.
+      });
       onEmailSent?.();
       handleClose();
     },

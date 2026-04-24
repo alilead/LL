@@ -551,6 +551,21 @@ class EmailService:
                 except Exception as spam_error:
                     logger.error(f"Error syncing Spam folder: {spam_error}")
                     total_errors += 1
+
+            # Sync trash so Trash tab matches provider-side folder.
+            if account.sync_inbox:
+                try:
+                    trash_folder = self._select_first_existing_folder(
+                        imap,
+                        ["Trash", "Bin", "[Gmail]/Trash", "INBOX.Trash"],
+                    )
+                    if trash_folder:
+                        trash_synced, trash_errors = self._sync_folder(imap, account, trash_folder, effective_days_back)
+                        total_synced += trash_synced
+                        total_errors += trash_errors
+                except Exception as trash_error:
+                    logger.error(f"Error syncing Trash folder: {trash_error}")
+                    total_errors += 1
             
             # Update sync status in database using raw query  
             self.db.query(EmailAccount).filter(EmailAccount.id == account_id).update({
@@ -657,6 +672,18 @@ class EmailService:
                     direction=EmailDirection.incoming,
                     status=self._status(EmailStatus.unread),
                     folder_name="SPAM",
+                )
+                total_synced += synced
+                total_errors += errors
+            if account.sync_inbox:
+                synced, errors = self._sync_gmail_label(
+                    account=account,
+                    access_token=access_token,
+                    label_query="in:trash",
+                    days_back=days_back,
+                    direction=EmailDirection.incoming,
+                    status=self._status(EmailStatus.read, default=EmailStatus.read),
+                    folder_name="TRASH",
                 )
                 total_synced += synced
                 total_errors += errors
