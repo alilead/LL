@@ -434,7 +434,7 @@ def delete_user(
     return user
 
 
-@router.post("/deactivate-all-except-ali", response_model=dict)
+@router.post("/actions/deactivate-all-except-ali", response_model=dict)
 def deactivate_all_except_ali(
     *,
     db: Session = Depends(deps.get_db),

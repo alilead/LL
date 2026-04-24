@@ -265,7 +265,7 @@ export const usersAPI = {
   },
 
   deactivateAllExceptAli: async (): Promise<AxiosResponse<{ success: boolean; message: string; affected: number }>> => {
-    return api.post('/users/deactivate-all-except-ali');
+    return api.post('/users/actions/deactivate-all-except-ali');
   },
 
   me: async (): Promise<AxiosResponse<User>> => {
