@@ -15,6 +15,7 @@ interface EmailComposeModalProps {
   isOpen: boolean;
   onClose: () => void;
   accountId: string;
+  onEmailSent?: () => void;
   replyTo?: {
     to: string;
     subject: string;
@@ -31,6 +32,7 @@ export default function EmailComposeModal({
   isOpen,
   onClose,
   accountId,
+  onEmailSent,
   replyTo,
   forward,
 }: EmailComposeModalProps) {
@@ -50,6 +52,22 @@ export default function EmailComposeModal({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  React.useEffect(() => {
+    if (!isOpen) return;
+    setTo(replyTo?.to || '');
+    setCc('');
+    setBcc('');
+    setShowCc(false);
+    setShowBcc(false);
+    setSubject(replyTo ? `Re: ${replyTo.subject}` : forward ? `Fwd: ${forward.subject}` : '');
+    setBody(
+      forward
+        ? `\n\n---------- Forwarded message ----------\nFrom: ${forward.from}\nSubject: ${forward.subject}\n\n${forward.body}`
+        : ''
+    );
+    setAttachments([]);
+  }, [isOpen, replyTo, forward]);
+
   const sendEmailMutation = useMutation({
     mutationFn: emailAPI.sendEmail,
     onSuccess: (result) => {
@@ -62,6 +80,7 @@ export default function EmailComposeModal({
         variant: wasPersisted ? 'default' : 'destructive',
       });
       queryClient.invalidateQueries({ queryKey: ['emails', accountId] });
+      onEmailSent?.();
       handleClose();
     },
     onError: (error) => {
@@ -130,7 +149,7 @@ export default function EmailComposeModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80]">
       <Card className="w-full max-w-4xl max-h-[90vh] flex flex-col">
         <CardHeader className="flex flex-row items-center justify-between border-b">
           <CardTitle>Compose Email</CardTitle>

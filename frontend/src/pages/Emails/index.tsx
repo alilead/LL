@@ -28,6 +28,8 @@ export const EmailsPage: React.FC = () => {
   const [selectedFolder, setSelectedFolder] = useState('inbox');
   const [selectedEmail, setSelectedEmail] = useState<EmailMessage | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [composeReplyTo, setComposeReplyTo] = useState<{ to: string; subject: string; messageId: string } | undefined>(undefined);
+  const [composeForward, setComposeForward] = useState<{ from: string; subject: string; body: string } | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
   const [customLabels, setCustomLabels] = useState<string[]>([]);
 
@@ -140,6 +142,43 @@ export const EmailsPage: React.FC = () => {
       syncAccountMutation.mutate(selectedAccount);
     }
     refetchEmails();
+  };
+
+  const parseRecipients = (value?: string): string[] =>
+    (value || '')
+      .split(/[;,]/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+
+  const openComposeForAction = (email: EmailMessage, action: 'reply' | 'reply-all' | 'forward') => {
+    setComposeForward(undefined);
+    setComposeReplyTo(undefined);
+    if (action === 'forward') {
+      setComposeForward({
+        from: email.from_name || email.from_address,
+        subject: email.subject || '',
+        body: email.body_text || '',
+      });
+    } else {
+      if (action === 'reply') {
+        setComposeReplyTo({
+          to: email.from_address,
+          subject: email.subject || '',
+          messageId: String(email.id),
+        });
+      } else {
+        const currentAccountEmail = (accounts || []).find((a) => a.id === selectedAccount)?.email?.toLowerCase();
+        const recipients = Array.from(
+          new Set([email.from_address, ...parseRecipients(email.to_address)])
+        ).filter((addr) => addr.toLowerCase() !== currentAccountEmail);
+        setComposeReplyTo({
+          to: recipients.join(', '),
+          subject: email.subject || '',
+          messageId: String(email.id),
+        });
+      }
+    }
+    setIsComposeOpen(true);
   };
 
   useEffect(() => {
@@ -366,9 +405,13 @@ export const EmailsPage: React.FC = () => {
           isOpen={isComposeOpen}
           onClose={() => setIsComposeOpen(false)}
           accountId={selectedAccount.toString()}
+          replyTo={composeReplyTo}
+          forward={composeForward}
           onEmailSent={() => {
             refetchEmails();
             setIsComposeOpen(false);
+            setComposeReplyTo(undefined);
+            setComposeForward(undefined);
           }}
         />
       )}
@@ -383,9 +426,7 @@ export const EmailsPage: React.FC = () => {
           onDelete={(emailId) => {
             deleteEmailMutation.mutate({ accountId: selectedAccount, emailId });
           }}
-          onReply={(email) => {
-            setIsComposeOpen(true);
-          }}
+          onReply={(email, action) => openComposeForAction(email, action)}
         />
       )}
     </div>

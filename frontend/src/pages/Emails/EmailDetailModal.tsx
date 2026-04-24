@@ -5,7 +5,6 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Avatar, AvatarFallback } from '../../components/ui/avatar';
 import { format } from 'date-fns';
-import EmailComposeModal from './EmailComposeModal';
 
 interface EmailMessage {
   id: number;
@@ -33,7 +32,7 @@ interface EmailDetailModalProps {
   onDelete: (emailId: number) => void;
   onArchive?: (emailId: number) => void;
   onMarkUnread?: (emailId: number) => void;
-  onReply: (email: EmailMessage) => void;
+  onReply: (email: EmailMessage, action: 'reply' | 'reply-all' | 'forward') => void;
 }
 
 const EmailDetailModal: React.FC<EmailDetailModalProps> = ({
@@ -45,30 +44,24 @@ const EmailDetailModal: React.FC<EmailDetailModalProps> = ({
   onMarkUnread,
   onReply
 }) => {
-  const [isReplyOpen, setIsReplyOpen] = React.useState(false);
-  const [replyType, setReplyType] = React.useState<'reply' | 'reply-all' | 'forward'>('reply');
-
   const formatEmailDate = (dateString: string) => {
     const date = new Date(dateString);
     return format(date, 'EEEE, dd MMMM yyyy HH:mm');
   };
 
   const handleReply = () => {
-    setReplyType('reply');
-    setIsReplyOpen(true);
-    onReply(email);
+    onReply(email, 'reply');
+    onClose();
   };
 
   const handleReplyAll = () => {
-    setReplyType('reply-all');
-    setIsReplyOpen(true);
-    onReply(email);
+    onReply(email, 'reply-all');
+    onClose();
   };
 
   const handleForward = () => {
-    setReplyType('forward');
-    setIsReplyOpen(true);
-    onReply(email);
+    onReply(email, 'forward');
+    onClose();
   };
 
   const handleMarkUnread = () => {
@@ -84,30 +77,6 @@ const EmailDetailModal: React.FC<EmailDetailModalProps> = ({
   const handleDelete = () => {
     onDelete(email.id);
     onClose();
-  };
-
-  const getReplyData = () => {
-    switch (replyType) {
-      case 'reply':
-        return {
-          to: email.from_address,
-          subject: `Re: ${email.subject}`,
-        };
-      case 'reply-all':
-        return {
-          to: email.from_address,
-          cc: email.to_address,
-          subject: `Re: ${email.subject}`,
-        };
-      case 'forward':
-        return {
-          to: '',
-          subject: `Fwd: ${email.subject}`,
-          body: `\n\n---------- Forwarded message ---------\nFrom: ${email.from_name || email.from_address}\nDate: ${formatEmailDate(email.sent_date)}\nSubject: ${email.subject}\nTo: ${email.to_address}\n\n${email.body_text}`,
-        };
-      default:
-        return {};
-    }
   };
 
   if (!isOpen) return null;
@@ -242,17 +211,6 @@ const EmailDetailModal: React.FC<EmailDetailModalProps> = ({
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Reply Modal */}
-      {isReplyOpen && (
-        <EmailComposeModal
-          isOpen={isReplyOpen}
-          onClose={() => setIsReplyOpen(false)}
-          accountId={String(email.email_account_id)}
-          replyTo={{ to: getReplyData().to || '', subject: getReplyData().subject || '', messageId: String(email.id) }}
-          forward={replyType === 'forward' ? { from: email.from_address, subject: email.subject, body: email.body_text || '' } : undefined}
-        />
-      )}
     </>
   );
 };
