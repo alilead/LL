@@ -41,7 +41,6 @@ import { faLinkedin, faTwitter, faFacebook } from '@fortawesome/free-brands-svg-
 export function HomePage() {
   const { user, isAuthenticated } = useAuthStore()
   const navigate = useNavigate()
-  const [email, setEmail] = useState('')
   
   // ROI Calculator states
   const [leadVolume, setLeadVolume] = useState(100)
@@ -89,14 +88,6 @@ export function HomePage() {
       element.scrollIntoView()
     }
   }
-
-  const handleGetStarted = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (email) {
-      navigate('/signup', { state: { email } })
-    }
-  }
-
 
   const stats = [
     { number: 300, suffix: '%', text: 'Lead Generation Increase' },
@@ -164,19 +155,6 @@ export function HomePage() {
                   transition={{ duration: 0.8, delay: 0.8 }}
                   className="w-full max-w-2xl space-y-4"
                 >
-                  {!isAuthenticated && (
-                    <form onSubmit={handleGetStarted} className="flex flex-col space-y-4">
-                      <input
-                        className="w-full px-6 py-4 text-lg border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
-                        placeholder="Enter your work email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                      />
-                    </form>
-                  )}
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <a
                       href="https://calendly.com/the-leadlab"
@@ -191,13 +169,13 @@ export function HomePage() {
                       to="/intake"
                       className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl"
                     >
-                      Pitch idea or sign up
+                      Tell us what you need
                       <ArrowRight className="w-5 h-5 ml-2" />
                     </Link>
                   </div>
 
                   <p className="text-sm text-gray-500">
-                    Tell us your goals through our forms, or create your account to get started immediately.
+                    We will guide you to the right form: business diagnostic, data request, or pitch your idea.
                   </p>
 
                   {isAuthenticated && (
@@ -368,13 +346,13 @@ export function HomePage() {
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, delay: index * 0.2 }}
-                    className="bg-gradient-to-br from-blue-50 to-indigo-50 p-8 rounded-2xl shadow-lg border border-blue-100"
+                    className="bg-white p-8 rounded-2xl shadow-lg border border-blue-100"
                   >
                     <div className="bg-white w-20 h-20 rounded-xl flex items-center justify-center mb-6 shadow-md">
                       {feature.icon}
                     </div>
                     <h3 className="text-2xl font-bold mb-4">{feature.title}</h3>
-                    <p className="text-gray-600 text-lg">{feature.description}</p>
+                    <p className="text-gray-600">{feature.description}</p>
                   </motion.div>
                 ))}
               </div>
