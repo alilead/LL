@@ -122,7 +122,7 @@ export function HomePage() {
                   transition={{ duration: 0.8, delay: 0.2 }}
                   className="space-y-6 max-w-4xl"
                 >
-                  <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl leading-[1.05] bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 animate-gradient">
+                  <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl leading-[1.15] pb-1 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 animate-gradient">
                     Connecting Businesses with Qualified Leads
                   </h1>
                   <p className="mx-auto max-w-[800px] text-gray-600 md:text-xl lg:text-2xl leading-relaxed">
@@ -155,19 +155,19 @@ export function HomePage() {
                   transition={{ duration: 0.8, delay: 0.8 }}
                   className="w-full max-w-2xl space-y-4"
                 >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
                     <a
                       href="https://calendly.com/the-leadlab"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+                      className="inline-flex items-center justify-center min-w-[240px] px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all duration-300 shadow-lg hover:shadow-xl"
                     >
                       <Calendar className="w-6 h-6 mr-2" />
                       Book a meeting
                     </a>
                     <Link
                       to="/intake"
-                      className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+                      className="inline-flex items-center justify-center min-w-[240px] px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl"
                     >
                       Tell us what you need
                       <ArrowRight className="w-5 h-5 ml-2" />
@@ -202,7 +202,7 @@ export function HomePage() {
           <section id="about" className="w-full py-16 bg-gradient-to-br from-white via-blue-50/50 to-white">
             <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
               <div className="text-center mb-16">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.2] pb-1 mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
                   About The-LeadLab.com
                 </h2>
                 <p className="text-xl text-gray-600 max-w-4xl mx-auto">
@@ -258,7 +258,7 @@ export function HomePage() {
               </div>
 
               <div className="text-center mb-16">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.2] pb-1 mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
                   The Problems We Solve
                 </h2>
               </div>
@@ -315,7 +315,7 @@ export function HomePage() {
           <section className="w-full py-16 bg-white">
             <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
               <div className="text-center mb-16">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.2] pb-1 mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
                   Why Industry Leaders Choose LeadLab
                 </h2>
                 <p className="text-xl text-gray-600 max-w-3xl mx-auto">
@@ -362,7 +362,7 @@ export function HomePage() {
           <section className="w-full py-16 bg-gradient-to-br from-white via-blue-50/50 to-white" id="services">
             <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
               <div className="text-center mb-16">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.2] pb-1 mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
                   How LeadLab Works
                 </h2>
                 <p className="text-xl text-gray-600 max-w-3xl mx-auto">
@@ -417,33 +417,10 @@ export function HomePage() {
             </div>
           </section>
 
-          <section
-            id="lead-intake-section"
-            className="w-full py-16 md:py-24 bg-gradient-to-br from-white via-blue-50/50 to-white border-y border-gray-100"
-          >
-            <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
-              <div className="text-center">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
-                  Ready to talk?
-                </h2>
-                <p className="text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed mb-10">
-                  Tell us what you need — we route your request securely and follow up by email with next steps, including
-                  an NDA when relevant.
-                </p>
-                <Link
-                  to="/intake"
-                  className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:from-blue-700 hover:to-indigo-700 shadow-lg transition-all"
-                >
-                  Tell us what you need
-                </Link>
-              </div>
-            </div>
-          </section>
-
           <section className="w-full py-16 bg-white">
             <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
               <div className="text-center mb-16">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.2] pb-1 mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
                   Real Results, Real Time
                 </h2>
                 <p className="text-xl text-gray-600 max-w-3xl mx-auto">
@@ -669,7 +646,7 @@ export function HomePage() {
 
           <section id="features" className="w-full py-16 md:py-24 bg-gradient-to-br from-white via-blue-50/50 to-white">
             <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
-              <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+              <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.2] pb-1 text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
                 Our Unique Approach
               </h2>
               <p className="text-xl text-gray-600 text-center mb-16 max-w-3xl mx-auto">
@@ -723,7 +700,7 @@ export function HomePage() {
 
           <section id="testimonials" className="w-full py-16 md:py-24 bg-gradient-to-br from-white via-blue-50/50 to-white">
             <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
-              <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+              <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.2] pb-1 text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
                 What Our Clients Say
               </h2>
               <p className="text-xl text-gray-600 text-center mb-16 max-w-3xl mx-auto">
@@ -763,7 +740,7 @@ export function HomePage() {
 
           <section id="pricing" className="w-full py-16 md:py-24 bg-gradient-to-br from-white via-indigo-50/50 to-white">
             <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
-              <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+              <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.2] pb-1 text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
                 Our Products
               </h2>
               <p className="text-xl text-gray-600 text-center mb-16 max-w-3xl mx-auto">
@@ -845,7 +822,7 @@ export function HomePage() {
 
           <section id="packages" className="w-full py-16 md:py-24 bg-gradient-to-br from-white via-blue-50/50 to-white">
             <div className="w-full max-w-[2000px] px-4 md:px-6 mx-auto">
-              <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.05] text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+              <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl leading-[1.2] pb-1 text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
                 Our Packages
               </h2>
               <p className="text-xl text-gray-600 text-center mb-16 max-w-3xl mx-auto">
