@@ -43,7 +43,7 @@ Use **Pass** / **Fail** / **N/A** when you test in staging or production. Screen
 
 | Area | Files |
 |------|--------|
-| Supabase | `docs/SUPABASE_RENDER_LOCAL_SETUP.md`, `frontend/src/lib/supabaseClient.ts` |
+| Supabase | `docs/SUPABASE_RENDER_LOCAL_SETUP.md`, `docs/CURSOR_SUPER_PROMPT_SUPABASE_RLS_SECURITY.md`, `backend/migrations/manual/007_enable_rls_public_tables_supabase_advisor.sql`, `frontend/src/lib/supabaseClient.ts` |
 | Routes | `frontend/src/router.tsx` (sequences, notifications, org redirect, territories) |
 | Territories IA | `ModernSidebar.tsx`, `CommandPalette.tsx`, `ModernSettings.tsx` (Organization card) |
 | Email | `EmailSequences/SequenceBuilder.tsx`, `Emails/index.tsx`, `services/emailAPI.ts` |

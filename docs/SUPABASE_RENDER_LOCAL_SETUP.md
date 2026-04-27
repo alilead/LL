@@ -219,6 +219,21 @@ You are **not** required to leave Render as a host; you only replace **where the
 
 ---
 
+## Supabase security: Advisors (`rls_disabled_in_public`, `sensitive_columns_exposed`)
+
+LeadLab’s API uses **FastAPI + `DATABASE_URL`** (usually the `postgres` role, which **bypasses RLS** in the dashboard). The **Supabase Data API** (PostgREST) still exposes `public` tables to **`anon` / `authenticated`** unless you enable **Row Level Security**.
+
+1. In Supabase → **SQL Editor**, run the manual migration:
+   - `backend/migrations/manual/007_enable_rls_public_tables_supabase_advisor.sql`  
+   It enables RLS on every base table in `public`, so unauthenticated API clients get **no rows** by default (no broad policies). Re-run is safe.
+2. In **Database → Advisors**, confirm the critical RLS / sensitive-data issues are cleared.
+3. Never put **`service_role`** in `VITE_*` or the frontend bundle; use **anon** + Project URL only (`frontend/src/lib/supabaseClient.ts`).
+4. Super-prompt (full checklist): `docs/CURSOR_SUPER_PROMPT_SUPABASE_RLS_SECURITY.md`.
+
+If you later use Supabase Auth in the browser for some tables, add **explicit** `CREATE POLICY` rules (e.g. `auth.uid() = user_id`); do not rely on this script alone for that path.
+
+---
+
 ## Part 7 — End-to-end checklist
 
 - [ ] Data restored or migrated into Supabase Postgres.
@@ -226,6 +241,7 @@ You are **not** required to leave Render as a host; you only replace **where the
 - [ ] Local API + frontend smoke test passes.
 - [ ] Render `DATABASE_URL` updated; production health and main flows OK.
 - [ ] Optional: `VITE_SUPABASE_*` set in Vercel/hosting for the frontend if you use the Supabase JS client in production builds.
+- [ ] Supabase **Advisors** clean for RLS: run `007_enable_rls_public_tables_supabase_advisor.sql` if the project uses Supabase-hosted Postgres.
 - [ ] Old Render Postgres backed up and removed or marked deprecated.
 
 ---
@@ -249,6 +265,8 @@ You are **not** required to leave Render as a host; you only replace **where the
 - `backend/scripts/migrate_mysql_to_postgres.py` — MySQL → Postgres migration.
 - `DEPLOYMENT_GUIDE.md` — Render build commands and related notes.
 - `frontend/src/lib/supabaseClient.ts` — browser Supabase client (optional).
+- `backend/migrations/manual/007_enable_rls_public_tables_supabase_advisor.sql` — enable RLS on all `public` tables (Supabase Advisor).
+- `docs/CURSOR_SUPER_PROMPT_SUPABASE_RLS_SECURITY.md` — RLS + sensitive data hardening prompt.
 
 ---
 
