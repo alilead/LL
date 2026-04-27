@@ -1,7 +1,11 @@
+import asyncio
 from types import SimpleNamespace
 
 from app.services.email_service import EmailService
+from app.core.email import EmailSender
 from app.core.config import settings
+from app.api.v1.endpoints import team_invitations as team_invitations_endpoint
+from fastapi import HTTPException
 
 
 class _FakeQuery:
@@ -53,7 +57,9 @@ def test_send_email_auto_falls_back_to_api(monkeypatch):
     monkeypatch.setattr(service, "_send_email_provider_api", lambda *args, **kwargs: True)
     monkeypatch.setattr(service, "_persist_sent_email", lambda *args, **kwargs: None)
 
-    assert service.send_email(1, ["to@example.com"], "Subject", "Text", "Html") is True
+    result = service.send_email(1, ["to@example.com"], "Subject", "Text", "Html")
+    assert result["sent"] is True
+    assert result["transport"] == "api"
 
 
 def test_send_email_returns_provider_error_when_all_transports_fail(monkeypatch):
@@ -70,7 +76,8 @@ def test_send_email_returns_provider_error_when_all_transports_fail(monkeypatch)
     monkeypatch.setattr(service, "_send_email_provider_api", _provider_fail)
     monkeypatch.setattr(service, "_persist_sent_email", lambda *args, **kwargs: None)
 
-    assert service.send_email(1, ["to@example.com"], "Subject", "Text", "Html") is False
+    result = service.send_email(1, ["to@example.com"], "Subject", "Text", "Html")
+    assert result["sent"] is False
     assert service.last_send_error_code == "PROVIDER_UNAVAILABLE"
     assert service.last_send_retryable is True
     assert service.last_send_status_code == 503
@@ -85,3 +92,94 @@ def test_send_email_raises_for_missing_account(monkeypatch):
         assert False, "Expected ValueError for missing account"
     except ValueError as exc:
         assert "Email account not found" in str(exc)
+
+
+def test_email_sender_production_missing_smtp_returns_false(monkeypatch):
+    monkeypatch.setattr(settings, "ENV", "production")
+    monkeypatch.setattr(settings, "RESEND_API_KEY", None)
+    sender = EmailSender()
+    sender.smtp_user = None
+    sender.smtp_password = None
+
+    result = asyncio.run(
+        sender.send_email(
+            to_email="invitee@example.com",
+            subject="Invite",
+            html_content="<p>Join</p>",
+            text_content="Join",
+        )
+    )
+
+    assert result is False
+
+
+def test_email_sender_development_missing_smtp_uses_mock(monkeypatch):
+    monkeypatch.setattr(settings, "ENV", "development")
+    monkeypatch.setattr(settings, "RESEND_API_KEY", None)
+    sender = EmailSender()
+    sender.smtp_user = None
+    sender.smtp_password = None
+
+    result = asyncio.run(
+        sender.send_email(
+            to_email="invitee@example.com",
+            subject="Invite",
+            html_content="<p>Join</p>",
+            text_content="Join",
+        )
+    )
+
+    assert result is True
+
+
+def test_invitation_wrapper_awaits_async_sender(monkeypatch):
+    called = {"value": False}
+
+    async def _fake_send_team_invitation(*args, **kwargs):
+        called["value"] = True
+        return True
+
+    monkeypatch.setattr(
+        team_invitations_endpoint.email_sender,
+        "send_team_invitation",
+        _fake_send_team_invitation,
+    )
+
+    asyncio.run(
+        team_invitations_endpoint._send_invitation_email_or_raise(
+            email="invitee@example.com",
+            inviter_name="Ali Attia",
+            organization_name="LeadLab",
+            invitation_link="https://the-leadlab.com/invite/token-123",
+            role="member",
+            message="Welcome",
+        )
+    )
+
+    assert called["value"] is True
+
+
+def test_invitation_wrapper_raises_http_exception_when_send_returns_false(monkeypatch):
+    async def _fake_send_team_invitation(*args, **kwargs):
+        return False
+
+    monkeypatch.setattr(
+        team_invitations_endpoint.email_sender,
+        "send_team_invitation",
+        _fake_send_team_invitation,
+    )
+
+    try:
+        asyncio.run(
+            team_invitations_endpoint._send_invitation_email_or_raise(
+                email="invitee@example.com",
+                inviter_name="Ali Attia",
+                organization_name="LeadLab",
+                invitation_link="https://the-leadlab.com/invite/token-123",
+                role="member",
+                message="Welcome",
+            )
+        )
+        assert False, "Expected HTTPException when invitation delivery fails"
+    except HTTPException as exc:
+        assert exc.status_code == 502

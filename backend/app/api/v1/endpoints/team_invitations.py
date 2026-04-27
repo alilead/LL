@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _send_invitation_email_safe(
+async def _send_invitation_email_or_raise(
     email: str,
     inviter_name: str,
     organization_name: str,
@@ -34,9 +34,9 @@ def _send_invitation_email_safe(
     role: str,
     message: str | None,
 ) -> None:
-    """Background email sender wrapper with reliable logging."""
+    """Send invitation email and raise when delivery fails."""
     try:
-        email_sender.send_team_invitation(
+        sent = await email_sender.send_team_invitation(
             email,
             inviter_name,
             organization_name,
@@ -44,6 +44,8 @@ def _send_invitation_email_safe(
             role,
             message,
         )
+        if not sent:
+            raise RuntimeError("Invitation email delivery returned false")
     except Exception as exc:
         logger.exception(
             "Failed to send team invitation email",
@@ -53,6 +55,13 @@ def _send_invitation_email_safe(
                 "role": role,
             },
         )
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Invitation created, but email delivery failed. "
+                "Please verify SMTP/Resend configuration and try resending."
+            )
+        ) from exc
 
 @router.post("", response_model=TeamInvitation)
 @router.post("/", response_model=TeamInvitation)
@@ -93,12 +102,11 @@ async def create_team_invitation(
             invited_by_id=current_user.id
         )
         
-        # Send invitation email in background
+        # Send invitation email before returning success.
         invitation_link = f"{settings.FRONTEND_URL}/invite/{invitation.invitation_token}"
         inviter_name = f"{current_user.first_name} {current_user.last_name}".strip()
-        
-        background_tasks.add_task(
-            _send_invitation_email_safe,
+
+        await _send_invitation_email_or_raise(
             invitation.email,
             inviter_name,
             organization.name,
@@ -106,7 +114,7 @@ async def create_team_invitation(
             invitation.role,
             invitation.message,
         )
-        
+
         return invitation
         
     except ValueError as e:
@@ -381,7 +389,7 @@ async def resend_team_invitation(
         # Resend invitation (updates token and expiration)
         updated_invitation = team_invitation.resend_invitation(db=db, invitation=invitation)
         
-        # Send new invitation email
+        # Send new invitation email before returning success.
         organization = db.query(Organization).filter(
             Organization.id == current_user.organization_id
         ).first()
@@ -389,8 +397,7 @@ async def resend_team_invitation(
         invitation_link = f"{settings.FRONTEND_URL}/invite/{updated_invitation.invitation_token}"
         inviter_name = f"{current_user.first_name} {current_user.last_name}".strip()
         
-        background_tasks.add_task(
-            _send_invitation_email_safe,
+        await _send_invitation_email_or_raise(
             updated_invitation.email,
             inviter_name,
             organization.name,

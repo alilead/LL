@@ -19,6 +19,7 @@ class EmailSender:
         self.smtp_tls = settings.SMTP_TLS
         self.from_email = settings.EMAILS_FROM_EMAIL
         self.from_name = settings.SMTP_FROM_NAME
+        self.mock_mode_enabled = (settings.ENV or "").lower() == "development"
 
     async def send_email(
         self,
@@ -44,11 +45,14 @@ class EmailSender:
 
         # Check if SMTP is properly configured
         if not self.smtp_user or not self.smtp_password:
-            print(f"📧 SMTP credentials not configured, running in mock mode")
-            print(f"📧 MOCK: Email to {to_email}")
-            print(f"📧 MOCK: Subject: {subject}")
-            print(f"📧 MOCK: Content: {html_content[:100]}...")
-            return True
+            if self.mock_mode_enabled:
+                print(f"📧 SMTP credentials not configured, running in mock mode")
+                print(f"📧 MOCK: Email to {to_email}")
+                print(f"📧 MOCK: Subject: {subject}")
+                print(f"📧 MOCK: Content: {html_content[:100]}...")
+                return True
+            print(f"❌ SMTP credentials not configured for {to_email}")
+            return False
 
         try:
             # Create message
@@ -102,11 +106,13 @@ class EmailSender:
 
         except Exception as e:
             print(f"❌ Failed to send email to {to_email}: {str(e)}")
-            # Fall back to mock mode
-            print(f"📧 MOCK: Email to {to_email}")
-            print(f"📧 MOCK: Subject: {subject}")
-            print(f"📧 MOCK: Content: {html_content[:100]}...")
-            return True
+            if self.mock_mode_enabled:
+                # Keep mock mode for local development only.
+                print(f"📧 MOCK: Email to {to_email}")
+                print(f"📧 MOCK: Subject: {subject}")
+                print(f"📧 MOCK: Content: {html_content[:100]}...")
+                return True
+            return False
 
     async def _send_via_resend_api(
         self,
@@ -582,6 +588,7 @@ class InvoiceEmailSender:
         self.smtp_tls = settings.SMTP_TLS
         self.from_email = settings.INVOICE_EMAIL
         self.from_name = "LeadLab Invoicing"
+        self.mock_mode_enabled = (settings.ENV or "").lower() == "development"
 
     async def send_email(
         self,
@@ -595,11 +602,14 @@ class InvoiceEmailSender:
         
         # Check if SMTP is properly configured
         if not self.smtp_user or not self.smtp_password:
-            print(f"📧 Invoice SMTP credentials not configured, running in mock mode")
-            print(f"📧 MOCK: Invoice email to {to_email}")
-            print(f"📧 MOCK: Subject: {subject}")
-            print(f"📧 MOCK: Content: {html_content[:100]}...")
-            return True
+            if self.mock_mode_enabled:
+                print(f"📧 Invoice SMTP credentials not configured, running in mock mode")
+                print(f"📧 MOCK: Invoice email to {to_email}")
+                print(f"📧 MOCK: Subject: {subject}")
+                print(f"📧 MOCK: Content: {html_content[:100]}...")
+                return True
+            print(f"❌ Invoice SMTP credentials not configured for {to_email}")
+            return False
 
         try:
             # Create message
@@ -648,11 +658,13 @@ class InvoiceEmailSender:
 
         except Exception as e:
             print(f"❌ Failed to send invoice email to {to_email}: {str(e)}")
-            # Fall back to mock mode
-            print(f"📧 MOCK: Invoice email to {to_email}")
-            print(f"📧 MOCK: Subject: {subject}")
-            print(f"📧 MOCK: Content: {html_content[:100]}...")
-            return True
+            if self.mock_mode_enabled:
+                # Keep mock mode for local development only.
+                print(f"📧 MOCK: Invoice email to {to_email}")
+                print(f"📧 MOCK: Subject: {subject}")
+                print(f"📧 MOCK: Content: {html_content[:100]}...")
+                return True
+            return False
 
 # Create global instances
 email_sender = EmailSender()
