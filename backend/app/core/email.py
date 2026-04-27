@@ -29,20 +29,56 @@ class EmailSender:
         text_content: str = None,
         attachments: List[dict] = None
     ) -> bool:
-        """Send email using configured SMTP settings"""
-        if settings.RESEND_API_KEY:
-            try:
-                return await self._send_via_resend_api(
-                    to_email=to_email,
-                    subject=subject,
-                    html_content=html_content,
-                    text_content=text_content
-                )
-            except Exception as e:
-                # If Resend API fails, log the error but don't fall back to mock
-                print(f"❌ Resend API failed for {to_email}: {str(e)}")
-                raise
+        """Send email with SMTP-first strategy (Gmail-friendly)."""
+        provider_mode = (settings.EMAIL_PROVIDER or "smtp").lower().strip()
+        if provider_mode not in {"smtp", "api", "auto"}:
+            provider_mode = "smtp"
 
+        if provider_mode == "smtp":
+            return await self._send_via_smtp(
+                to_email=to_email,
+                subject=subject,
+                html_content=html_content,
+                text_content=text_content,
+                attachments=attachments,
+            )
+
+        if provider_mode == "api":
+            return await self._send_via_resend_api(
+                to_email=to_email,
+                subject=subject,
+                html_content=html_content,
+                text_content=text_content,
+            )
+
+        # auto mode: prefer SMTP first, fallback to Resend only if configured.
+        smtp_sent = await self._send_via_smtp(
+            to_email=to_email,
+            subject=subject,
+            html_content=html_content,
+            text_content=text_content,
+            attachments=attachments,
+        )
+        if smtp_sent:
+            return True
+        if settings.RESEND_API_KEY:
+            return await self._send_via_resend_api(
+                to_email=to_email,
+                subject=subject,
+                html_content=html_content,
+                text_content=text_content,
+            )
+        return False
+
+    async def _send_via_smtp(
+        self,
+        *,
+        to_email: str,
+        subject: str,
+        html_content: str,
+        text_content: Optional[str] = None,
+        attachments: Optional[List[dict]] = None,
+    ) -> bool:
         # Check if SMTP is properly configured
         if not self.smtp_user or not self.smtp_password:
             if self.mock_mode_enabled:
@@ -55,41 +91,35 @@ class EmailSender:
             return False
 
         try:
-            # Create message
             message = MIMEMultipart("alternative")
             message["Subject"] = subject
-            message["From"] = f"{self.from_name} <{self.from_email}>"
+            # For SMTP/Gmail, prefer authenticated SMTP user as sender.
+            from_email = self.smtp_user or self.from_email
+            message["From"] = f"{self.from_name} <{from_email}>"
             message["To"] = to_email
 
-            # Add text content if provided
             if text_content:
                 text_part = MIMEText(text_content, "plain")
                 message.attach(text_part)
 
-            # Add HTML content
             html_part = MIMEText(html_content, "html")
             message.attach(html_part)
 
-            # Add attachments if provided
             if attachments:
                 for attachment in attachments:
-                    part = MIMEBase('application', 'octet-stream')
-                    part.set_payload(attachment['content'])
+                    part = MIMEBase("application", "octet-stream")
+                    part.set_payload(attachment["content"])
                     encoders.encode_base64(part)
                     part.add_header(
-                        'Content-Disposition',
+                        "Content-Disposition",
                         f'attachment; filename= {attachment["filename"]}'
                     )
                     message.attach(part)
 
-            # Create SSL context
             context = ssl.create_default_context()
-
-            # Gmail often works better with STARTTLS on 587 in cloud hosts.
             use_tls = self.smtp_tls and self.smtp_port == 465
             start_tls = self.smtp_tls and self.smtp_port != 465
 
-            # Send email
             await aiosmtplib.send(
                 message,
                 hostname=self.smtp_host,
@@ -98,16 +128,14 @@ class EmailSender:
                 password=self.smtp_password,
                 use_tls=use_tls,
                 start_tls=start_tls,
-                tls_context=context
+                tls_context=context,
             )
 
-            print(f"✅ Email sent successfully to {to_email}")
+            print(f"✅ Email sent successfully to {to_email} via SMTP")
             return True
-
         except Exception as e:
-            print(f"❌ Failed to send email to {to_email}: {str(e)}")
+            print(f"❌ Failed to send email via SMTP to {to_email}: {str(e)}")
             if self.mock_mode_enabled:
-                # Keep mock mode for local development only.
                 print(f"📧 MOCK: Email to {to_email}")
                 print(f"📧 MOCK: Subject: {subject}")
                 print(f"📧 MOCK: Content: {html_content[:100]}...")
@@ -122,6 +150,10 @@ class EmailSender:
         html_content: str,
         text_content: Optional[str] = None
     ) -> bool:
+        if not settings.RESEND_API_KEY:
+            print(f"❌ RESEND_API_KEY is not configured for {to_email}")
+            return False
+
         payload = {
             "from": f"{self.from_name} <{self.from_email}>",
             "to": [to_email],
@@ -145,8 +177,7 @@ class EmailSender:
                 )
                 response.raise_for_status()
                 response_data = response.json()
-                
-                # Log the email ID for tracking
+
                 email_id = response_data.get("id", "unknown")
                 print(f"✅ Email sent successfully to {to_email} via Resend API (ID: {email_id})")
                 return True
@@ -155,17 +186,15 @@ class EmailSender:
             try:
                 error_data = e.response.json()
                 error_detail = error_data.get("message", str(e))
-            except:
+            except Exception:
                 error_detail = str(e)
-            
+
             print(f"❌ Failed to send email via Resend API to {to_email}: {error_detail}")
             print(f"   Status: {e.response.status_code}")
-            
-            # Don't fall back to mock mode for API errors - let the caller handle it
-            raise Exception(f"Resend API error: {error_detail}")
+            return False
         except Exception as e:
             print(f"❌ Failed to send email via Resend API to {to_email}: {str(e)}")
-            raise
+            return False
 
     async def send_welcome_email(self, to_email: str, first_name: str, login_link: str) -> bool:
         """Send welcome email to new users"""

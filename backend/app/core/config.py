@@ -99,7 +99,7 @@ class Settings(BaseSettings):
     SMTP_FROM_NAME: str = Field(default="LeadLab", description="Default from name")
     RESEND_API_KEY: Optional[str] = Field(default=None, description="Resend API key for HTTP email sending")
     RESEND_FROM_EMAIL: Optional[str] = Field(default=None, description="Verified sender email for Resend API")
-    EMAIL_PROVIDER: str = Field(default="auto", description="Email transport mode: smtp, api, or auto")
+    EMAIL_PROVIDER: str = Field(default="smtp", description="Email transport mode: smtp, api, or auto")
     EMAIL_PROVIDER_TIMEOUT_SECONDS: int = Field(default=12, description="Timeout (seconds) for provider API requests")
 
     # Invoice Email Configuration (separate from auth emails)

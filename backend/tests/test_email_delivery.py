@@ -132,6 +132,66 @@ def test_email_sender_development_missing_smtp_uses_mock(monkeypatch):
     assert result is True
 
 
+def test_email_sender_auto_prefers_smtp_before_resend(monkeypatch):
+    monkeypatch.setattr(settings, "EMAIL_PROVIDER", "auto")
+    monkeypatch.setattr(settings, "RESEND_API_KEY", "re_test_key")
+    sender = EmailSender()
+    calls = []
+
+    async def _fake_smtp(**kwargs):
+        calls.append("smtp")
+        return True
+
+    async def _fake_resend(**kwargs):
+        calls.append("api")
+        return True
+
+    monkeypatch.setattr(sender, "_send_via_smtp", _fake_smtp)
+    monkeypatch.setattr(sender, "_send_via_resend_api", _fake_resend)
+
+    result = asyncio.run(
+        sender.send_email(
+            to_email="invitee@example.com",
+            subject="Invite",
+            html_content="<p>Join</p>",
+            text_content="Join",
+        )
+    )
+
+    assert result is True
+    assert calls == ["smtp"]
+
+
+def test_email_sender_auto_falls_back_to_resend_when_smtp_fails(monkeypatch):
+    monkeypatch.setattr(settings, "EMAIL_PROVIDER", "auto")
+    monkeypatch.setattr(settings, "RESEND_API_KEY", "re_test_key")
+    sender = EmailSender()
+    calls = []
+
+    async def _fake_smtp(**kwargs):
+        calls.append("smtp")
+        return False
+
+    async def _fake_resend(**kwargs):
+        calls.append("api")
+        return True
+
+    monkeypatch.setattr(sender, "_send_via_smtp", _fake_smtp)
+    monkeypatch.setattr(sender, "_send_via_resend_api", _fake_resend)
+
+    result = asyncio.run(
+        sender.send_email(
+            to_email="invitee@example.com",
+            subject="Invite",
+            html_content="<p>Join</p>",
+            text_content="Join",
+        )
+    )
+
+    assert result is True
+    assert calls == ["smtp", "api"]
+
+
 def test_invitation_wrapper_awaits_async_sender(monkeypatch):
     called = {"value": False}
 
