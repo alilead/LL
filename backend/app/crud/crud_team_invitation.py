@@ -50,7 +50,18 @@ class CRUDTeamInvitation(CRUDBase[TeamInvitation, TeamInvitationCreate, TeamInvi
         ).first()
         
         if existing_invitation:
-            raise ValueError("A pending invitation already exists for this email")
+            # Reuse existing pending invite by refreshing token/expiration and latest payload.
+            existing_invitation.first_name = invitation_data.first_name
+            existing_invitation.last_name = invitation_data.last_name
+            existing_invitation.role = invitation_data.role
+            existing_invitation.message = invitation_data.message
+            existing_invitation.invited_by_id = invited_by_id
+            existing_invitation.invitation_token = self.generate_invitation_token()
+            existing_invitation.expires_at = datetime.utcnow() + timedelta(hours=expires_in_hours)
+            existing_invitation.status = "pending"
+            db.commit()
+            db.refresh(existing_invitation)
+            return existing_invitation
         
         # Generate invitation token
         invitation_token = self.generate_invitation_token()

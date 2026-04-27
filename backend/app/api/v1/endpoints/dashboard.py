@@ -420,12 +420,18 @@ async def get_dashboard_stats(
         # Org credit balance (same source as GET /credits/balance); replaces hardcoded user.tokens
         credit_balance = 0.0
         try:
-            row = db.execute(
-                text("SELECT credit_balance FROM organizations WHERE id = :org_id"),
-                {"org_id": current_user.organization_id},
-            ).fetchone()
-            if row is not None and row[0] is not None:
-                credit_balance = float(row[0])
+            inspector = inspect(db.get_bind())
+            if "organizations" in inspector.get_table_names():
+                org_columns = {c["name"] for c in inspector.get_columns("organizations")}
+                if "credit_balance" in org_columns:
+                    row = db.execute(
+                        text("SELECT credit_balance FROM organizations WHERE id = :org_id"),
+                        {"org_id": current_user.organization_id},
+                    ).fetchone()
+                    if row is not None and row[0] is not None:
+                        credit_balance = float(row[0])
+                else:
+                    logger.info("organizations.credit_balance column not present; using default 0.0")
         except Exception as e:
             logger.warning("Could not load organization credit_balance: %s", e)
         
