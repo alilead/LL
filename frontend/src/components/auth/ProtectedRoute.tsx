@@ -6,10 +6,10 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, access_token } = useAuthStore();
+  const { isAuthenticated, token } = useAuthStore();
   const location = useLocation();
 
-  if (!isAuthenticated || !access_token) {
+  if (!isAuthenticated || !token) {
     // Save the attempted URL for redirecting after login
     return <Navigate to="/signin" state={{ from: location }} replace />;
   }

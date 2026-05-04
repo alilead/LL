@@ -23,6 +23,11 @@ const api = axios.create({
   withCredentials: true // Include cookies in requests
 });
 
+/** Must match `store/auth.ts`: token may live in sessionStorage when "Remember me" is off. */
+function getStoredAccessToken(): string | null {
+  return localStorage.getItem('token') || sessionStorage.getItem('token');
+}
+
 // Variable to check whether to redirect
 let isRefreshingToken = false;
 let redirectToLogin = false;
@@ -72,7 +77,7 @@ const TOKEN_REFRESH_MIN_INTERVAL = 15000;
 // Request interceptor - Add authentication token to requests
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = getStoredAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -104,9 +109,9 @@ api.interceptors.response.use(
       console.warn(`Authentication error on lead detail: ${originalRequest.url}, retrying with fresh token`);
       
       // Try to get a fresh token from localStorage (might have been updated)
-      const token = localStorage.getItem('token');
+      const token = getStoredAccessToken();
       if (token) {
-        console.log('Retrying with fresh token from localStorage');
+        console.log('Retrying with fresh token from storage');
         originalRequest.headers['Authorization'] = `Bearer ${token}`;
         return api(originalRequest);
       }

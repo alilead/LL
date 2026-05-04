@@ -39,3 +39,34 @@ END $$;
 -- Prefer fixing via RLS above; only use if your project still exposes data:
 -- REVOKE ALL ON public.users FROM anon;
 -- (Uncomment and repeat per table only after confirming FastAPI does not use PostgREST for that table.)
+
+-- Create explicit deny-all policies for API roles if a table has no policies yet.
+-- This keeps PostgREST locked down and clears "RLS Enabled No Policy" warnings.
+-- Safe to re-run (checks for existing policy names).
+DO $$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN
+    SELECT c.relname AS table_name
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind = 'r'
+      AND c.relname NOT IN ('spatial_ref_sys')
+  LOOP
+    BEGIN
+      EXECUTE format(
+        'CREATE POLICY %I ON public.%I FOR ALL TO anon, authenticated USING (false) WITH CHECK (false)',
+        'deny_all_api_' || r.table_name,
+        r.table_name
+      );
+      RAISE NOTICE 'Policy created: public.%', r.table_name;
+    EXCEPTION
+      WHEN duplicate_object THEN
+        RAISE NOTICE 'Policy exists: public.%', r.table_name;
+      WHEN OTHERS THEN
+        RAISE NOTICE 'Skip policy public.%: %', r.table_name, SQLERRM;
+    END;
+  END LOOP;
+END $$;

@@ -115,11 +115,23 @@ export const useAuthStore = create<AuthState>()(
       
       fetchUser: async () => {
         set({ isLoading: true, error: null })
-        
+        const tokenAtStart =
+          useAuthStore.getState().token ||
+          localStorage.getItem('token') ||
+          sessionStorage.getItem('token')
+
         try {
           const user = await authService.getCurrentUser()
           set({ user, isAuthenticated: true, error: null })
         } catch (error: any) {
+          const tokenNow =
+            useAuthStore.getState().token ||
+            localStorage.getItem('token') ||
+            sessionStorage.getItem('token')
+          // Ignore stale failures (e.g. bootstrap /me with old token after a fresh login).
+          if (tokenAtStart && tokenNow && tokenAtStart !== tokenNow) {
+            throw error
+          }
           localStorage.removeItem('token')
           sessionStorage.removeItem('token')
           delete api.defaults.headers.common['Authorization']
@@ -179,9 +191,13 @@ export const useAuthStore = create<AuthState>()(
 // Auto-login if token exists
 const token = localStorage.getItem('token') || sessionStorage.getItem('token')
 if (token) {
+  const bootstrapToken = token
   api.defaults.headers.common['Authorization'] = `Bearer ${token}`
   useAuthStore.setState({ token, isAuthenticated: true })
   useAuthStore.getState().fetchUser().catch(() => {
+    const still =
+      localStorage.getItem('token') || sessionStorage.getItem('token')
+    if (still && still !== bootstrapToken) return
     delete api.defaults.headers.common['Authorization']
     localStorage.removeItem('token')
     sessionStorage.removeItem('token')
