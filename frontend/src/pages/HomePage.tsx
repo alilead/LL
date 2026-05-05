@@ -157,7 +157,7 @@ export function HomePage() {
                 >
                   <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
                     <a
-                      href="https://calendly.com/the-leadlab"
+                      href="https://calendly.com/joshua-the-leadlab/30min"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center justify-center min-w-[240px] px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all duration-300 shadow-lg hover:shadow-xl"
