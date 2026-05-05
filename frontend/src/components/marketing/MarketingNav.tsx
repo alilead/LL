@@ -66,7 +66,7 @@ export function MarketingNav() {
 
         <div className="hidden xl:flex items-center gap-2 shrink-0">
           <a
-            href="https://calendly.com/the-leadlab"
+            href="https://calendly.com/joshua-the-leadlab/15min"
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm font-medium bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg hover:from-green-600 hover:to-emerald-700 flex items-center gap-1"
@@ -109,7 +109,7 @@ export function MarketingNav() {
         <div className="xl:hidden border-t bg-white px-4 py-4 flex flex-col gap-3 shadow-lg max-h-[70vh] overflow-y-auto">
           {links}
           <a
-            href="https://calendly.com/the-leadlab"
+            href="https://calendly.com/joshua-the-leadlab/15min"
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm font-medium bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg text-center"
