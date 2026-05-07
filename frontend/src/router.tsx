@@ -51,6 +51,7 @@ import TeamManagement from './pages/TeamManagement'
 import AcceptInvitation from './pages/AcceptInvitation'
 import { InvoiceMaker } from './pages/Admin/InvoiceMaker'
 import RecordingDetail from './pages/ConversationIntelligence/RecordingDetail'
+import { GoogleAuthCallback } from './pages/GoogleAuthCallback'
 
 export const router = createBrowserRouter([
   {
@@ -60,6 +61,10 @@ export const router = createBrowserRouter([
   {
     path: '/signin',
     element: <SignIn />,
+  },
+  {
+    path: '/signin/google/callback',
+    element: <GoogleAuthCallback />,
   },
   {
     path: '/signup',

@@ -5,6 +5,7 @@ import { Eye, EyeOff, Mail, Lock, LogIn } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { PublicHeader } from '../components/layout/PublicHeader'
 import { motion } from 'framer-motion'
+import authService from '../services/auth'
 
 interface SignInForm {
   email?: string
@@ -65,6 +66,17 @@ export function SignIn() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
+  }
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setIsLoading(true)
+      const data = await authService.initGoogleSignIn(rememberMe)
+      window.location.href = data.authorization_url
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || 'Could not start Google sign in')
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -224,6 +236,16 @@ export function SignIn() {
               </div>
 
               <div className="mt-8 text-center text-sm text-gray-500">
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  className="mb-4 inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Continue with Google
+                </button>
+              </div>
+
+              <div className="text-center text-sm text-gray-500">
                 Don't have an account?{' '}
                 <Link to="/signup" className="font-semibold leading-6 text-indigo-600 hover:text-indigo-500 transition-colors">
                   Sign up now

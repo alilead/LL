@@ -165,16 +165,29 @@ def calendar_google_oauth_callback(
         provider_email = info.get("email")
         provider_sub = info.get("id")
 
-    integration = (
-        db.query(CalendarIntegration)
-        .filter(
-            CalendarIntegration.organization_id == organization_id,
-            CalendarIntegration.user_id == user_id,
-            CalendarIntegration.provider == "google",
-            CalendarIntegration.is_active == True,
+    integration = None
+    if provider_sub:
+        integration = (
+            db.query(CalendarIntegration)
+            .filter(
+                CalendarIntegration.organization_id == organization_id,
+                CalendarIntegration.user_id == user_id,
+                CalendarIntegration.provider == "google",
+                CalendarIntegration.external_account_id == provider_sub,
+            )
+            .first()
         )
-        .first()
-    )
+    if not integration and provider_email:
+        integration = (
+            db.query(CalendarIntegration)
+            .filter(
+                CalendarIntegration.organization_id == organization_id,
+                CalendarIntegration.user_id == user_id,
+                CalendarIntegration.provider == "google",
+                CalendarIntegration.provider_account_email == provider_email,
+            )
+            .first()
+        )
     expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
     if integration:
         integration.provider_account_email = provider_email or integration.provider_account_email

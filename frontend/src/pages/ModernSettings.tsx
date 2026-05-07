@@ -1190,7 +1190,8 @@ function IntegrationsSettings() {
     queryFn: calendarIntegrationsAPI.list,
   });
 
-  const googleIntegration = calendarIntegrations.find((i) => i.provider?.toLowerCase() === 'google');
+  const googleIntegrations = calendarIntegrations.filter((i) => i.provider?.toLowerCase() === 'google');
+  const googleIntegration = googleIntegrations[0];
 
   const connectGoogleMutation = useMutation({
     mutationFn: () => calendarIntegrationsAPI.initOAuth('google'),
@@ -1296,6 +1297,14 @@ function IntegrationsSettings() {
             <div className="flex gap-2">
               <button
                 type="button"
+                disabled={connectGoogleMutation.isPending}
+                className="rounded-lg border border-neutral-300 dark:border-neutral-600 px-3 py-2 text-sm font-medium hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50"
+                onClick={() => connectGoogleMutation.mutate()}
+              >
+                {connectGoogleMutation.isPending ? 'Redirecting…' : 'Add another calendar'}
+              </button>
+              <button
+                type="button"
                 disabled={syncGoogleMutation.isPending}
                 className="rounded-lg border border-neutral-300 dark:border-neutral-600 px-3 py-2 text-sm font-medium hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50"
                 onClick={() => syncGoogleMutation.mutate(googleIntegration.id)}
@@ -1320,6 +1329,16 @@ function IntegrationsSettings() {
             >
               {connectGoogleMutation.isPending ? 'Redirecting…' : 'Connect Google Calendar'}
             </button>
+          )}
+          {googleIntegrations.length > 1 && (
+            <div className="mt-3 text-xs text-neutral-600 dark:text-neutral-400">
+              Connected calendars:
+              <ul className="mt-1 list-disc pl-4">
+                {googleIntegrations.map((integration) => (
+                  <li key={integration.id}>{integration.provider_account_email || `Google account #${integration.id}`}</li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
 

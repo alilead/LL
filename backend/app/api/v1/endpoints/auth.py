@@ -1,6 +1,7 @@
 from datetime import timedelta, datetime
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 from fastapi import APIRouter, Depends, HTTPException, Response, status, Request, BackgroundTasks
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from app import crud, models, schemas
 from app.api import deps
@@ -13,13 +14,97 @@ from app.core.email import email_sender
 from app.utils.auth import generate_password_reset_token, verify_password_reset_token, generate_email_verification_token, verify_email_verification_token
 import logging
 import json
+import base64
+import hashlib
+import hmac
+import secrets
+from urllib.parse import urlencode
+import requests
 from sqlalchemy.exc import IntegrityError
+from app.models.email_account import EmailAccount, EmailProviderType, EmailSyncStatus
+from app.models.calendar_integration import CalendarIntegration
+from app.core.security import encrypt_password
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _google_auth_redirect_uri() -> str:
+    return (
+        settings.GOOGLE_AUTH_REDIRECT_URI
+        or settings.GOOGLE_EMAIL_REDIRECT_URI
+        or settings.GOOGLE_CALENDAR_REDIRECT_URI
+        or f"{settings.FRONTEND_URL.rstrip('/')}/signin/google/callback"
+    )
+
+
+def _sign_oauth_state(payload_b64: str) -> str:
+    return hmac.new(
+        settings.SECRET_KEY.encode("utf-8"),
+        payload_b64.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _build_oauth_state(*, remember_me: bool = False) -> str:
+    payload = {
+        "p": "auth_google",
+        "ts": int(datetime.utcnow().timestamp()),
+        "remember_me": bool(remember_me),
+    }
+    payload_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode("utf-8")).decode("utf-8")
+    return f"{payload_b64}.{_sign_oauth_state(payload_b64)}"
+
+
+def _parse_oauth_state(state: str) -> Dict[str, Any]:
+    try:
+        payload_b64, sig = state.split(".", 1)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid OAuth state")
+    if not hmac.compare_digest(sig, _sign_oauth_state(payload_b64)):
+        raise HTTPException(status_code=400, detail="Invalid OAuth state signature")
+    payload = json.loads(base64.urlsafe_b64decode(payload_b64.encode("utf-8")).decode("utf-8"))
+    if payload.get("p") != "auth_google":
+        raise HTTPException(status_code=400, detail="Invalid OAuth state purpose")
+    if int(datetime.utcnow().timestamp()) - int(payload.get("ts", 0)) > 1800:
+        raise HTTPException(status_code=400, detail="OAuth state expired")
+    return payload
+
+
+def _google_combined_scopes() -> str:
+    merged = []
+    for scope_line in [settings.GOOGLE_CALENDAR_SCOPES, settings.GOOGLE_EMAIL_SCOPES]:
+        for s in (scope_line or "").split():
+            if s and s not in merged:
+                merged.append(s)
+    return " ".join(merged)
+
+
+def _build_token_response_for_user(user: Any, access_token: str, expires_at: datetime) -> Dict[str, Any]:
+    user_is_admin = user.is_admin if hasattr(user, 'is_admin') else (user.is_superuser if hasattr(user, 'is_superuser') else False)
+    created_at_str = user.created_at.isoformat() if getattr(user, "created_at", None) else None
+    updated_at_str = user.updated_at.isoformat() if getattr(user, "updated_at", None) else None
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "expires_at": expires_at.isoformat(),
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "username": getattr(user, "username", None),
+            "first_name": getattr(user, "first_name", None),
+            "last_name": getattr(user, "last_name", None),
+            "is_active": getattr(user, "is_active", True),
+            "is_admin": user_is_admin,
+            "organization_id": getattr(user, "organization_id", None),
+            "created_at": created_at_str,
+            "updated_at": updated_at_str,
+            "token_balance": 0.0,
+        },
+    }
 
 class RegisterInput(BaseModel):
     email: EmailStr
@@ -31,6 +116,217 @@ class RegisterInput(BaseModel):
 class ChangePasswordInput(BaseModel):
     current_password: str
     new_password: str
+
+
+@router.get("/google/init")
+def google_auth_init(remember_me: bool = False) -> Any:
+    if not settings.GOOGLE_CALENDAR_CLIENT_ID:
+        raise HTTPException(status_code=400, detail="Google OAuth is not configured")
+    params = {
+        "client_id": settings.GOOGLE_CALENDAR_CLIENT_ID,
+        "redirect_uri": _google_auth_redirect_uri(),
+        "response_type": "code",
+        "access_type": "offline",
+        "prompt": "consent",
+        "scope": _google_combined_scopes(),
+        "state": _build_oauth_state(remember_me=remember_me),
+    }
+    return {"authorization_url": f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"}
+
+
+@router.get("/google/callback")
+def google_auth_callback(
+    *,
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    db: Session = Depends(deps.get_db),
+) -> Any:
+    redirect_base = f"{settings.FRONTEND_URL.rstrip('/')}/signin/google/callback"
+    if error:
+        return RedirectResponse(url=f"{redirect_base}?status=error&reason={error}")
+    if not code or not state:
+        return RedirectResponse(url=f"{redirect_base}?status=error&reason=missing_code")
+
+    try:
+        parsed_state = _parse_oauth_state(state)
+    except HTTPException as exc:
+        return RedirectResponse(url=f"{redirect_base}?status=error&reason={exc.detail}")
+
+    token_response = requests.post(
+        "https://oauth2.googleapis.com/token",
+        data={
+            "code": code,
+            "client_id": settings.GOOGLE_CALENDAR_CLIENT_ID,
+            "client_secret": settings.GOOGLE_CALENDAR_CLIENT_SECRET,
+            "redirect_uri": _google_auth_redirect_uri(),
+            "grant_type": "authorization_code",
+        },
+        timeout=20,
+    )
+    if token_response.status_code >= 400:
+        return RedirectResponse(url=f"{redirect_base}?status=error&reason=token_exchange")
+    token_data = token_response.json()
+    access_token = token_data.get("access_token")
+    refresh_token = token_data.get("refresh_token")
+    expires_in = int(token_data.get("expires_in") or 3600)
+    scopes = token_data.get("scope") or _google_combined_scopes()
+    if not access_token:
+        return RedirectResponse(url=f"{redirect_base}?status=error&reason=no_access_token")
+
+    profile_response = requests.get(
+        "https://www.googleapis.com/oauth2/v2/userinfo",
+        headers={"Authorization": f"Bearer {access_token}"},
+        timeout=20,
+    )
+    if profile_response.status_code >= 400:
+        return RedirectResponse(url=f"{redirect_base}?status=error&reason=userinfo")
+    profile = profile_response.json()
+    email_addr = profile.get("email")
+    if not email_addr:
+        return RedirectResponse(url=f"{redirect_base}?status=error&reason=no_email")
+
+    user = crud.user.get_by_email(db, email=email_addr)
+    if not user:
+        first = profile.get("given_name") or profile.get("name", "Google").split(" ")[0]
+        last = profile.get("family_name") or "User"
+        org = crud.organization.create(db, obj_in={"name": f"{first}'s Organization"})
+        user = crud.user.create(
+            db,
+            obj_in=schemas.UserCreate(
+                email=email_addr,
+                password=secrets.token_urlsafe(24),
+                first_name=first,
+                last_name=last,
+                organization_id=org.id,
+                is_active=True,
+                is_admin=True,
+            ),
+        )
+
+    expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+
+    # Auto-link Gmail account
+    email_account = db.query(EmailAccount).filter(
+        EmailAccount.email == email_addr,
+        EmailAccount.organization_id == user.organization_id,
+    ).first()
+    if email_account:
+        email_account.user_id = user.id
+        email_account.provider_type = EmailProviderType.GMAIL.value
+        email_account.display_name = profile.get("name") or email_addr
+        email_account.auth_type = "oauth"
+        email_account.oauth_access_token = access_token
+        email_account.oauth_refresh_token = refresh_token or email_account.oauth_refresh_token
+        email_account.oauth_token_expires_at = expires_at
+        email_account.oauth_scopes = scopes
+        email_account.imap_host = "imap.gmail.com"
+        email_account.imap_port = 993
+        email_account.imap_use_ssl = True
+        email_account.smtp_host = "smtp.gmail.com"
+        email_account.smtp_port = 465
+        email_account.smtp_use_tls = False
+        email_account.sync_enabled = True
+        email_account.sync_status = EmailSyncStatus.ACTIVE.value
+    else:
+        email_account = EmailAccount(
+            email=email_addr,
+            display_name=profile.get("name") or email_addr,
+            provider_type=EmailProviderType.GMAIL.value,
+            organization_id=user.organization_id,
+            user_id=user.id,
+            password_encrypted=encrypt_password("oauth_google_managed"),
+            auth_type="oauth",
+            oauth_access_token=access_token,
+            oauth_refresh_token=refresh_token,
+            oauth_token_expires_at=expires_at,
+            oauth_scopes=scopes,
+            imap_host="imap.gmail.com",
+            imap_port=993,
+            imap_use_ssl=True,
+            smtp_host="smtp.gmail.com",
+            smtp_port=465,
+            smtp_use_tls=False,
+            sync_status=EmailSyncStatus.ACTIVE.value,
+            sync_enabled=True,
+            sync_frequency_minutes=15,
+            sync_sent_items=True,
+            sync_inbox=True,
+            days_to_sync=30,
+            auto_create_contacts=True,
+            auto_create_tasks=True,
+        )
+        db.add(email_account)
+
+    # Auto-link Google Calendar (allow multiple accounts)
+    provider_sub = profile.get("id")
+    provider_email = profile.get("email")
+    calendar_integration = None
+    if provider_sub:
+        calendar_integration = (
+            db.query(CalendarIntegration)
+            .filter(
+                CalendarIntegration.organization_id == user.organization_id,
+                CalendarIntegration.user_id == user.id,
+                CalendarIntegration.provider == "google",
+                CalendarIntegration.external_account_id == provider_sub,
+            )
+            .first()
+        )
+    if not calendar_integration and provider_email:
+        calendar_integration = (
+            db.query(CalendarIntegration)
+            .filter(
+                CalendarIntegration.organization_id == user.organization_id,
+                CalendarIntegration.user_id == user.id,
+                CalendarIntegration.provider == "google",
+                CalendarIntegration.provider_account_email == provider_email,
+            )
+            .first()
+        )
+    if calendar_integration:
+        calendar_integration.provider_account_email = provider_email or calendar_integration.provider_account_email
+        calendar_integration.external_account_id = provider_sub or calendar_integration.external_account_id
+        calendar_integration.access_token = access_token
+        calendar_integration.refresh_token = refresh_token or calendar_integration.refresh_token
+        calendar_integration.token_expires_at = expires_at
+        calendar_integration.scopes = scopes
+        calendar_integration.sync_enabled = True
+        calendar_integration.is_active = True
+        calendar_integration.last_error = None
+        calendar_integration.updated_at = datetime.utcnow()
+    else:
+        db.add(
+            CalendarIntegration(
+                organization_id=user.organization_id,
+                user_id=user.id,
+                provider="google",
+                provider_account_email=provider_email,
+                external_account_id=provider_sub,
+                access_token=access_token,
+                refresh_token=refresh_token,
+                token_expires_at=expires_at,
+                scopes=scopes,
+                sync_enabled=True,
+                sync_direction="two_way",
+                is_active=True,
+            )
+        )
+
+    # Local app token for app auth
+    app_expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    app_expires_at = datetime.utcnow() + app_expires_delta
+    app_access_token = security.create_access_token(
+        user.id,
+        expires_delta=app_expires_delta,
+        organization_id=user.organization_id,
+    )
+    db.commit()
+
+    remember = "1" if parsed_state.get("remember_me") else "0"
+    return RedirectResponse(
+        url=f"{redirect_base}?status=success&access_token={app_access_token}&remember_me={remember}"
+    )
 
 @router.post("/register", response_model=schemas.User)
 async def register(

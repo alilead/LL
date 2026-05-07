@@ -57,9 +57,18 @@ export interface RefreshTokenResponse {
   expires_at: string;
 }
 
+export interface GoogleInitResponse {
+  authorization_url: string;
+}
+
 // API endpoints aligned with backend-go
 export const login = async (credentials: LoginCredentials): Promise<TokenResponse> => {
   const response = await api.post('/auth/login', credentials);
+  return response.data;
+};
+
+export const initGoogleSignIn = async (rememberMe = false): Promise<GoogleInitResponse> => {
+  const response = await api.get('/auth/google/init', { params: { remember_me: rememberMe } });
   return response.data;
 };
 
@@ -115,6 +124,7 @@ export const resendVerification = async (): Promise<{ message: string }> => {
 
 export default {
   login,
+  initGoogleSignIn,
   register,
   getCurrentUser,
   changePassword,
