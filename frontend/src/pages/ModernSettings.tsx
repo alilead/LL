@@ -1189,9 +1189,18 @@ function IntegrationsSettings() {
     queryKey: ['calendar-integrations'],
     queryFn: calendarIntegrationsAPI.list,
   });
+  const { data: emailAccounts = [] } = useQuery({
+    queryKey: ['email-accounts'],
+    queryFn: emailAPI.getAccounts,
+  });
 
   const googleIntegrations = calendarIntegrations.filter((i) => i.provider?.toLowerCase() === 'google');
   const googleIntegration = googleIntegrations[0];
+  const hasGoogleEmailOAuth = emailAccounts.some(
+    (a: any) => String(a.provider_type || '').toLowerCase() === 'gmail' && String(a.auth_type || '').toLowerCase() === 'oauth'
+  );
+  const hasGoogleCalendar = googleIntegrations.length > 0;
+  const connectedViaGoogleSignIn = hasGoogleEmailOAuth && hasGoogleCalendar;
 
   const connectGoogleMutation = useMutation({
     mutationFn: () => calendarIntegrationsAPI.initOAuth('google'),
@@ -1265,6 +1274,11 @@ function IntegrationsSettings() {
       <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-6">
         Integrations
       </h2>
+      {connectedViaGoogleSignIn && (
+        <div className="mb-4 inline-flex items-center rounded-full border border-green-300 bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
+          Connected via Google Sign-In
+        </div>
+      )}
       <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-6">
         Connect email below. HubSpot and Salesforce use the Data Import wizard (CSV and CRM sources). Other connectors
         are placeholders until enabled for your org.
