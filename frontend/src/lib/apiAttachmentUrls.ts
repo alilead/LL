@@ -20,7 +20,7 @@ export function taskAttachmentUrl(taskId: number, storedName: string): string {
 }
 
 export async function fetchAttachmentWithAuth(url: string): Promise<Blob> {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
   const res = await fetch(url, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     credentials: 'include',
@@ -41,8 +41,13 @@ export async function fetchAttachmentWithAuth(url: string): Promise<Blob> {
 
 /** Open attachment in a new tab using the session token (plain href cannot send Authorization). */
 export async function openAttachmentInNewTab(url: string): Promise<void> {
+  const opened = window.open('', '_blank', 'noopener,noreferrer');
   const blob = await fetchAttachmentWithAuth(url);
   const blobUrl = URL.createObjectURL(blob);
-  window.open(blobUrl, '_blank', 'noopener,noreferrer');
+  if (opened) {
+    opened.location.href = blobUrl;
+  } else {
+    window.open(blobUrl, '_blank', 'noopener,noreferrer');
+  }
   window.setTimeout(() => URL.revokeObjectURL(blobUrl), 120_000);
 }

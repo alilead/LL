@@ -65,6 +65,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import api from '@/lib/axios';
 
 
 interface Lead {
@@ -406,6 +407,10 @@ export function LeadList() {
                     <Eye className="mr-2 h-4 w-4" />
                     View Details
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleQuickAddNote(lead)}>
+                    <BookOpen className="mr-2 h-4 w-4" />
+                    Add note
+                  </DropdownMenuItem>
                   <DropdownMenuItem>
                     <Edit className="mr-2 h-4 w-4" />
                     Edit Lead
@@ -657,6 +662,33 @@ export function LeadList() {
     setSelectedLeads([]);
     setRowSelection({});
     setIsLoading(false);
+  };
+
+  const handleQuickAddNote = async (lead: Lead) => {
+    const note = window.prompt(`Add a note for ${lead.first_name} ${lead.last_name}`);
+    if (!note || !note.trim()) return;
+    if (!user?.organization_id) {
+      toast({
+        title: 'Error',
+        description: 'Organization is required before creating notes.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    try {
+      await api.post('/notes', {
+        lead_id: lead.id,
+        organization_id: Number(user.organization_id),
+        content: note.trim(),
+      });
+      toast({ title: 'Success', description: 'Note added.' });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: handleMutationError(error as MutationError, 'Failed to add note'),
+        variant: 'destructive',
+      });
+    }
   };
 
   // Mutations
@@ -1018,6 +1050,10 @@ export function LeadList() {
                               <DropdownMenuItem onClick={() => saveScrollAndNavigate(lead.id)}>
                                 <Eye className="mr-2 h-4 w-4" />
                                 View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleQuickAddNote(lead)}>
+                                <BookOpen className="mr-2 h-4 w-4" />
+                                Add note
                               </DropdownMenuItem>
                               <DropdownMenuItem>
                                 <Edit className="mr-2 h-4 w-4" />

@@ -131,6 +131,7 @@ const WorkflowBuilder: React.FC = () => {
   const [future, setFuture] = useState<HistorySnapshot[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('brainstorm');
   const [customTemplates, setCustomTemplates] = useState<MapTemplate[]>([]);
+  const [lastCanvasClick, setLastCanvasClick] = useState<{ x: number; y: number } | null>(null);
 
   const allTemplates = useMemo(() => [...DEFAULT_TEMPLATES, ...customTemplates], [customTemplates]);
   const selectedNode = useMemo(() => nodes.find((n) => n.id === selectedNodeId) || null, [nodes, selectedNodeId]);
@@ -285,9 +286,9 @@ const WorkflowBuilder: React.FC = () => {
   }, [pushHistory]);
 
   const addFreeText = useCallback(() => {
-    const p = selectedNode ? { x: selectedNode.position.x + 40, y: selectedNode.position.y - 110 } : { x: 380, y: 180 };
+    const p = lastCanvasClick || (selectedNode ? { x: selectedNode.position.x + 40, y: selectedNode.position.y - 110 } : { x: 380, y: 180 });
     addNodeAt(NODE_TEMPLATES.find((t) => t.type === 'free_text') || NODE_TEMPLATES[0], p.x, p.y);
-  }, [selectedNode, addNodeAt]);
+  }, [lastCanvasClick, selectedNode, addNodeAt]);
 
   const applyTemplate = useCallback((templateId: string) => {
     const tpl = allTemplates.find((t) => t.id === templateId);
@@ -479,7 +480,14 @@ const WorkflowBuilder: React.FC = () => {
             <div key={cat} className="space-y-2">
               <p className="text-xs uppercase font-semibold text-neutral-500">{cat === 'starting' ? 'Starting points' : cat === 'flow' ? 'Flow blocks' : 'Logic'}</p>
               {NODE_TEMPLATES.filter((t) => t.category === cat).map((t) => (
-                <Card key={t.type} className="cursor-pointer hover:shadow-md" onClick={() => addNodeAt(t, 420 + Math.random() * 120, 180 + Math.random() * 120)}>
+                <Card
+                  key={t.type}
+                  className="cursor-pointer hover:shadow-md"
+                  onClick={() => {
+                    const target = lastCanvasClick || { x: 420, y: 200 };
+                    addNodeAt(t, target.x, target.y);
+                  }}
+                >
                   <CardContent className="p-3 flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium">{t.label}</p>
@@ -502,6 +510,7 @@ const WorkflowBuilder: React.FC = () => {
           }}
           onMouseDown={(e) => {
             if ((e.target as HTMLElement).dataset.canvasNode === 'true') return;
+            setLastCanvasClick(worldFromClient(e.clientX, e.clientY));
             setPanning(true);
             setPanOrigin({ x: e.clientX - pan.x, y: e.clientY - pan.y });
             setSelectedNodeId(null);
@@ -774,6 +783,16 @@ const WorkflowBuilder: React.FC = () => {
                         autoFocus
                         value={node.label}
                         onChange={(e) => updateNodeLabel(node.id, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            e.preventDefault();
+                            setEditingNodeId(null);
+                          }
+                          if ((e.key === 'Enter' && !e.shiftKey) || ((e.ctrlKey || e.metaKey) && e.key === 'Enter')) {
+                            e.preventDefault();
+                            setEditingNodeId(null);
+                          }
+                        }}
                         onBlur={() => setEditingNodeId(null)}
                         className={`w-full resize-none border rounded-md px-2 py-1 text-sm ${isText ? 'min-h-[100px] bg-transparent border-neutral-300' : 'min-h-[64px] border-neutral-200'}`}
                       />

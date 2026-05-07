@@ -359,7 +359,7 @@ export function MessagesPage() {
   };
 
   const parseAttachmentMessage = (content: string) => {
-    const match = content.match(/^\[Attachment:\s*(.+?)\]\s*\((\d+)\s+bytes\)\.\s*Stored as\s+([^.]+)\.?$/i);
+    const match = content.match(/^\[Attachment:\s*(.+?)\]\s*\((\d+)\s+bytes\)\.\s*Stored as\s+(.+?)\.?$/i);
     if (!match) return null;
     const fileName = match[1];
     const sizeBytes = Number(match[2] || 0);

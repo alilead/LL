@@ -32,6 +32,8 @@ export const EmailsPage: React.FC = () => {
   const [composeForward, setComposeForward] = useState<{ from: string; subject: string; body: string } | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
   const [customLabels, setCustomLabels] = useState<string[]>([]);
+  const [syncProgress, setSyncProgress] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Fetch email accounts
   const { data: accounts, isLoading: accountsLoading } = useQuery({
@@ -98,6 +100,16 @@ export const EmailsPage: React.FC = () => {
     mutationFn: (accountId: number) => emailAPI.syncAccount(accountId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['emails', selectedAccount, selectedFolder] });
+      refetchEmails();
+      setSyncProgress(100);
+      window.setTimeout(() => {
+        setIsRefreshing(false);
+        setSyncProgress(0);
+      }, 500);
+    },
+    onError: () => {
+      setIsRefreshing(false);
+      setSyncProgress(0);
     },
   });
 
@@ -138,10 +150,15 @@ export const EmailsPage: React.FC = () => {
   };
 
   const handleRefresh = () => {
-    if (selectedAccount) {
-      syncAccountMutation.mutate(selectedAccount);
-    }
-    refetchEmails();
+    if (!selectedAccount || isRefreshing) return;
+    setIsRefreshing(true);
+    setSyncProgress(8);
+    const step = window.setInterval(() => {
+      setSyncProgress((prev) => (prev >= 92 ? prev : prev + 8));
+    }, 450);
+    syncAccountMutation.mutate(selectedAccount, {
+      onSettled: () => window.clearInterval(step),
+    });
   };
 
   const parseRecipients = (value?: string): string[] =>
@@ -312,13 +329,28 @@ export const EmailsPage: React.FC = () => {
                   variant="ghost"
                   size="sm"
                   onClick={handleRefresh}
-                  disabled={emailsLoading}
+                  disabled={emailsLoading || isRefreshing}
                   className="text-gray-500 hover:text-gray-700"
                 >
-                  <RefreshCw className={`h-4 w-4 ${emailsLoading ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`h-4 w-4 ${(emailsLoading || isRefreshing) ? 'animate-spin' : ''}`} />
+                  <span className="ml-2">Actualiser</span>
                 </Button>
               </div>
             </div>
+            {isRefreshing && (
+              <div className="px-6 py-2 border-b bg-blue-50/50">
+                <div className="flex items-center justify-between text-xs text-blue-700 mb-1">
+                  <span>Sync in progress</span>
+                  <span>{Math.min(100, syncProgress)}%</span>
+                </div>
+                <div className="h-2 rounded-full bg-blue-100 overflow-hidden">
+                  <div
+                    className="h-full bg-blue-600 transition-all duration-300"
+                    style={{ width: `${Math.min(100, syncProgress)}%` }}
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 12rem)' }}>
             {emailsLoading ? (

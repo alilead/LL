@@ -165,6 +165,7 @@ function ProfileSettings() {
 
   useEffect(() => {
     if (!user) return;
+    const cacheKey = `avatar-cache-${user.id}`;
     let cancelled = false;
     (async () => {
       try {
@@ -176,13 +177,29 @@ function ProfileSettings() {
         const url = URL.createObjectURL(res.data);
         avatarBlobRef.current = url;
         setAvatarObjectUrl(url);
+        try {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            if (typeof reader.result === 'string') {
+              localStorage.setItem(cacheKey, reader.result);
+            }
+          };
+          reader.readAsDataURL(res.data);
+        } catch {
+          // ignore cache write failures
+        }
       } catch {
         if (cancelled) return;
-        if (avatarBlobRef.current) {
-          URL.revokeObjectURL(avatarBlobRef.current);
-          avatarBlobRef.current = null;
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          setAvatarObjectUrl(cached);
+        } else {
+          if (avatarBlobRef.current) {
+            URL.revokeObjectURL(avatarBlobRef.current);
+            avatarBlobRef.current = null;
+          }
+          setAvatarObjectUrl(null);
         }
-        setAvatarObjectUrl(null);
       }
     })();
     return () => {
@@ -209,6 +226,15 @@ function ProfileSettings() {
     setIsUploadingAvatar(true);
     try {
       await uploadAvatar(file);
+      if (user?.id) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (typeof reader.result === 'string') {
+            localStorage.setItem(`avatar-cache-${user.id}`, reader.result);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
       setAvatarVersion((v) => v + 1);
       useAuthStore.getState().bumpAvatarRevision();
       toast.success('Photo updated');
