@@ -134,6 +134,15 @@ const eventTypes = [
   }
 ];
 
+const normalizeEventTypeForApi = (eventType: string): 'meeting' | 'video_call' | 'task' | 'reminder' => {
+  if (eventType === 'call') return 'video_call';
+  if (eventType === 'break') return 'reminder';
+  if (eventType === 'meeting' || eventType === 'video_call' || eventType === 'task' || eventType === 'reminder') {
+    return eventType;
+  }
+  return 'meeting';
+};
+
 const TIMEZONE_OPTIONS = [
   { value: 'Europe/Istanbul', label: 'Istanbul (GMT+3)' },
   { value: 'UTC', label: 'UTC (GMT+0)' },
@@ -313,7 +322,7 @@ export const CalendarPage = () => {
       start_date: new Date(newEvent.start_time).toISOString(),
       end_date: new Date(newEvent.end_time).toISOString(),
       location: newEvent.location || null,
-      event_type: newEvent.event_type,
+      event_type: normalizeEventTypeForApi(newEvent.event_type),
       is_all_day: newEvent.is_all_day,
       organization_id: user?.organization_id || 0,
       timezone: newEvent.timezone || selectedTimezone,
@@ -345,7 +354,7 @@ export const CalendarPage = () => {
         start_date: updatedEvent.start.toISOString(),
         end_date: updatedEvent.end.toISOString(),
         location: updatedEvent.location,
-        event_type: updatedEvent.event_type,
+        event_type: normalizeEventTypeForApi(updatedEvent.event_type),
         is_all_day: updatedEvent.is_all_day,
         status: updatedEvent.status,
         timezone: selectedTimezone
