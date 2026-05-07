@@ -1,5 +1,5 @@
 // Takvim sayfası
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { format, formatInTimeZone, parseISO, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, addWeeks, subWeeks, isSameMonth, isToday, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/Dialog';
@@ -145,9 +145,13 @@ const normalizeEventTypeForApi = (eventType: string): 'meeting' | 'video_call' |
 
 const TIMEZONE_OPTIONS = [
   { value: 'Europe/Istanbul', label: 'Istanbul (GMT+3)' },
+  { value: 'Europe/London', label: 'London (GMT+0)' },
+  { value: 'Europe/Paris', label: 'Paris (GMT+1)' },
+  { value: 'Europe/Berlin', label: 'Berlin (GMT+1)' },
+  { value: 'Europe/Madrid', label: 'Madrid (GMT+1)' },
+  { value: 'Europe/Rome', label: 'Rome (GMT+1)' },
   { value: 'UTC', label: 'UTC (GMT+0)' },
   { value: 'America/New_York', label: 'New York (GMT-5)' },
-  { value: 'Europe/London', label: 'London (GMT+0)' },
   { value: 'Asia/Tokyo', label: 'Tokyo (GMT+9)' },
 ];
 
@@ -167,13 +171,20 @@ export const CalendarPage = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
+  const detectedTimezone = useMemo(() => getSystemTimezone(), []);
+  const timezoneOptions = useMemo(() => {
+    if (TIMEZONE_OPTIONS.some((tz) => tz.value === detectedTimezone)) {
+      return TIMEZONE_OPTIONS;
+    }
+    return [{ value: detectedTimezone, label: `${detectedTimezone} (Detected)` }, ...TIMEZONE_OPTIONS];
+  }, [detectedTimezone]);
   
   // States
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'agenda'>('month');
-  const [selectedTimezone, setSelectedTimezone] = useState(getSystemTimezone());
+  const [selectedTimezone, setSelectedTimezone] = useState(detectedTimezone);
   const [isDetailModalOpen, setDetailModalOpen] = useState(false);
   const [isNewEventDialogOpen, setNewEventDialogOpen] = useState(false);
   const [newEvent, setNewEvent] = useState<NewEventForm>(() => ({
@@ -186,7 +197,7 @@ export const CalendarPage = () => {
     user_id: user?.id,
     is_all_day: false,
     location: '',
-    timezone: getSystemTimezone(),
+    timezone: detectedTimezone,
     meeting_link: '',
   }));
 
@@ -341,7 +352,7 @@ export const CalendarPage = () => {
       user_id: user?.id,
       is_all_day: false,
       location: '',
-      timezone: getSystemTimezone(),
+      timezone: detectedTimezone,
       meeting_link: '',
     });
   };
@@ -497,7 +508,7 @@ export const CalendarPage = () => {
               </div>
             </SelectTrigger>
             <SelectContent>
-              {TIMEZONE_OPTIONS.map((tz) => (
+              {timezoneOptions.map((tz) => (
                 <SelectItem key={tz.value} value={tz.value}>
                   {tz.label}
                 </SelectItem>
@@ -553,11 +564,11 @@ export const CalendarPage = () => {
                 </Button>
               )}
               <Button
-                onClick={() => window.location.href = '/settings'}
+                onClick={() => window.location.href = '/settings?tab=integrations'}
                 variant="outline"
                 size="sm"
               >
-                Manage Email Accounts
+                Add Calendar
               </Button>
             </div>
         </div>
@@ -1064,7 +1075,7 @@ export const CalendarPage = () => {
                         <SelectValue placeholder="Timezone" />
                       </SelectTrigger>
                       <SelectContent>
-                        {TIMEZONE_OPTIONS.map((tz) => (
+                        {timezoneOptions.map((tz) => (
                           <SelectItem key={tz.value} value={tz.value}>
                             {tz.label}
                           </SelectItem>
