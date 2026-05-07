@@ -2,15 +2,116 @@ from typing import Any, List, Optional, Dict
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta, date
+from uuid import uuid4
+import requests
 from app import crud, models, schemas
 from app.api import deps
 from app.schemas.event import Event, EventCreate, EventUpdate, EventListResponse
 from zoneinfo import ZoneInfo, available_timezones
 import logging
+from app.models.calendar_integration import CalendarIntegration
+from app.models.calendar_event_link import CalendarEventLink
+from app.services.google_calendar_sync_service import GoogleCalendarSyncService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+MEETING_LINK_PREFIX = "[meeting-link]"
+MEETING_LINK_SUFFIX = "[/meeting-link]"
+
+
+def _extract_google_meet_link(payload: Dict[str, Any]) -> Optional[str]:
+    if payload.get("hangoutLink"):
+        return payload["hangoutLink"]
+    conference_data = payload.get("conferenceData") or {}
+    for entry in conference_data.get("entryPoints") or []:
+        if (entry.get("entryPointType") or "").lower() == "video" and entry.get("uri"):
+            return entry["uri"]
+    return None
+
+
+def _add_meeting_link_to_description(description: Optional[str], meet_link: str) -> str:
+    body = (description or "").strip()
+    if MEETING_LINK_PREFIX in body and MEETING_LINK_SUFFIX in body:
+        return body
+    return f"{MEETING_LINK_PREFIX}{meet_link}{MEETING_LINK_SUFFIX}\n{body}".strip()
+
+
+def _try_attach_google_meet_link(db: Session, created_event: models.Event, current_user: models.User) -> None:
+    # Only attach Google Meet for call-like events.
+    if created_event.event_type not in ("call", "video_call"):
+        return
+
+    integration = (
+        db.query(CalendarIntegration)
+        .filter(
+            CalendarIntegration.organization_id == current_user.organization_id,
+            CalendarIntegration.user_id == current_user.id,
+            CalendarIntegration.provider == "google",
+            CalendarIntegration.is_active == True,
+            CalendarIntegration.sync_enabled == True,
+        )
+        .order_by(CalendarIntegration.updated_at.desc())
+        .first()
+    )
+    if not integration:
+        return
+
+    sync_service = GoogleCalendarSyncService(db)
+    access_token = sync_service._refresh_access_token(integration)  # Reuse existing refresh logic.
+    headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
+    event_payload = {
+        "summary": created_event.title,
+        "description": created_event.description or "",
+        "location": created_event.location or "",
+        "start": {"dateTime": created_event.start_date.isoformat(), "timeZone": created_event.timezone or "UTC"},
+        "end": {"dateTime": created_event.end_date.isoformat(), "timeZone": created_event.timezone or "UTC"},
+        "conferenceData": {
+            "createRequest": {
+                "requestId": f"leadlab-{created_event.id}-{uuid4().hex}",
+                "conferenceSolutionKey": {"type": "hangoutsMeet"},
+            }
+        },
+    }
+    google_resp = requests.post(
+        "https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1",
+        headers=headers,
+        json=event_payload,
+        timeout=30,
+    )
+    if google_resp.status_code >= 400:
+        logger.warning(
+            "Google Meet auto-link creation failed",
+            extra={"event_id": created_event.id, "status_code": google_resp.status_code, "body": google_resp.text[:500]},
+        )
+        return
+
+    google_event = google_resp.json() or {}
+    meet_link = _extract_google_meet_link(google_event)
+    if meet_link:
+        created_event.description = _add_meeting_link_to_description(created_event.description, meet_link)
+        created_event.updated_at = datetime.now(timezone.utc)
+        db.add(created_event)
+
+    updated_raw = (google_event.get("updated") or "").replace("Z", "+00:00")
+    external_id = google_event.get("id")
+    if external_id:
+        link = CalendarEventLink(
+            integration_id=integration.id,
+            organization_id=integration.organization_id,
+            user_id=integration.user_id,
+            event_id=created_event.id,
+            external_event_id=external_id,
+            external_calendar_id="primary",
+            external_etag=google_event.get("etag"),
+            last_external_updated_at=datetime.fromisoformat(updated_raw).replace(tzinfo=None) if updated_raw else None,
+            last_internal_updated_at=created_event.updated_at.replace(tzinfo=None) if created_event.updated_at else None,
+            last_synced_at=datetime.utcnow(),
+            is_deleted=False,
+        )
+        db.add(link)
+    db.commit()
+    db.refresh(created_event)
 
 def parse_date(date_str: str, timezone_str: Optional[str] = None) -> datetime:
     """Parse date string to datetime with provided timezone."""
@@ -219,6 +320,14 @@ def create_event(
                     "attendee_count": len(valid_attendee_ids) if attendee_ids else 0
                 }
             )
+            try:
+                _try_attach_google_meet_link(db, event, current_user)
+            except Exception as meet_error:
+                # Event creation must still succeed even if Meet generation fails.
+                logger.warning(
+                    "Event created but Google Meet auto-link failed",
+                    extra={"event_id": event.id, "user_id": current_user.id, "error": str(meet_error)},
+                )
             
             return event
             
