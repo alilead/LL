@@ -20,6 +20,17 @@ MEETING_LINK_PREFIX = "[meeting-link]"
 MEETING_LINK_SUFFIX = "[/meeting-link]"
 
 
+def _normalize_event_type(event_type: Optional[str]) -> str:
+    normalized = (event_type or "meeting").strip().lower()
+    if normalized == "call":
+        return "video_call"
+    if normalized == "break":
+        return "reminder"
+    if normalized in {"meeting", "video_call", "task", "reminder"}:
+        return normalized
+    return "meeting"
+
+
 def _extract_google_meet_link(payload: Dict[str, Any]) -> Optional[str]:
     if payload.get("hangoutLink"):
         return payload["hangoutLink"]
@@ -234,6 +245,7 @@ def create_event(
         # Veriyi modele dönüştürmeden önce temizle
         event_data = event_in.dict()
         attendee_ids = event_data.pop("attendee_ids", None)  # attendee_ids'yi çıkar
+        event_data["event_type"] = _normalize_event_type(event_data.get("event_type"))
         
         # ÖNEMLİ: Eksik/boş zorunlu alanları doldurma
         now = datetime.now(timezone.utc)
@@ -382,6 +394,9 @@ def update_event(
         raise HTTPException(status_code=400, detail="Not enough permissions")
         
     # Convert dates to the specified timezone if provided
+    if event_in.event_type is not None:
+        event_in.event_type = _normalize_event_type(event_in.event_type)
+
     if hasattr(event_in, 'start_date') and event_in.start_date:
         if isinstance(event_in.start_date, str):
             event_in.start_date = parse_date(event_in.start_date, event_in.timezone or event.timezone)
