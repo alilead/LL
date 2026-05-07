@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 import requests
 from sqlalchemy.orm import Session
 
@@ -85,7 +85,7 @@ class GoogleCalendarSyncService:
         self.db.commit()
         return access
 
-    def _google_get_events(self, access_token: str) -> list[dict]:
+    def _google_get_events(self, access_token: str) -> Tuple[list[dict], str]:
         headers = {"Authorization": f"Bearer {access_token}"}
         params = {
             "calendarId": "primary",
@@ -103,7 +103,8 @@ class GoogleCalendarSyncService:
         )
         if resp.status_code >= 400:
             raise ValueError(f"Google events fetch failed ({resp.status_code})")
-        return resp.json().get("items", []) or []
+        payload = resp.json() or {}
+        return payload.get("items", []) or [], (payload.get("timeZone") or "UTC")
 
     def _google_create_event(self, access_token: str, ev: Event) -> dict:
         headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
@@ -133,7 +134,7 @@ class GoogleCalendarSyncService:
 
     def sync_integration(self, integration: CalendarIntegration) -> dict:
         access_token = self._refresh_access_token(integration)
-        google_items = self._google_get_events(access_token)
+        google_items, default_calendar_tz = self._google_get_events(access_token)
         now_utc = datetime.utcnow()
         created_internal = 0
         updated_internal = 0
@@ -175,7 +176,12 @@ class GoogleCalendarSyncService:
             g_title = item.get("summary") or "No title"
             g_desc = item.get("description") or ""
             g_location = item.get("location") or ""
-            g_tz = (item.get("start", {}) or {}).get("timeZone") or "UTC"
+            g_tz = (
+                (item.get("start", {}) or {}).get("timeZone")
+                or (item.get("end", {}) or {}).get("timeZone")
+                or default_calendar_tz
+                or "UTC"
+            )
 
             if link:
                 ev = self.db.query(Event).filter(Event.id == link.event_id).first()
