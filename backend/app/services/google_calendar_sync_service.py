@@ -11,6 +11,14 @@ from app.models.calendar_event_link import CalendarEventLink
 from app.models.event import Event
 
 
+def _as_naive_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
 def _parse_google_dt(item: Dict[str, Any], key: str) -> tuple[datetime, bool]:
     src = item.get(key, {}) or {}
     if "date" in src:
@@ -174,7 +182,7 @@ class GoogleCalendarSyncService:
                 if not ev:
                     skipped += 1
                     continue
-                internal_updated = (ev.updated_at or ev.created_at or now_utc)
+                internal_updated = _as_naive_utc(ev.updated_at or ev.created_at) or now_utc
                 # Conflict policy C: newest updated_at wins
                 if google_updated > internal_updated:
                     ev.title = g_title
@@ -197,7 +205,7 @@ class GoogleCalendarSyncService:
                 else:
                     skipped += 1
 
-                link.last_internal_updated_at = ev.updated_at or internal_updated
+                link.last_internal_updated_at = _as_naive_utc(ev.updated_at) or internal_updated
                 link.last_synced_at = now_utc
                 link.updated_at = now_utc
                 link.external_etag = item.get("etag") or link.external_etag
@@ -232,7 +240,7 @@ class GoogleCalendarSyncService:
                     external_calendar_id="primary",
                     external_etag=item.get("etag"),
                     last_external_updated_at=google_updated,
-                    last_internal_updated_at=ev.updated_at,
+                    last_internal_updated_at=_as_naive_utc(ev.updated_at),
                     last_synced_at=now_utc,
                     is_deleted=False,
                 )
@@ -270,7 +278,7 @@ class GoogleCalendarSyncService:
                 external_calendar_id="primary",
                 external_etag=created.get("etag"),
                 last_external_updated_at=datetime.fromisoformat(updated_ext_raw).replace(tzinfo=None) if updated_ext_raw else None,
-                last_internal_updated_at=ev.updated_at,
+                last_internal_updated_at=_as_naive_utc(ev.updated_at),
                 last_synced_at=now_utc,
                 is_deleted=False,
             )
