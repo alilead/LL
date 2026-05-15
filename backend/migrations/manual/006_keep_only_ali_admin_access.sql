@@ -13,12 +13,10 @@ SET
   updated_at = NOW()
 WHERE LOWER(email) = 'ali@the-leadlab.com';
 
--- 2) Disable all other users so only Ali can access the platform.
-UPDATE users
-SET
-  is_active = FALSE,
-  updated_at = NOW()
-WHERE LOWER(email) <> 'ali@the-leadlab.com';
+-- 2) Prefer app purge (hard delete): POST /users/actions/delete-all-except-ali
+--    or: py scripts/purge_users_except_ali.py
+-- Soft-disable fallback only:
+-- UPDATE users SET is_active = FALSE, updated_at = NOW() WHERE LOWER(email) <> 'ali@the-leadlab.com';
 
 -- 3) Remove non-Ali email integrations/accounts from app tables.
 -- Different environments may use `email`, `address`, or `email_address`.
@@ -51,7 +49,7 @@ BEGIN
   END IF;
 END $$;
 
--- Optional hard-delete (uncomment only if you really want physical deletion and FK constraints allow it):
--- DELETE FROM users WHERE LOWER(email) <> 'ali@the-leadlab.com';
+-- Hard-delete is handled by user_purge_service (deletes dependent rows first).
+-- Do NOT run a bare DELETE FROM users without clearing FKs first.
 
 COMMIT;

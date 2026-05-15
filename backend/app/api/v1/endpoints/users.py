@@ -435,44 +435,30 @@ def delete_user(
 
 
 @router.post("/actions/deactivate-all-except-ali", response_model=dict)
-def deactivate_all_except_ali(
+@router.post("/actions/delete-all-except-ali", response_model=dict)
+def delete_all_except_ali(
     *,
     db: Session = Depends(deps.get_db),
     current_user: UserModel = Depends(deps.get_current_user),
 ) -> Any:
     """
-    Purge every user except ali@the-leadlab.com.
-    Keeps DB row integrity while freeing original emails for reuse.
+    Permanently delete every user except ali@the-leadlab.com (and their dependent rows).
     """
     if not current_user.is_admin:
         raise HTTPException(
             status_code=403,
-            detail="Not enough permissions to delete users"
+            detail="Not enough permissions to delete users",
         )
 
-    protected_email = "ali@the-leadlab.com"
-    rows = (
-        db.query(UserModel)
-        .filter(func.lower(UserModel.email) != protected_email)
-        .all()
-    )
+    from app.services.user_purge_service import hard_delete_all_except_ali
 
-    affected = 0
-    for row in rows:
-        row.email = f"deleted+user-{row.id}-{int(time.time())}@deleted.local"
-        if hasattr(row, "username"):
-            row.username = None
-        row.first_name = "Deleted"
-        row.last_name = f"User {row.id}"
-        row.is_active = False
-        row.is_superuser = False
-        row.role = "user"
-        row.updated_at = datetime.utcnow()
-        affected += 1
-
-    db.commit()
-    return {
-        "success": True,
-        "message": f"Deleted {affected} users (emails released). Kept {protected_email} active.",
-        "affected": affected,
-    }
+    try:
+        return hard_delete_all_except_ali(db)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete users: {exc}",
+        ) from exc

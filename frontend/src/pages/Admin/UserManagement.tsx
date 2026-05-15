@@ -171,7 +171,7 @@ export function UserManagement() {
   const handleDeactivateAllExceptAli = () => {
     if (
       window.confirm(
-        'This will deactivate all users except ali@the-leadlab.com. Continue?'
+        'This will permanently delete all users except ali@the-leadlab.com and their linked data. This cannot be undone. Continue?'
       )
     ) {
       deactivateAllExceptAliMutation.mutate();
