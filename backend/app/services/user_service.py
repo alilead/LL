@@ -24,19 +24,18 @@ class UserService:
             db.flush()
 
         # Create user with organization
+        is_admin = bool(getattr(user_data, "is_admin", False))
         db_user = User(
             organization_id=organization.id,
             email=user_data.email,
             password_hash=get_password_hash(user_data.password),
             first_name=user_data.first_name,
             last_name=user_data.last_name,
-            company=user_data.company,  # Keep for backwards compatibility
-            job_title=user_data.job_title,
             is_active=True,
             is_superuser=False,
-            is_admin=user_data.is_admin,
+            role="admin" if is_admin else "user",
             created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            updated_at=datetime.utcnow(),
         )
         
         db.add(db_user)

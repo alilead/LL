@@ -76,7 +76,7 @@ class NotificationService:
         priority: str = "medium"
     ) -> List[Notification]:
         """Create notifications for all admin users"""
-        admin_users = db.query(User).filter(User.is_admin == True).all()
+        admin_users = db.query(User).filter(User.role == "admin", User.is_active == True).all()
         notifications = []
         
         for admin in admin_users:

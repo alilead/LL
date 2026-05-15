@@ -36,19 +36,18 @@ class AuthService:
 
         # Create user with hashed password
         hashed_password = pwd_context.hash(user_data.password)
+        is_admin = bool(getattr(user_data, "is_admin", False))
         db_user = User(
             email=user_data.email,
             password_hash=hashed_password,
             first_name=user_data.first_name,
             last_name=user_data.last_name,
-            company=user_data.company,
             organization_id=organization.id,
-            job_title=user_data.job_title,
             is_active=True,
             is_superuser=False,
-            is_admin=user_data.is_admin,
+            role="admin" if is_admin else "user",
             created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            updated_at=datetime.utcnow(),
         )
         
         self.db.add(db_user)

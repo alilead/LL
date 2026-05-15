@@ -25,17 +25,18 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         from datetime import datetime
         now = datetime.utcnow()
         
+        is_admin = bool(getattr(obj_in, "is_admin", False))
         db_obj = User(
             email=obj_in.email,
-            hashed_password=get_password_hash(obj_in.password),
+            password_hash=get_password_hash(obj_in.password),
             first_name=obj_in.first_name,
             last_name=obj_in.last_name,
             organization_id=obj_in.organization_id,
             is_active=True,
-            is_superuser=False,
-            is_admin=False,
+            is_superuser=is_admin,
+            role="admin" if is_admin else "user",
             created_at=now,
-            updated_at=now
+            updated_at=now,
         )
         db.add(db_obj)
         db.commit()
