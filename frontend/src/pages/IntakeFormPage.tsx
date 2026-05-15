@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { MarketingNav } from '../components/marketing/MarketingNav'
 import { submitMarketingForm } from '../services/marketingFormsApi'
+import { DataRequestForm } from '../components/intake/DataRequestForm'
 import { inputClass, labelClass } from '../components/intake/intakeFieldClasses'
 
 const SLUGS = ['business-diagnostic', 'data-request', 'pitch-your-idea'] as const
@@ -30,19 +31,6 @@ export function IntakeFormPage() {
   const [bdBiggestPain, setBdBiggestPain] = useState('')
   const [bdTools, setBdTools] = useState('')
   const [bdGoals, setBdGoals] = useState('')
-
-  const [drLoading, setDrLoading] = useState(false)
-  const [drFullName, setDrFullName] = useState('')
-  const [drEmail, setDrEmail] = useState('')
-  const [drCompany, setDrCompany] = useState('')
-  const [drPhone, setDrPhone] = useState('')
-  const [drDataType, setDrDataType] = useState('')
-  const [drGeography, setDrGeography] = useState('')
-  const [drVolume, setDrVolume] = useState('')
-  const [drCriteria, setDrCriteria] = useState('')
-  const [drUseCase, setDrUseCase] = useState('')
-  const [drTimeline, setDrTimeline] = useState('')
-  const [drCompliance, setDrCompliance] = useState('')
 
   const [piLoading, setPiLoading] = useState(false)
   const [piFullName, setPiFullName] = useState('')
@@ -115,42 +103,6 @@ export function IntakeFormPage() {
       toast.error(err instanceof Error ? err.message : 'Failed to submit. Please try again.')
     } finally {
       setBdLoading(false)
-    }
-  }
-
-  const onSubmitDataRequest = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!ndaAccepted || !ndaSignature.trim()) {
-      toast.error('Please accept the NDA and type your signature.')
-      return
-    }
-    setDrLoading(true)
-    try {
-      await submitMarketingForm({
-        form_type: 'data_request',
-        full_name: drFullName,
-        email: drEmail,
-        company: drCompany || undefined,
-        phone: drPhone || undefined,
-        subject: `Data request — ${drDataType || drCompany || drEmail}`,
-        payload: {
-          data_type: drDataType,
-          geography: drGeography,
-          expected_volume: drVolume,
-          targeting_criteria: drCriteria,
-          use_case: drUseCase,
-          timeline: drTimeline,
-          compliance_notes: drCompliance,
-          nda_accepted: ndaAccepted,
-          nda_signature: ndaSignature,
-          nda_signed_at: new Date().toISOString(),
-        },
-      })
-      setStep('success')
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to submit. Please try again.')
-    } finally {
-      setDrLoading(false)
     }
   }
 
@@ -229,7 +181,7 @@ export function IntakeFormPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <MarketingNav />
       <main className="pt-28 pb-20 px-4">
-        <div className="max-w-3xl mx-auto">
+        <div className={`mx-auto ${slug === 'data-request' ? 'max-w-4xl' : 'max-w-3xl'}`}>
           <Link
             to="/intake"
             className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600 mb-8"
@@ -245,8 +197,9 @@ export function IntakeFormPage() {
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Thank you for submitting</h1>
               <p className="text-gray-600 leading-relaxed max-w-lg mx-auto mb-2">
-                We received your details. Our team will review your request and follow up by email. Depending on scope,
-                we may send a formal NDA and scheduling options.
+                {slug === 'data-request'
+                  ? 'We received your data request. Our admin team has been notified by email and will review your answers shortly.'
+                  : 'We received your details. Our team will review your request and follow up by email. Depending on scope, we may send a formal NDA and scheduling options.'}
               </p>
               <p className="text-sm text-gray-500 mb-8">Please allow a short time for us to respond.</p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -268,9 +221,11 @@ export function IntakeFormPage() {
             <>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">{titleForSlug[slug]}</h1>
               <p className="text-gray-600 mb-8">
-                {step === 'form'
-                  ? 'Fill in the details below. On the next step you will review and sign the NDA acknowledgment before we receive your submission.'
-                  : 'Review and complete the NDA step, then submit.'}
+                {slug === 'data-request'
+                  ? 'Complete each step of the data request questionnaire. Your answers are emailed to our admin team and saved in our system.'
+                  : step === 'form'
+                    ? 'Fill in the details below. On the next step you will review and sign the NDA acknowledgment before we receive your submission.'
+                    : 'Review and complete the NDA step, then submit.'}
               </p>
 
               {step === 'form' && slug === 'business-diagnostic' && (
@@ -373,110 +328,8 @@ export function IntakeFormPage() {
                 </form>
               )}
 
-              {step === 'form' && slug === 'data-request' && (
-                <form
-                  onSubmit={continueFromForm}
-                  className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sm:p-8 space-y-6"
-                >
-                  <h2 className="text-xl font-bold text-gray-900">Your data request</h2>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className={labelClass}>Full name *</label>
-                      <input
-                        className={inputClass}
-                        required
-                        value={drFullName}
-                        onChange={(e) => setDrFullName(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Work email *</label>
-                      <input
-                        className={inputClass}
-                        type="email"
-                        required
-                        value={drEmail}
-                        onChange={(e) => setDrEmail(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className={labelClass}>Company</label>
-                      <input className={inputClass} value={drCompany} onChange={(e) => setDrCompany(e.target.value)} />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Phone</label>
-                      <input className={inputClass} type="tel" value={drPhone} onChange={(e) => setDrPhone(e.target.value)} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className={labelClass}>Type of data / list *</label>
-                    <input
-                      className={inputClass}
-                      required
-                      value={drDataType}
-                      onChange={(e) => setDrDataType(e.target.value)}
-                      placeholder="e.g. decision-makers in fintech, EU, with verified emails"
-                    />
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className={labelClass}>Geography</label>
-                      <input className={inputClass} value={drGeography} onChange={(e) => setDrGeography(e.target.value)} />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Expected volume</label>
-                      <input
-                        className={inputClass}
-                        value={drVolume}
-                        onChange={(e) => setDrVolume(e.target.value)}
-                        placeholder="e.g. 500 contacts, 10k companies"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className={labelClass}>Targeting criteria</label>
-                    <textarea className={inputClass} rows={4} value={drCriteria} onChange={(e) => setDrCriteria(e.target.value)} />
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className={labelClass}>Use case</label>
-                      <textarea
-                        className={inputClass}
-                        rows={2}
-                        value={drUseCase}
-                        onChange={(e) => setDrUseCase(e.target.value)}
-                        placeholder="Outbound, ABM, research…"
-                      />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Timeline</label>
-                      <input
-                        className={inputClass}
-                        value={drTimeline}
-                        onChange={(e) => setDrTimeline(e.target.value)}
-                        placeholder="e.g. needed by end of quarter"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className={labelClass}>Compliance / privacy requirements</label>
-                    <textarea
-                      className={inputClass}
-                      rows={2}
-                      value={drCompliance}
-                      onChange={(e) => setDrCompliance(e.target.value)}
-                      placeholder="GDPR, industry-specific rules, DPA needs…"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="w-full py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all"
-                  >
-                    Continue to NDA
-                  </button>
-                </form>
+              {slug === 'data-request' && step === 'form' && (
+                <DataRequestForm onSuccess={() => setStep('success')} />
               )}
 
               {step === 'form' && slug === 'pitch-your-idea' && (
@@ -620,39 +473,6 @@ export function IntakeFormPage() {
                       className="flex-1 py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60"
                     >
                       {bdLoading ? 'Sending…' : 'Submit request'}
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {step === 'nda' && slug === 'data-request' && (
-                <form
-                  onSubmit={onSubmitDataRequest}
-                  className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sm:p-8 space-y-6"
-                >
-                  <h2 className="text-xl font-bold text-gray-900">Review & submit</h2>
-                  <p className="text-sm text-gray-600">
-                    You are about to submit as <strong>{drFullName}</strong> ({drEmail}).
-                  </p>
-                  {ndaBlock}
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNdaAccepted(false)
-                        setNdaSignature('')
-                        setStep('form')
-                      }}
-                      className="flex-1 py-3 rounded-xl font-medium border border-gray-300 text-gray-800 hover:bg-gray-50"
-                    >
-                      Back to form
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={drLoading}
-                      className="flex-1 py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60"
-                    >
-                      {drLoading ? 'Sending…' : 'Submit request'}
                     </button>
                   </div>
                 </form>

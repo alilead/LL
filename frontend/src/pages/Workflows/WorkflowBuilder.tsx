@@ -19,6 +19,7 @@ import {
   Unlink,
 } from 'lucide-react';
 import { bezierPath, deriveTriggerType, migrateLegacyFlow } from './mindMapUtils';
+import { MindMapFormattedText, toggleMindMapWrap } from './mindMapTextFormat';
 
 type MindNodeKind = 'central' | 'standard' | 'free_text';
 type TemplateCategory = 'starting' | 'flow' | 'logic';
@@ -798,7 +799,7 @@ const WorkflowBuilder: React.FC = () => {
                       />
                     ) : (
                       <div className={`${isText ? 'text-base font-medium text-neutral-700 whitespace-pre-wrap' : 'text-sm font-medium text-neutral-900'} min-h-[40px]`}>
-                        {node.label}
+                        <MindMapFormattedText text={node.label} className="font-medium" />
                       </div>
                     )}
                   </div>
@@ -909,7 +910,9 @@ const WorkflowBuilder: React.FC = () => {
           {selectedNode && (
             <div className="mt-4 rounded-lg border border-neutral-200 p-3">
               <p className="text-xs uppercase text-neutral-500 mb-1">Selected</p>
-              <p className="text-sm font-medium">{selectedNode.label}</p>
+              <p className="text-sm font-medium">
+                <MindMapFormattedText text={selectedNode.label} />
+              </p>
               <p className="text-xs text-neutral-500">{selectedNode.type}</p>
             </div>
           )}
@@ -919,15 +922,15 @@ const WorkflowBuilder: React.FC = () => {
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  className="w-full"
-                  onClick={() => updateNodeLabel(selectedNode.id, `**${selectedNode.label}**`)}
+                  className="w-full font-bold"
+                  onClick={() => updateNodeLabel(selectedNode.id, toggleMindMapWrap(selectedNode.label, '**'))}
                 >
                   Bold
                 </Button>
                 <Button
                   variant="outline"
-                  className="w-full"
-                  onClick={() => updateNodeLabel(selectedNode.id, `*${selectedNode.label}*`)}
+                  className="w-full italic"
+                  onClick={() => updateNodeLabel(selectedNode.id, toggleMindMapWrap(selectedNode.label, '*'))}
                 >
                   Italic
                 </Button>

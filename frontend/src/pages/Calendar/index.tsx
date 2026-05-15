@@ -158,6 +158,17 @@ const TIMEZONE_OPTIONS = [
 const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const weekDayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+/** Max events shown per day cell in month view before "+N more". */
+const MONTH_DAY_EVENT_PREVIEW = 4;
+/** Default agenda list page size (load more increases this). */
+const AGENDA_PAGE_SIZE = 50;
+const AGENDA_RANGE_OPTIONS = [
+  { value: '7', label: 'Next 7 days' },
+  { value: '14', label: 'Next 14 days' },
+  { value: '30', label: 'Next 30 days' },
+  { value: '90', label: 'Next 90 days' },
+] as const;
+
 const getSystemTimezone = () => {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -184,6 +195,9 @@ export const CalendarPage = () => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'agenda'>('month');
+  const [agendaRangeDays, setAgendaRangeDays] = useState<7 | 14 | 30 | 90>(30);
+  const [agendaVisibleCount, setAgendaVisibleCount] = useState(AGENDA_PAGE_SIZE);
+  const [expandedMonthDay, setExpandedMonthDay] = useState<Date | null>(null);
   const [selectedTimezone, setSelectedTimezone] = useState(detectedTimezone);
   const [isDetailModalOpen, setDetailModalOpen] = useState(false);
   const [isNewEventDialogOpen, setNewEventDialogOpen] = useState(false);
@@ -212,7 +226,7 @@ export const CalendarPage = () => {
       case 'agenda':
         return {
           start: startOfDay(currentDate),
-          end: endOfDay(addDays(currentDate, 30)) // Next 30 days
+          end: endOfDay(addDays(currentDate, agendaRangeDays - 1)),
         };
       default: // month
         const monthStart = startOfMonth(currentDate);
@@ -228,7 +242,7 @@ export const CalendarPage = () => {
 
   // Fetch events
   const { data: events = [], isLoading } = useQuery({
-    queryKey: ['events', startDate.toISOString(), endDate.toISOString(), selectedTimezone],
+    queryKey: ['events', startDate.toISOString(), endDate.toISOString(), selectedTimezone, viewMode, agendaRangeDays],
     queryFn: async () => {
       const response = await eventsAPI.list({
         start_date: startDate.toISOString(),
@@ -417,6 +431,19 @@ export const CalendarPage = () => {
     }
   };
 
+  useEffect(() => {
+    setAgendaVisibleCount(AGENDA_PAGE_SIZE);
+  }, [currentDate, agendaRangeDays, viewMode]);
+
+  const goToToday = () => setCurrentDate(new Date());
+
+  const jumpToDate = (isoDate: string) => {
+    if (!isoDate) return;
+    const parsed = new Date(`${isoDate}T12:00:00`);
+    if (Number.isNaN(parsed.getTime())) return;
+    setCurrentDate(parsed);
+  };
+
   const getViewTitle = () => {
     switch (viewMode) {
       case 'week':
@@ -424,7 +451,7 @@ export const CalendarPage = () => {
         const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
         return `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}`;
       case 'agenda':
-        return `Agenda - ${format(currentDate, 'MMMM yyyy')}`;
+        return `Agenda — ${format(currentDate, 'MMM d')} – ${format(addDays(currentDate, agendaRangeDays - 1), 'MMM d, yyyy')}`;
       default:
         return format(currentDate, 'MMMM yyyy');
     }
@@ -454,6 +481,16 @@ export const CalendarPage = () => {
             >
               <ChevronRight className="h-5 w-5" />
             </Button>
+            <Button variant="outline" size="sm" onClick={goToToday} className="rounded-lg">
+              Today
+            </Button>
+            <Input
+              type="date"
+              value={format(currentDate, 'yyyy-MM-dd')}
+              onChange={(e) => jumpToDate(e.target.value)}
+              className="w-[150px] h-9 border-gray-200"
+              aria-label="Jump to date"
+            />
           </div>
 
           <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
@@ -497,6 +534,24 @@ export const CalendarPage = () => {
               <span>Agenda</span>
             </Button>
           </div>
+
+          {viewMode === 'agenda' && (
+            <Select
+              value={String(agendaRangeDays)}
+              onValueChange={(value) => setAgendaRangeDays(Number(value) as 7 | 14 | 30 | 90)}
+            >
+              <SelectTrigger className="w-40 bg-white border-gray-200 h-9">
+                <SelectValue placeholder="Range" />
+              </SelectTrigger>
+              <SelectContent>
+                {AGENDA_RANGE_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         <div className="flex items-center space-x-4">
@@ -648,7 +703,7 @@ export const CalendarPage = () => {
               </div>
               
               <div className="space-y-1.5">
-                {dayEvents.slice(0, 3).map((event: CalendarEvent) => {
+                {dayEvents.slice(0, MONTH_DAY_EVENT_PREVIEW).map((event: CalendarEvent) => {
                   const typeDetails = getEventTypeDetails(event.event_type);
                   return (
                     <div
@@ -676,10 +731,17 @@ export const CalendarPage = () => {
                     </div>
                   );
                 })}
-                {dayEvents.length > 3 && (
-                  <div className="text-xs text-gray-500 pl-2 font-medium">
-                    +{dayEvents.length - 3} more
-                  </div>
+                {dayEvents.length > MONTH_DAY_EVENT_PREVIEW && (
+                  <button
+                    type="button"
+                    className="text-xs text-indigo-600 pl-2 font-medium hover:underline text-left w-full"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setExpandedMonthDay(day);
+                    }}
+                  >
+                    +{dayEvents.length - MONTH_DAY_EVENT_PREVIEW} more
+                  </button>
                 )}
               </div>
             </div>
@@ -772,10 +834,12 @@ export const CalendarPage = () => {
   );
 
   const renderAgendaView = () => {
-    const agendaEvents = events
-      .filter(event => event.start >= startOfDay(currentDate))
-      .sort((a, b) => a.start.getTime() - b.start.getTime())
-      .slice(0, 50); // Limit to 50 events
+    const agendaEnd = endOfDay(addDays(currentDate, agendaRangeDays - 1));
+    const sortedAgendaEvents = events
+      .filter((event) => event.start >= startOfDay(currentDate) && event.start <= agendaEnd)
+      .sort((a, b) => a.start.getTime() - b.start.getTime());
+    const agendaEvents = sortedAgendaEvents.slice(0, agendaVisibleCount);
+    const hasMoreAgendaEvents = sortedAgendaEvents.length > agendaVisibleCount;
 
     return (
       <div className="flex-1 p-8">
@@ -863,6 +927,16 @@ export const CalendarPage = () => {
               })}
             </div>
           )}
+          {hasMoreAgendaEvents && (
+            <div className="p-4 border-t border-gray-100 text-center">
+              <Button
+                variant="outline"
+                onClick={() => setAgendaVisibleCount((count) => count + AGENDA_PAGE_SIZE)}
+              >
+                Load more ({sortedAgendaEvents.length - agendaVisibleCount} remaining)
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -900,6 +974,41 @@ export const CalendarPage = () => {
             {renderCurrentView()}
           </div>
         </Card>
+
+        <Dialog open={!!expandedMonthDay} onOpenChange={(open) => !open && setExpandedMonthDay(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogTitle>
+              {expandedMonthDay ? format(expandedMonthDay, 'EEEE, MMMM d, yyyy') : 'Day events'}
+            </DialogTitle>
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto mt-2">
+              {expandedMonthDay &&
+                getEventsForDay(expandedMonthDay).map((event) => {
+                  const typeDetails = getEventTypeDetails(event.event_type);
+                  return (
+                    <button
+                      key={event.id}
+                      type="button"
+                      className={`w-full text-left text-sm p-3 rounded-lg border ${typeDetails.bgColor} ${typeDetails.textColor} ${typeDetails.borderColor}`}
+                      onClick={() => {
+                        setExpandedMonthDay(null);
+                        handleEventClick(event);
+                      }}
+                    >
+                      <div className="font-medium">{event.title}</div>
+                      {!event.is_all_day && (
+                        <div className="text-xs opacity-75 mt-1">
+                          {format(event.start, 'HH:mm')} – {format(event.end, 'HH:mm')}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              {expandedMonthDay && getEventsForDay(expandedMonthDay).length === 0 && (
+                <p className="text-sm text-gray-500">No events on this day.</p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Event Detail Modal */}
         {selectedEvent && (

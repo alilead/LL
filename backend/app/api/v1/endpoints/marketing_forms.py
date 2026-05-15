@@ -14,6 +14,7 @@ from app.core.email import EmailSender
 from app.models.marketing_form_submission import MarketingFormSubmission
 from app.models.user import User
 from app.schemas.marketing_forms import MarketingFormSubmissionCreate
+from app.services.marketing_form_email import build_data_request_email, build_generic_email
 
 router = APIRouter()
 
@@ -39,7 +40,11 @@ async def submit_marketing_form(
     db.commit()
     db.refresh(row)
 
-    # Notify all active admins/superusers with the full submission payload.
+    # Primary admin inbox + any active platform admins (super prompt: ali + admins).
+    primary_admin = "ali@the-leadlab.com"
+    recipient_set = {primary_admin}
+    if body.to_email:
+        recipient_set.add(str(body.to_email).strip().lower())
     admin_rows = (
         db.query(User)
         .filter(
@@ -48,40 +53,16 @@ async def submit_marketing_form(
         )
         .all()
     )
-    recipient_set = {
-        str(u.email).strip().lower()
-        for u in admin_rows
-        if getattr(u, "email", None)
-    }
-    # Backward-compatible explicit recipient (e.g. ali override) remains included.
-    if body.to_email:
-        recipient_set.add(str(body.to_email).strip().lower())
-    if not recipient_set:
-        recipient_set.add("ali@the-leadlab.com")
+    for u in admin_rows:
+        if getattr(u, "email", None):
+            recipient_set.add(str(u.email).strip().lower())
 
-    payload_pretty = json.dumps(body.payload or {}, ensure_ascii=False, indent=2, default=str)
     subject = body.subject or f"New {body.form_type.replace('_', ' ')} submission"
-    html_content = f"""
-    <h2>New marketing form submission</h2>
-    <p><strong>Form type:</strong> {body.form_type}</p>
-    <p><strong>Name:</strong> {body.full_name}</p>
-    <p><strong>Email:</strong> {body.email}</p>
-    <p><strong>Company:</strong> {body.company or '-'}</p>
-    <p><strong>Phone:</strong> {body.phone or '-'}</p>
-    <p><strong>Subject:</strong> {body.subject or '-'}</p>
-    <h3>Payload</h3>
-    <pre>{payload_pretty}</pre>
-    """
-    text_content = (
-        f"New marketing form submission\n"
-        f"Form type: {body.form_type}\n"
-        f"Name: {body.full_name}\n"
-        f"Email: {body.email}\n"
-        f"Company: {body.company or '-'}\n"
-        f"Phone: {body.phone or '-'}\n"
-        f"Subject: {body.subject or '-'}\n\n"
-        f"Payload:\n{payload_pretty}"
-    )
+    payload = body.payload or {}
+    if body.form_type == "data_request":
+        html_content, text_content = build_data_request_email(body, payload)
+    else:
+        html_content, text_content = build_generic_email(body, payload)
     try:
         sender = EmailSender()
         for recipient in sorted(recipient_set):
