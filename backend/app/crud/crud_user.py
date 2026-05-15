@@ -1,10 +1,12 @@
 from typing import Any, Dict, Optional, Union, List
 from datetime import datetime
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.core.security import get_password_hash, verify_password
 from app.crud.base import CRUDBase
 from app.models.user import User
 from app.schemas.user import UserCreate, UserUpdate
+from app.services.user_purge_service import is_tombstone_user
 from app.models.email_log import EmailLog  # Import EmailLog model
 from app.models.communication import Communication  # Import Communication model
 import logging
@@ -44,6 +46,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         is_active: Optional[bool] = None,
         is_admin: Optional[bool] = None,
         organization_id: Optional[int] = None,
+        exclude_tombstones: bool = True,
     ) -> List[User]:
         query = db.query(self.model)
         if is_active is not None:
@@ -52,6 +55,11 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             query = query.filter(User.is_admin == is_admin)
         if organization_id is not None:
             query = query.filter(User.organization_id == organization_id)
+        if exclude_tombstones:
+            query = query.filter(
+                ~func.lower(User.email).like("%@deleted.local"),
+                ~func.lower(User.email).like("deleted+user-%"),
+            )
         return query.offset(skip).limit(limit).all()
 
     def get_organization_users(
@@ -66,7 +74,9 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             db.query(User)
             .filter(
                 User.organization_id == organization_id,
-                User.is_active == True
+                User.is_active == True,
+                ~func.lower(User.email).like("%@deleted.local"),
+                ~func.lower(User.email).like("deleted+user-%"),
             )
             .order_by(User.first_name)
             .all()

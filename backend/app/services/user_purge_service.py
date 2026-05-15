@@ -17,6 +17,16 @@ from app.models.workflow import Workflow, WorkflowExecution
 logger = logging.getLogger(__name__)
 
 PROTECTED_EMAIL = "ali@the-leadlab.com"
+TOMBSTONE_EMAIL_SUFFIX = "@deleted.local"
+TOMBSTONE_EMAIL_PREFIX = "deleted+user-"
+
+
+def is_tombstone_user(user: User) -> bool:
+    """True for soft-deleted users kept only for FK integrity."""
+    email = (user.email or "").strip().lower()
+    if not email or email == PROTECTED_EMAIL.lower():
+        return False
+    return email.endswith(TOMBSTONE_EMAIL_SUFFIX) or email.startswith(TOMBSTONE_EMAIL_PREFIX)
 
 
 def _delete_in(db: Session, sql: str, ids: List[int]) -> None:

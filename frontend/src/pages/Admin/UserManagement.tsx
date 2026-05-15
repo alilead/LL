@@ -59,13 +59,25 @@ export function UserManagement() {
     },
   });
 
+  const isTombstoneUser = (user: { email?: string; first_name?: string }) => {
+    const email = (user.email || '').toLowerCase();
+    return email.endsWith('@deleted.local') || email.startsWith('deleted+user-');
+  };
+
+  const activeUsers = React.useMemo(
+    () => users.filter((user) => !isTombstoneUser(user)),
+    [users],
+  );
+
   const filteredUsers = React.useMemo(() => {
-    if (!searchTerm) return users;
-    return users.filter(user => 
-      user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    const base = activeUsers;
+    if (!searchTerm) return base;
+    return base.filter(
+      (user) =>
+        user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase()),
     );
-  }, [users, searchTerm]);
+  }, [activeUsers, searchTerm]);
 
   const createUserMutation = useMutation({
     mutationFn: (data: UserFormData) => usersAPI.create(data),
@@ -110,7 +122,7 @@ export function UserManagement() {
     mutationFn: () => usersAPI.deactivateAllExceptAli(),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast.success(res.data?.message || 'All non-Ali users were deactivated');
+      toast.success(res.data?.message || 'Non-Ali users were permanently deleted');
     },
     onError: () => {
       toast.error('Failed to deactivate non-Ali users');
